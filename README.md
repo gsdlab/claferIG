@@ -13,8 +13,12 @@ Dependencies
 * Alloy 4.2 (backend reasoner)
 * MiniSAT (SAT solver used by Alloy that can produce Unsat Core)
 
-Command-line Usage
-------------------
+Usage
+-----
+
+Clafer Instance Generator can be used in interactive and batch modes, as well as, an API.
+
+### Command-line Usage
 
 claferIG <model file name>.cfr 
 - opens an interactive session and displays the minimal instance or a counterexample
@@ -23,8 +27,7 @@ claferIG <model file name>.cfr -all <scope>
 - opens a non-interactive session and saves all instances up to the provided scope or a counterexample to a file <model file name>.cfr.data
 
 
-Interactive Session Usage
--------------------------
+### Interactive Session Usage
 
 * 'n' - produces the next instance if available or outputs a message that no more instances exist
 * 's' - saves all instances displayed so far or a counterexample to a file <model file name>.cfr.data
@@ -36,6 +39,7 @@ Output format
 ### Instance data
 
 The instance data notation is very similar to a regular Clafer notation for concrete clafer with a few differences:
+
 * no constraints
 * no types and super types
 * no clafer and group cardinalities (each clafer has the default group (0..*) and clafer (1..1) cardinality)
@@ -51,7 +55,8 @@ How it works
 ------------
 
 The Clafer instance generator:
-* translates the input Clafer model (.cfr) to an Alloy model (.als) and Clafer IR model (.xml),
+
+* translates the input Clafer model (.cfr) to an Alloy model (.als) and Clafer IR model (.xml). The IR model contains the mapping between Clafer names and Alloy names,
 * computes the smallest scopes for each Alloy signature to ensure that a valid instance can be found if it exists,
 * invokes Alloy Analyzer to produce an instance or find a counterexample,
 * translates the instance or the counterexample data produced by Alloy Analyzer to Clafer instance data format using the name traceability map in a reverse direction,
