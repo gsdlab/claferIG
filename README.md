@@ -20,11 +20,15 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 
 ### Command-line Usage
 
-    claferIG <model file name>.cfr
+```
+claferIG <model file name>.cfr
+```
 
 - opens an interactive session and displays the minimal instance or a counterexample
 
-    claferIG <model file name>.cfr -all <scope>
+```
+claferIG <model file name>.cfr -all <scope>
+```
 
 - opens a non-interactive session and saves all instances up to the provided scope or a counterexample to a file <model file name>.cfr.data
 
