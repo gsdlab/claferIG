@@ -20,10 +20,12 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 
 ### Command-line Usage
 
-claferIG <model file name>.cfr 
+    claferIG <model file name>.cfr
+
 - opens an interactive session and displays the minimal instance or a counterexample
 
-claferIG <model file name>.cfr -all <scope>
+    claferIG <model file name>.cfr -all <scope>
+
 - opens a non-interactive session and saves all instances up to the provided scope or a counterexample to a file <model file name>.cfr.data
 
 
@@ -57,7 +59,7 @@ How it works
 The Clafer instance generator:
 
 * translates the input Clafer model (.cfr) to an Alloy model (.als) and Clafer IR model (.xml). The IR model contains the mapping between Clafer names and Alloy names,
-* computes the smallest scopes for each Alloy signature to ensure that a valid instance can be found if it exists,
-* invokes Alloy Analyzer to produce an instance or find a counterexample,
+* computes the smallest scopes for each Alloy signature to ensure that a valid instance can be found if it exists
+* invokes Alloy Analyzer to produce an instance or find a counterexample
 * translates the instance or the counterexample data produced by Alloy Analyzer to Clafer instance data format using the name traceability map in a reverse direction,
-* for a counterexample, translates constraint violations in Alloy into constraint violations in Clafer model.
+* for a counterexample, translates constraint violations in Alloy into constraint violations in Clafer model
