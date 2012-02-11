@@ -22,11 +22,11 @@
 
 module Main where
 
-import Control.Concurrent
 import Control.Monad
 import Data.Maybe
 import System.Cmd
 import System.Console.CmdArgs
+import System.Environment.Executable
 import System.Exit
 import System.IO
 import System.Process
@@ -51,6 +51,14 @@ claferIG = IGArgs {
 -- Read a string of a certain length from a handle.
 hGetString :: Handle -> Int -> IO String
 hGetString handle size = foldr (liftM2 (:)) (return []) (replicate size $ hGetChar handle)
+
+
+-- Print a string, newline and flush
+hPutCommand :: Handle -> String -> IO ()
+hPutCommand handle command =
+    do
+        hPutStrLn handle command
+        hFlush handle
 
 
 -- Read the length, then the string
@@ -95,7 +103,7 @@ beginInterface file process =
         topLevelInterface file process counter (Save answers) =
             do
                 save answers file counter
-                nextInterace process >>= (topLevelInterface file process (counter + (length answers)))
+                nextInterace process >>= topLevelInterface file process (counter + (length answers))
         topLevelInterface _ _ _ _ = return ()
         
         save :: [String] -> FilePath -> Int -> IO ()
@@ -108,23 +116,24 @@ beginInterface file process =
             where saveName = file ++ (show counter) ++ ".data"
                 
         
-
-
 interface :: Command -> Process -> IO Command
-interface Next process@(Process stdIn stdOut _) =
+interface Next proc@(Process stdIn stdOut _) =
     do
-        hPutStrLn stdIn "n"
-        hFlush stdIn
+        hPutCommand stdIn "n"
         status <- read `liftM` hGetLine stdOut
         case status of
             True -> do
                 xml <- hGetMessage stdOut
                 putStrLn xml
-                answers <- nextInterace process
+                answers <- nextInterace proc
                 return $ collect answers xml
             False -> do
                 putStrLn "No more instances found"
-                nextInterace process
+                nextInterace proc
+interface Quit proc =
+    do
+        hPutCommand (stdIn proc) "q"
+        return Quit
 interface x _ = return x
 
         
@@ -143,16 +152,17 @@ nextInterace process =
 
 main =
     do
+        (execDir, _) <- splitExecutablePath
         args <- cmdArgs claferIG
 
         
-        claferProc <- pipeCommand "./clafer" ["-o", "-s", claferFile args]
+        claferProc <- pipeCommand (execDir ++ "clafer") ["-o", "-s", claferFile args]
         claferOutput <- hGetContents $ stdOut claferProc
         claferExit <- waitForProcess (procHandle claferProc)
         when (claferExit /= ExitSuccess) (print "clafer unexpectedly terminated" >> exitWith claferExit)
         
         
-        alloyIG <- pipeCommand "java" ["-jar", "alloyIG.jar"]
+        alloyIG <- pipeCommand "java" ["-jar", execDir ++ "alloyIG.jar"]
         hPutMessage (stdIn alloyIG) claferOutput
 
 
