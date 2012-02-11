@@ -30,13 +30,13 @@ claferIG <model file name>.cfr
 claferIG <model file name>.cfr -all <scope>
 ```
 
-- opens a non-interactive session and saves all instances up to the provided scope or a counterexample to a file <model file name>.cfr.data
+- opens a non-interactive session and saves all instances up to the provided scope or a counterexample to a file `<model file name>.cfr.data`
 
 
 ### Interactive Session Usage
 
 * 'n' - produces the next instance if available or outputs a message that no more instances exist
-* 's' - saves all instances displayed so far or a counterexample to a file <model file name>.cfr.data
+* 's' - saves all instances displayed so far or a counterexample to a file `<model file name>.cfr.data`
 * 'q' - quits the interactive session
 
 Output format
@@ -44,7 +44,7 @@ Output format
 
 ### Instance data
 
-The instance data notation is very similar to a regular Clafer notation for concrete clafer with a few differences:
+The instance data notation is very similar to a regular Clafer notation for concrete clafers with a few differences:
 
 * no constraints
 * no types and super types
@@ -60,7 +60,7 @@ The counter example notation is the same as the instance data notation. Addition
 How it works
 ------------
 
-The Clafer instance generator:
+The Clafer Instance Generator:
 
 * translates the input Clafer model (.cfr) to an Alloy model (.als) and Clafer IR model (.xml). The IR model contains the mapping between Clafer names and Alloy names,
 * computes the smallest scopes for each Alloy signature to ensure that a valid instance can be found if it exists
