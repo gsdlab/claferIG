@@ -33,18 +33,23 @@ import edu.mit.csail.sdg.alloy4compiler.translator.TranslateAlloyToKodkod;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.io.PrintWriter;
-import java.io.Reader;
 import java.io.StringWriter;
 
 public final class AlloyInterface {
 
-    public static String readFull(Reader in, int size) throws IOException {
-        char[] buf = new char[size];
+    private static BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+    private static PrintStream output = System.out;
+
+    public static String readMessage() throws IOException {
+        int length = Integer.parseInt(input.readLine());
+
+        char[] buf = new char[length];
         int off = 0;
 
-        while (off < size) {
-            int l = in.read(buf, off, size - off);
+        while (off < length) {
+            int l = input.read(buf, off, length - off);
             if (l == -1) {
                 throw new IOException("Unexpected eof");
             }
@@ -53,6 +58,11 @@ public final class AlloyInterface {
         }
 
         return new String(buf);
+    }
+
+    public static void writeMessage(String message) throws IOException {
+        output.println(message.length());
+        output.print(message);
     }
     // Alloy4 sends diagnostic messages and progress reports to the A4Reporter.
     // By default, the A4Reporter ignores all these events (but you can extend the A4Reporter to display the event for the user)
@@ -65,8 +75,7 @@ public final class AlloyInterface {
         }
     };
 
-    public static boolean interact(BufferedReader input) throws IOException {
-        String op = input.readLine();
+    public static boolean interact(String op) throws IOException {
         if (op == null || op.equals("q")) {
             return false;
         } else if (op.equals("n")) {
@@ -78,10 +87,7 @@ public final class AlloyInterface {
     }
 
     public static void main(String[] args) throws IOException, Err {
-        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
-        int modelLength = Integer.parseInt(input.readLine());
-
-        String modelVerbatim = readFull(input, modelLength);
+        String modelVerbatim = readMessage();
 
         // Parse+typecheck the model
         CompModule world = AlloyCompiler.parse(rep, modelVerbatim);
@@ -97,22 +103,20 @@ public final class AlloyInterface {
             // If satisfiable...
             while (ans.satisfiable()) {
 
-                System.out.println("True");
+                writeMessage("True");
 
                 // Read the input inside here so that we don't block
                 // before computing. Hide some of the latency.
-                if (!interact(input)) {
+                if (!interact(readMessage())) {
                     return;
                 }
 
                 StringWriter xml = new StringWriter();
                 ans.writeXML(new PrintWriter(xml), null, null);
-                String output = xml.toString();
-                System.out.println(output.length());
-                System.out.print(output);
+                writeMessage(xml.toString());
 
                 A4Solution nextAns = ans.next();
-                if(nextAns == ans) {
+                if (nextAns == ans) {
                     break;
                 }
                 ans = nextAns;
@@ -120,7 +124,7 @@ public final class AlloyInterface {
         }
 
         do {
-            System.out.println("False");
-        } while (interact(input));
+            writeMessage("False");
+        } while (interact(readMessage()));
     }
 }

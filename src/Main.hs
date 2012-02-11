@@ -48,25 +48,12 @@ claferIG = IGArgs {
 } &= summary "ClaferIG v0.0.1"
 
 
--- Read a string of a certain length from a handle.
-hGetString :: Handle -> Int -> IO String
-hGetString handle size = foldr (liftM2 (:)) (return []) (replicate size $ hGetChar handle)
-
-
--- Print a string, newline and flush
-hPutCommand :: Handle -> String -> IO ()
-hPutCommand handle command =
-    do
-        hPutStrLn handle command
-        hFlush handle
-
-
 -- Read the length, then the string
 hGetMessage :: Handle -> IO String
 hGetMessage handle =
     do
         length <- read `liftM` hGetLine handle
-        hGetString handle length
+        foldr (liftM2 (:)) (return []) (replicate length $ hGetChar handle)
         
 
 -- Put the length, then the string
@@ -119,8 +106,8 @@ beginInterface file process =
 interface :: Command -> Process -> IO Command
 interface Next proc@(Process stdIn stdOut _) =
     do
-        hPutCommand stdIn "n"
-        status <- read `liftM` hGetLine stdOut
+        hPutMessage stdIn "n"
+        status <- read `liftM` hGetMessage stdOut
         case status of
             True -> do
                 xml <- hGetMessage stdOut
@@ -132,7 +119,7 @@ interface Next proc@(Process stdIn stdOut _) =
                 nextInterace proc
 interface Quit proc =
     do
-        hPutCommand (stdIn proc) "q"
+        hPutMessage (stdIn proc) "q"
         return Quit
 interface x _ = return x
 
