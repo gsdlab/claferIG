@@ -31,6 +31,7 @@ import edu.mit.csail.sdg.alloy4compiler.translator.A4Options;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Solution;
 import edu.mit.csail.sdg.alloy4compiler.translator.TranslateAlloyToKodkod;
 import java.io.BufferedReader;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
@@ -43,7 +44,11 @@ public final class AlloyInterface {
     private static PrintStream output = System.out;
 
     public static String readMessage() throws IOException {
-        int length = Integer.parseInt(input.readLine());
+        String line = input.readLine();
+        if (line == null) {
+            throw new EOFException();
+        }
+        int length = Integer.parseInt(line);
 
         char[] buf = new char[length];
         int off = 0;
@@ -51,7 +56,7 @@ public final class AlloyInterface {
         while (off < length) {
             int l = input.read(buf, off, length - off);
             if (l == -1) {
-                throw new IOException("Unexpected eof");
+                throw new EOFException();
             }
 
             off += l;
@@ -87,44 +92,48 @@ public final class AlloyInterface {
     }
 
     public static void main(String[] args) throws IOException, Err {
-        String modelVerbatim = readMessage();
+        try {
+            String modelVerbatim = readMessage();
 
-        // Parse+typecheck the model
-        CompModule world = AlloyCompiler.parse(rep, modelVerbatim);
+            // Parse+typecheck the model
+            CompModule world = AlloyCompiler.parse(rep, modelVerbatim);
 
-        // Choose some default options for how you want to execute the commands
-        A4Options options = new A4Options();
-        options.solver = A4Options.SatSolver.SAT4J;
+            // Choose some default options for how you want to execute the commands
+            A4Options options = new A4Options();
+            options.solver = A4Options.SatSolver.SAT4J;
 
-        for (Command command : world.getAllCommands()) {
-            // Execute the command
-            A4Solution ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
+            for (Command command : world.getAllCommands()) {
+                // Execute the command
+                A4Solution ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
 
-            // If satisfiable...
-            while (ans.satisfiable()) {
+                // If satisfiable...
+                while (ans.satisfiable()) {
 
-                writeMessage("True");
+                    writeMessage("True");
 
-                // Read the input inside here so that we don't block
-                // before computing. Hide some of the latency.
-                if (!interact(readMessage())) {
-                    return;
+                    // Read the input inside here so that we don't block
+                    // before computing. Hide some of the latency.
+                    if (!interact(readMessage())) {
+                        return;
+                    }
+
+                    StringWriter xml = new StringWriter();
+                    ans.writeXML(new PrintWriter(xml), null, null);
+                    writeMessage(xml.toString());
+
+                    A4Solution nextAns = ans.next();
+                    if (nextAns == ans) {
+                        break;
+                    }
+                    ans = nextAns;
                 }
-
-                StringWriter xml = new StringWriter();
-                ans.writeXML(new PrintWriter(xml), null, null);
-                writeMessage(xml.toString());
-
-                A4Solution nextAns = ans.next();
-                if (nextAns == ans) {
-                    break;
-                }
-                ans = nextAns;
             }
-        }
 
-        do {
-            writeMessage("False");
-        } while (interact(readMessage()));
+            do {
+                writeMessage("False");
+            } while (interact(readMessage()));
+        } catch (EOFException e) {
+            // EOF likely because parent process exited. Stop this process too.
+        }
     }
 }

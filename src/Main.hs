@@ -22,13 +22,16 @@
 
 module Main where
 
+import ClaferModel
 import Control.Monad
 import Data.Maybe
+import Solution
 import System.Cmd
 import System.Console.CmdArgs
 import System.Environment.Executable
 import System.Exit
 import System.IO
+import System.IO.Error
 import System.Process
 
 
@@ -53,7 +56,7 @@ hGetMessage :: Handle -> IO String
 hGetMessage handle =
     do
         length <- read `liftM` hGetLine handle
-        foldr (liftM2 (:)) (return []) (replicate length $ hGetChar handle)
+        mapM hGetChar $ replicate length handle
         
 
 -- Put the length, then the string
@@ -111,7 +114,9 @@ interface Next proc@(Process stdIn stdOut _) =
         case status of
             True -> do
                 xml <- hGetMessage stdOut
-                putStrLn xml
+                let solution = parseSolution xml
+                let claferModel = buildClaferModel solution
+                putStrLn (concatMap show claferModel)
                 answers <- nextInterace proc
                 return $ collect answers xml
             False -> do
@@ -123,17 +128,19 @@ interface Quit proc =
         return Quit
 interface x _ = return x
 
-        
+
 nextInterace :: Process -> IO Command
 nextInterace process =
     do
         putStr "n,q,s>"
         hFlush stdout
-        op <- getLine
+        op <- try getLine
         case op of
-            "n" -> interface Next process
-            "q" -> interface Quit process
-            "s" -> interface (Save []) process
+            -- User submitted eof. Quit process.
+            Left e -> if isEOFError e then interface Quit process else ioError e
+            Right "n" -> interface Next process
+            Right "q" -> interface Quit process
+            Right "s" -> interface (Save []) process
             _ -> putStrLn "Unknown command" >> nextInterace process
 
 
@@ -154,3 +161,4 @@ main =
 
 
         beginInterface (claferFile args) alloyIG
+        
