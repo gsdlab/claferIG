@@ -1,4 +1,4 @@
-module ClaferModel (Clafer(..), buildClaferModel) where
+module ClaferModel (ClaferModel, Clafer(..), buildClaferModel) where
 
 import Data.List 
 import Data.Map as Map hiding (map)
@@ -7,11 +7,14 @@ import Data.Set as Set hiding (map)
 import Solution
 
 
-
+data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
 data Clafer = Clafer {c_name::String, c_children::[Clafer]}
 
 data FamilyTree = FamilyTree {roots::Set String, descendants::Map String [String]} deriving Show
 
+
+instance Show ClaferModel where
+    show (ClaferModel clafers) = concatMap show clafers
 
 instance Show Clafer where
     show clafer = displayClafer "" clafer
@@ -47,9 +50,9 @@ buildFamilyTree (Solution sigs fields) =
     buildTuples ((Tuple from to):fs) = addChild from to $ buildTuples fs
 
 
-buildClaferModel :: Solution -> [Clafer]
+buildClaferModel :: Solution -> ClaferModel
 buildClaferModel solution =
-    map buildClafer (getRoots ftree)
+    ClaferModel $ map buildClafer (getRoots ftree)
     where
     ftree = buildFamilyTree solution
     buildClafer name = Clafer (simpleName name) $ map buildClafer (getChildren name ftree)
@@ -62,4 +65,7 @@ findSig label (Solution sigs _) = fromJust $ find ((==) label . s_label) sigs
 
 -- Only keeps the substring between the '_' and '$' exclusive.
 simpleName :: String -> String
-simpleName = fst . break ((==) '$') . tail . snd . break ((==) '_')
+simpleName n =
+    case snd $ break ((==) '_') n of
+        [] -> fst $ break ((==) '$') n
+        x -> fst $ break ((==) '$') $ tail x

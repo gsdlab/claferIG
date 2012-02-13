@@ -43,7 +43,17 @@ data IGArgs = IGArgs {
 } deriving (Show, Data, Typeable)
 
 
-data Command = Next | Save [String] | Quit
+data Command = Next | Save | Quit
+
+
+isNext Next = True
+isNext _ = False
+
+isSave Save = True
+isSave _ = False
+
+isQuit Quit = True
+isQuit _ = False
 
 
 claferIG = IGArgs {
@@ -52,20 +62,20 @@ claferIG = IGArgs {
 
 
 -- Read the length, then the string
-hGetMessage :: Handle -> IO String
-hGetMessage handle =
+getMessage :: Process -> IO String
+getMessage process =
     do
-        length <- read `liftM` hGetLine handle
-        mapM hGetChar $ replicate length handle
+        length <- read `liftM` hGetLine (stdOut process)
+        mapM hGetChar $ replicate length (stdOut process)
         
 
 -- Put the length, then the string
-hPutMessage :: Handle -> String -> IO ()
-hPutMessage handle message =
+putMessage :: Process -> String -> IO ()
+putMessage process message =
     do
-        hPutStrLn handle (show $ length message)
-        hPutStr handle message
-        hFlush handle
+        hPutStrLn (stdIn process) (show $ length message)
+        hPutStr (stdIn process) message
+        hFlush (stdIn process)
 
 
 -- Start another process and return the piped std_in, std_out stream
@@ -77,71 +87,81 @@ pipeCommand exec args =
     where process = (proc exec args) { std_in = CreatePipe, std_out = CreatePipe }
     
 
-collect :: Command -> String -> Command
-collect (Save collection) item = Save $ item:collection
-collect x _ = x
-
-
 beginInterface :: FilePath -> Process -> IO ()
-beginInterface file process =
-    do
-        answers <- interface Next process
-        topLevelInterface file process 1 answers
+beginInterface file proc =
+    topLevelInterface Next [] []
     where
-        -- Responsible for performing saves
-        topLevelInterface :: FilePath -> Process -> Int -> Command -> IO ()
-        topLevelInterface file process counter (Save answers) =
+        topLevelInterface :: Command -> [ClaferModel] -> [ClaferModel] -> IO ()
+        topLevelInterface Next saved unsaved =
             do
-                save answers file counter
-                nextInterace process >>= topLevelInterface file process (counter + (length answers))
-        topLevelInterface _ _ _ _ = return ()
-        
-        save :: [String] -> FilePath -> Int -> IO ()
-        save [] _ _ = return ()
-        save (x:xs) file counter =
+                answer <- communicateCommand Next proc
+                case answer of
+                    Just model -> do
+                        putStrLn $ show model
+                        nextInterface saved (model:unsaved)
+                    Nothing -> do
+                        putStrLn "No more instances found"
+                        nextInterface saved unsaved
+        topLevelInterface Save saved unsaved =
             do
-                writeFile saveName x
+                communicateCommand Save proc
+                save unsaved (length saved)
+                nextInterface (unsaved ++ saved) []
+        topLevelInterface Quit _ _ =
+            do
+                communicateCommand Quit proc
+                return ()
+                
+        nextInterface :: [ClaferModel] -> [ClaferModel] -> IO ()
+        nextInterface saved unsaved =
+            do
+                next <- nextCommand
+                topLevelInterface next saved unsaved
+                
+        save :: [ClaferModel] -> Int -> IO ()
+        save [] _ = return ()
+        save (c:cs) counter =
+            do
+                writeFile saveName (show c)
                 putStrLn $ "Saved to " ++ saveName
-                save xs file (counter + 1)
+                save cs (counter + 1)
             where saveName = file ++ (show counter) ++ ".data"
                 
         
-interface :: Command -> Process -> IO Command
-interface Next proc@(Process stdIn stdOut _) =
+-- Sends the command to the alloyIG subprocess
+communicateCommand :: Command -> Process -> IO (Maybe ClaferModel)
+communicateCommand Next proc =
     do
-        hPutMessage stdIn "n"
-        status <- read `liftM` hGetMessage stdOut
+        putMessage proc "n"
+        status <- read `liftM` getMessage proc
         case status of
             True -> do
-                xml <- hGetMessage stdOut
+                xml <- getMessage proc
                 let solution = parseSolution xml
                 let claferModel = buildClaferModel solution
-                putStrLn (concatMap show claferModel)
-                answers <- nextInterace proc
-                return $ collect answers xml
-            False -> do
-                putStrLn "No more instances found"
-                nextInterace proc
-interface Quit proc =
+                return $ Just claferModel
+            False -> return Nothing
+communicateCommand Quit proc =
     do
-        hPutMessage (stdIn proc) "q"
-        return Quit
-interface x _ = return x
+        putMessage proc "q"
+        return Nothing
+communicateCommand Save _ = return Nothing
 
 
-nextInterace :: Process -> IO Command
-nextInterace process =
+-- Retrieve the next user input command
+nextCommand :: IO Command
+nextCommand =
     do
         putStr "n,q,s>"
         hFlush stdout
         op <- try getLine
         case op of
             -- User submitted eof. Quit process.
-            Left e -> if isEOFError e then interface Quit process else ioError e
-            Right "n" -> interface Next process
-            Right "q" -> interface Quit process
-            Right "s" -> interface (Save []) process
-            _ -> putStrLn "Unknown command" >> nextInterace process
+            Left e -> if isEOFError e then return Quit else ioError e
+            Right "n" -> return Next
+            Right "q" -> return Quit
+            Right "s" -> return Save
+            _ -> putStrLn "Unknown command" >> nextCommand
 
 
 main =
@@ -157,7 +177,7 @@ main =
         
         
         alloyIG <- pipeCommand "java" ["-jar", execDir ++ "alloyIG.jar"]
-        hPutMessage (stdIn alloyIG) claferOutput
+        putMessage alloyIG claferOutput
 
 
         beginInterface (claferFile args) alloyIG
