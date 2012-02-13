@@ -8,7 +8,7 @@ import Solution
 
 
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
-data Clafer = Clafer {c_name::String, c_children::[Clafer]}
+data Clafer = Clafer {c_name::String, c_children::[Clafer]} | IntClafer {c_value::Int}
 
 data FamilyTree = FamilyTree {roots::Set String, descendants::Map String [String]} deriving Show
 
@@ -21,6 +21,8 @@ instance Show Clafer where
         where
         displayClafer indent (Clafer name children) =
             indent ++ name ++ "\n" ++ concatMap (displayClafer (indent ++ "  ")) children
+        displayClafer indent (IntClafer value) =
+            indent ++ "[this = " ++ (show value) ++ "]\n"
             
 
 addChild :: String -> String -> FamilyTree -> FamilyTree
@@ -47,15 +49,41 @@ buildFamilyTree (Solution sigs fields) =
     atoms = concatMap s_atoms sigs
     atomLabels = map a_label atoms
     buildTuples [] = FamilyTree (Set.fromList atomLabels) Map.empty
-    buildTuples ((Tuple from to):fs) = addChild from to $ buildTuples fs
+    buildTuples (t:ts) = addChild (t_from t) (t_to t) $ buildTuples ts
+
+
+-- A map of label -> Sig
+buildSigMap :: Solution -> Map String Sig
+buildSigMap (Solution sigs _) = Map.fromList $ zip (map s_label sigs) sigs
+
+
+-- A map of label -> ID
+buildTypeMap :: Solution -> Map String Int
+buildTypeMap (Solution _ fields) =
+    buildTuples tuples
+    where
+    tuples = concatMap f_tuples fields
+    buildTuples :: [Tuple] -> Map String Int
+    buildTuples [] = Map.empty
+    buildTuples (t:ts) = Map.insert (t_from t) (t_fromType t) $ Map.insert (t_to t) (t_toType t) (buildTuples ts)
 
 
 buildClaferModel :: Solution -> ClaferModel
 buildClaferModel solution =
     ClaferModel $ map buildClafer (getRoots ftree)
     where
+    sigMap = buildSigMap solution
+    typeMap = buildTypeMap solution
     ftree = buildFamilyTree solution
-    buildClafer name = Clafer (simpleName name) $ map buildClafer (getChildren name ftree)
+    
+    intId = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
+    isInt label = (findWithDefault (error $ "Missing label " ++ label) label typeMap) == intId
+    
+    buildClafer label = 
+        if isInt label then
+            IntClafer $ read label
+        else
+            Clafer (simpleName label) $ map buildClafer (getChildren label ftree)
     
 
 -- Find the sig with the given label

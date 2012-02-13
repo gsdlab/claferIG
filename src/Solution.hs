@@ -16,7 +16,7 @@ data Atom = Atom {a_label::String} deriving Show
 
 data Field = Field {f_label::String, f_id::Int, f_parentId::Int, f_tuples::[Tuple]} deriving Show
 
-data Tuple = Tuple {t_from::String, t_to::String} deriving Show
+data Tuple = Tuple {t_from::String, t_fromType::Int, t_to::String, t_toType::Int} deriving Show
 
 
 parseSolution :: String -> Solution
@@ -36,10 +36,9 @@ parseSig content =
         (read $ findAttr "ID" content)
         (read `liftM` findOptAttr "parentID" content)
         (map parseAtom $ (keep /> tag "atom") content)
-
-
-parseAtom :: Content i -> Atom
-parseAtom = Atom . findAttr "label"
+    where
+    parseAtom :: Content i -> Atom
+    parseAtom = Atom . findAttr "label"
 
 
 parseField :: Content i -> Field
@@ -49,12 +48,19 @@ parseField content =
         (read $ findAttr "ID" content)
         (read $ findAttr "parentID" content)
         (map parseTuple $ (keep /> tag "tuple") content)
+    where
+    
+    parseType :: Content i -> (Int, Int)
+    parseType content = 
+        (toFromType !! 0, toFromType !! 1)
+        where toFromType = map (read . findAttr "ID") $ (keep /> tag "types" /> tag "type") content
 
+    (fromType, toType) = parseType content
 
-parseTuple :: Content i -> Tuple
-parseTuple content =
-    Tuple (toFrom !! 0) (toFrom !! 1)
-    where toFrom = map (findAttr "label") $ (keep /> tag "atom") content
+    parseTuple :: Content i -> Tuple
+    parseTuple content =
+        Tuple (toFrom !! 0) fromType (toFrom !! 1) toType
+        where toFrom = map (findAttr "label") $ (keep /> tag "atom") content
 
 
 findOptAttr :: String -> Content i -> Maybe String
