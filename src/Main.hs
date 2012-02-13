@@ -82,8 +82,9 @@ putMessage process message =
 pipeCommand :: FilePath -> [String] -> IO Process
 pipeCommand exec args =
     do
-        (stdIn, stdOut, _, procHandle) <- createProcess process
-        return $ Process (fromJust stdIn) (fromJust stdOut) procHandle -- Pipe always has a handle according to docs
+        (Just stdIn, Just stdOut, _, procHandle) <- createProcess process
+        hSetNewlineMode stdIn noNewlineTranslation
+        return $ Process stdIn stdOut procHandle -- Pipe always has a handle according to docs
     where process = (proc exec args) { std_in = CreatePipe, std_out = CreatePipe }
     
 
