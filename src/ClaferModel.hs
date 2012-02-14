@@ -59,13 +59,18 @@ buildSigMap (Solution sigs _) = Map.fromList $ zip (map s_label sigs) sigs
 
 -- A map of label -> ID
 buildTypeMap :: Solution -> Map String Int
-buildTypeMap (Solution _ fields) =
+buildTypeMap (Solution sigs fields) =
     buildTuples tuples
     where
+    buildSig :: Sig -> Map String Int
+    buildSig sig = Map.fromList $ zip (map a_label $ s_atoms sig) (repeat $ s_id sig)
+    
     tuples = concatMap f_tuples fields
     buildTuples :: [Tuple] -> Map String Int
-    buildTuples [] = Map.empty
-    buildTuples (t:ts) = Map.insert (t_from t) (t_fromType t) $ Map.insert (t_to t) (t_toType t) (buildTuples ts)
+    buildTuples [] = foldr (Map.union) Map.empty (map buildSig sigs)
+    buildTuples (t:ts) =
+        Map.insert (t_from t) (t_fromType t) $
+        Map.insert (t_to t) (t_toType t) (buildTuples ts)
 
 
 buildClaferModel :: Solution -> ClaferModel
@@ -84,11 +89,6 @@ buildClaferModel solution =
             IntClafer $ read label
         else
             Clafer (simpleName label) $ map buildClafer (getChildren label ftree)
-    
-
--- Find the sig with the given label
-findSig :: String -> Solution -> Sig
-findSig label (Solution sigs _) = fromJust $ find ((==) label . s_label) sigs
     
 
 -- Only keeps the substring between the '_' and '$' exclusive.
