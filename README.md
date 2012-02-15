@@ -15,7 +15,7 @@ Dependencies
 * The Haskell libraries: haxml, cmdargs, executable-path
 
 ```
-cabal install haxml, cmdargs, executable-path
+cabal install haxml cmdargs executable-path
 ```
 
 Usage
