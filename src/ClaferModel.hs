@@ -1,3 +1,25 @@
+{-
+ Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy of
+ this software and associated documentation files (the "Software"), to deal in
+ the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do
+ so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+-}
+
 module ClaferModel (ClaferModel, Clafer(..), buildClaferModel) where
 
 import Data.List 
@@ -60,17 +82,19 @@ buildSigMap (Solution sigs _) = Map.fromList $ zip (map s_label sigs) sigs
 -- A map of label -> ID
 buildTypeMap :: Solution -> Map String Int
 buildTypeMap (Solution sigs fields) =
-    buildTuples tuples
+    mapSigs `Map.union` mapTuples
     where
     buildSig :: Sig -> Map String Int
     buildSig sig = Map.fromList $ zip (map a_label $ s_atoms sig) (repeat $ s_id sig)
     
-    tuples = concatMap f_tuples fields
     buildTuples :: [Tuple] -> Map String Int
-    buildTuples [] = foldr (Map.union) Map.empty (map buildSig sigs)
+    buildTuples [] = Map.empty
     buildTuples (t:ts) =
         Map.insert (t_from t) (t_fromType t) $
         Map.insert (t_to t) (t_toType t) (buildTuples ts)
+        
+    mapSigs = foldr (Map.union) Map.empty (map buildSig sigs)
+    mapTuples = buildTuples $ concatMap f_tuples fields
 
 
 buildClaferModel :: Solution -> ClaferModel
