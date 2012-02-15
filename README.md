@@ -12,6 +12,11 @@ Dependencies
 * Clafer translator (to produce Alloy models (.als) and Clafer IR (.xml) from Clafer models)
 * Alloy 4.2 (backend reasoner)
 * MiniSAT (SAT solver used by Alloy that can produce Unsat Core)
+* The Haskell libraries: haxml, cmdargs, executable-path
+
+```
+cabal install haxml, cmdargs, executable-path
+```
 
 Usage
 -----
