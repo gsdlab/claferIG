@@ -25,15 +25,11 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 
 ### Command-line Usage
 
-```
-claferIG <model file name>.cfr
-```
+`claferIG <model file name>.cfr`
 
 - opens an interactive session and displays the minimal instance or a counterexample
 
-```
-claferIG <model file name>.cfr -all <scope>
-```
+`claferIG <model file name>.cfr -all <scope>`
 
 - opens a non-interactive session and saves all instances up to the provided scope or a counterexample to files named `<model file name>-<instance number>.cfr.data`, one instance per file.
 
@@ -49,9 +45,9 @@ In the interactive mode, the users can invoke the following commands by pressing
 
 The command '**i**ncrease' allows you to change the maximum number of instances for a given clafer or for all clafers as follows:
 
-* 'i' [enter] [enter] - to increase for all clafers by 1 
-* 'i' <name> [enter] - to increase for the clafer <name> by 1 
-* 'i' <name> <number> - to increase for the clafer <name> by <number> 
+* `'i' [enter] [enter]` - to increase for all clafers by `1` 
+* `'i' <name> [enter]` - to increase for the clafer `<name>` by `1` 
+* `'i' <name> <number>` - to increase for the clafer `<name>` by `<number>`
 
 Output format
 -------------
@@ -62,7 +58,7 @@ The instance data notation is very similar to a regular Clafer notation for conc
 
 * no constraints
 * no types and super types
-* no clafer and group cardinalities (each clafer has the default group (0..*) and clafer (1..1) cardinality)
+* no clafer and group cardinalities (each clafer has the default group `(0..*)` and clafer `(1..1)` cardinality)
 * no clafers not present in the instance
 
 Additionally, the data notation contains concrete values of the clafers and suffix numbers to distinguish among multipe instances of the same clafer.
@@ -127,7 +123,7 @@ a1
     b
 ```
 
-Here, C1 and C3 are satisfied but C2 is not. To resolve the conflict and assuming that the counter example is actually a correct instance data, the user has to modify the model by removing C2. However, should the counter example actually represent incorrect instance data, the user can remove C3 to resolve the inconsistency.
+Here, `C1` and `C3` are satisfied but `C2` is not. To resolve the conflict and assuming that the counter example is actually a correct instance data, the user has to modify the model by removing `C2`. However, should the counter example actually represent incorrect instance data, the user can remove `C3` to resolve the inconsistency.
 
 How it works
 ------------
