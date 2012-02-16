@@ -9,9 +9,9 @@ Clafer instance generator (claferIG) is an API and an interactive tool that gene
 Dependencies
 ------------
 
-* Clafer translator (to produce Alloy models (.als) and Clafer IR (.xml) from Clafer models)
-* Alloy 4.2 (backend reasoner)
-* MiniSAT (SAT solver used by Alloy that can produce Unsat Core)
+* [Clafer translator](https://github.com/gsdlab/clafer) (to produce Alloy models (.als) and Clafer IR (.xml) from Clafer models)
+* [Alloy 4.2](http://alloy.mit.edu/alloy/) (backend reasoner)
+* MiniSAT (SAT solver used by Alloy that can produce Unsat Core, bundled with Alloy)
 * The Haskell libraries: haxml, cmdargs, executable-path
 
 ```
@@ -39,10 +39,13 @@ claferIG <model file name>.cfr -all <scope>
 
 
 ### Interactive Session Usage
+In the interactive mode, the users can invoke the following commands:
 
-* 'n' - produces the next instance if available or outputs a message that no more instances exist
-* 's' - saves all instances displayed so far or a counterexample to a file `<model file name>.cfr.data`
-* 'q' - quits the interactive session
+* 'n' (**N**ext) - to produce the next instance if available or to output a message that no more instances exist within the given scope
+* 'i' (**I**ncrease) - to increase the maximum number of instances of a given clafer (scope)
+* 's' (**S**ave) - to save all instances displayed so far or a counterexample to a file; single file per example `<model file name>-<instance number>.cfr.data`
+* 'q' (**Q**uit) - to quit the interactive session
+* 'h' (**H**elp) - to display this menu options summary
 
 Output format
 -------------
@@ -58,9 +61,66 @@ The instance data notation is very similar to a regular Clafer notation for conc
 
 Additionally, the data notation contains concrete values of the clafers and suffix numbers to distinguish among multipe instances of the same clafer.
 
+#### Example 
+
+For a model
+
+```clafer
+abstract A
+    a ?
+    b
+    c : integer ?
+    d -> E
+
+abstract E
+    f : integer +
+
+a1 : A
+e1 : E
+```
+
+A possible instance data looks as follows:
+
+```clafer
+a1
+    b
+    c = 10
+    d = e1
+
+e1
+    f = 2, 3, 4
+```
+
 ### Counter example
 
 The counter example notation is the same as the instance data notation. Additionally, it indicates which constraints belong to the UnSAT Core.
+
+#### Example 
+
+For a model
+
+```clafer
+abstract A
+    a ?
+    b ?
+        [ a ]   // C1
+
+a1 : A
+    [ no a ]    // C2
+    [ b ]       // C3
+```
+
+Constraints C1, C2, and C3 form an UNSAT Core. Removal of any of them will make the model satisfiable. The constraint C1 is part of the model and cannot be removed (part of domain knowledge). Therefore, either C2 or C3 must be removed to remove the inconsistency. On possible counter example that illustrates the inconsistency is as follows:
+
+```clafer
+
+a1
+    a
+    [ no a ]   // violated
+    b
+```
+
+Here, C1 and C3 are satisfied but C2 is not. To resolve the conflict and assuming that the counter example is actually a correct instance data, the user has to modify the model by removing C2. However, should the counter example actually represent incorrect instance data, the user can remove C3 to resolve the inconsistency.
 
 How it works
 ------------
