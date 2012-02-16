@@ -23,6 +23,7 @@
 module ClaferModel (ClaferModel, Clafer(..), buildClaferModel) where
 
 import Data.List 
+import Data.Either
 import Data.Map as Map hiding (map)
 import Data.Maybe
 import Data.Set as Set hiding (map)
@@ -30,7 +31,8 @@ import Solution
 
 
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
-data Clafer = Clafer {c_name::String, c_children::[Clafer]} | IntClafer {c_value::Int}
+data Clafer = Clafer {c_name::String, c_value::Maybe Value, c_children::[Clafer]}
+data Value = IntClafer {v_value::Int} deriving Show
 
 data FamilyTree = FamilyTree {roots::Set String, descendants::Map String [String]} deriving Show
 
@@ -41,10 +43,11 @@ instance Show ClaferModel where
 instance Show Clafer where
     show clafer = displayClafer "" clafer
         where
-        displayClafer indent (Clafer name children) =
-            indent ++ name ++ "\n" ++ concatMap (displayClafer (indent ++ "  ")) children
-        displayClafer indent (IntClafer value) =
-            indent ++ "[this = " ++ (show value) ++ "]\n"
+        displayClafer indent (Clafer name value children) =
+            indent ++ name ++ displayValue value ++
+            "\n" ++ concatMap (displayClafer (indent ++ "  ")) children
+        displayValue Nothing = ""
+        displayValue (Just (IntClafer value)) = " = " ++ show value
             
 
 addChild :: String -> String -> FamilyTree -> FamilyTree
@@ -99,7 +102,7 @@ buildTypeMap (Solution sigs fields) =
 
 buildClaferModel :: Solution -> ClaferModel
 buildClaferModel solution =
-    ClaferModel $ map buildClafer (getRoots ftree)
+    ClaferModel $ map (left . buildClafer) (getRoots ftree)
     where
     sigMap = buildSigMap solution
     typeMap = buildTypeMap solution
@@ -108,11 +111,21 @@ buildClaferModel solution =
     intId = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
     isInt label = (findWithDefault (error $ "Missing label " ++ label) label typeMap) == intId
     
+    left (Left x) = x
+    
+    singleton [] = Nothing
+    singleton [x] = Just x
+    singleton xs = error $ "Received more than one value " ++ show xs
+    
+    buildClafer :: String -> Either Clafer Value
     buildClafer label = 
         if isInt label then
-            IntClafer $ read label
+            Right $ IntClafer (read label)
         else
-            Clafer (simpleName label) $ map buildClafer (getChildren label ftree)
+            Left $ Clafer (simpleName label) (singleton valueChildren) claferChildren
+            where
+            children = map buildClafer (getChildren label ftree)
+            (claferChildren, valueChildren) = partitionEithers children
     
 
 -- Only keeps the substring between the '_' and '$' exclusive.
