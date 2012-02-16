@@ -27,11 +27,12 @@ import Data.Either
 import Data.Map as Map hiding (map)
 import Data.Maybe
 import Data.Set as Set hiding (map)
+import Debug.Trace
 import Solution
 
 
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
-data Clafer = Clafer {c_name::String, c_value::Maybe Value, c_children::[Clafer]}
+data Clafer = Clafer {c_name::String, c_aliases::[String], c_value::Maybe Value, c_children::[Clafer]}
 data Value = IntClafer {v_value::Int} deriving Show
 
 data FamilyTree = FamilyTree {roots::Set String, descendants::Map String [String]} deriving Show
@@ -43,9 +44,11 @@ instance Show ClaferModel where
 instance Show Clafer where
     show clafer = displayClafer "" clafer
         where
-        displayClafer indent (Clafer name value children) =
-            indent ++ name ++ displayValue value ++
+        displayClafer indent (Clafer name aliases value children) =
+            indent ++ name ++ displayAlias aliases ++ displayValue value ++
             "\n" ++ concatMap (displayClafer (indent ++ "  ")) children
+        displayAlias [] = ""
+        displayAlias as = ',' : intercalate "," as
         displayValue Nothing = ""
         displayValue (Just (IntClafer value)) = " = " ++ show value
             
@@ -67,7 +70,7 @@ getRoots = Set.toList . roots
 
 
 buildFamilyTree :: Solution -> FamilyTree
-buildFamilyTree (Solution sigs fields) =
+buildFamilyTree (Solution sigs _ fields) =
     buildTuples tuples
     where
     tuples = concatMap f_tuples fields
@@ -79,12 +82,12 @@ buildFamilyTree (Solution sigs fields) =
 
 -- A map of label -> Sig
 buildSigMap :: Solution -> Map String Sig
-buildSigMap (Solution sigs _) = Map.fromList $ zip (map s_label sigs) sigs
+buildSigMap (Solution sigs _ _) = Map.fromList $ zip (map s_label sigs) sigs
 
 
 -- A map of label -> ID
 buildTypeMap :: Solution -> Map String Int
-buildTypeMap (Solution sigs fields) =
+buildTypeMap (Solution sigs _ fields) =
     mapSigs `Map.union` mapTuples
     where
     buildSig :: Sig -> Map String Int
@@ -98,15 +101,34 @@ buildTypeMap (Solution sigs fields) =
         
     mapSigs = foldr (Map.union) Map.empty (map buildSig sigs)
     mapTuples = buildTuples $ concatMap f_tuples fields
+    
+
+-- A map of aliases
+buildAliasMap :: Solution -> Map String [String]
+buildAliasMap (Solution _ aliases _) =
+    buildAlias aliases
+    where
+    buildAlias :: [Alias] -> Map String [String]
+    buildAlias [] = Map.empty
+    buildAlias (a:as) =
+        foldr (flip (Map.insertWith (++)) [l_label a]) aa bb
+        where 
+            aa :: Map String [String]
+            aa = (buildAlias as)
+            
+            bb :: [String]
+            bb = (l_alias a)
 
 
 buildClaferModel :: Solution -> ClaferModel
 buildClaferModel solution =
+    trace (show $ buildAliasMap solution)
     ClaferModel $ map (left . buildClafer) (getRoots ftree)
     where
     sigMap = buildSigMap solution
     typeMap = buildTypeMap solution
     ftree = buildFamilyTree solution
+    aliasMap = buildAliasMap solution
     
     intId = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
     isInt label = (findWithDefault (error $ "Missing label " ++ label) label typeMap) == intId
@@ -122,8 +144,9 @@ buildClaferModel solution =
         if isInt label then
             Right $ IntClafer (read label)
         else
-            Left $ Clafer (simpleName label) (singleton valueChildren) claferChildren
+            Left $ Clafer (simpleName label) (map simpleAlias aliases) (singleton valueChildren) claferChildren
             where
+            aliases = Map.findWithDefault [] label aliasMap
             children = map buildClafer (getChildren label ftree)
             (claferChildren, valueChildren) = partitionEithers children
     
@@ -131,6 +154,13 @@ buildClaferModel solution =
 -- Only keeps the substring between the '_' and '$' exclusive.
 simpleName :: String -> String
 simpleName n =
-    case snd $ break ((==) '_') n of
-        [] -> fst $ break ((==) '$') n
-        x -> fst $ break ((==) '$') $ tail x
+    fst $ break ('$' ==) $
+    case snd $ break ('_' ==) n of
+        [] ->  n
+        x -> tail x
+        
+simpleAlias :: String -> String
+simpleAlias n =
+    case stripPrefix "this/" n of
+        Just x -> simpleName x
+        Nothing -> error $ "Unexpected alias name " ++ n

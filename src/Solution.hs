@@ -20,16 +20,16 @@
  SOFTWARE.
 -}
 
-module Solution (Solution(..), Sig(..), Atom(..), Field(..), Tuple(..), parseSolution) where
+module Solution (Solution(..), Sig(..), Atom(..), Field(..), Tuple(..), Alias(..), parseSolution) where
 
 import Control.Monad
-import Data.Graph
+import Data.Either
 import Data.Maybe
 import Text.XML.HaXml
 import Text.XML.HaXml.Posn
 
 
-data Solution = Solution{s_sigs::[Sig], s_fields::[Field]} deriving Show
+data Solution = Solution{s_sigs::[Sig], s_aliases::[Alias], s_fields::[Field]} deriving Show
 
 -- The univ sig does not have a parent
 data Sig = Sig {s_label::String, s_id::Int, s_parentId::Maybe Int, s_atoms::[Atom]} deriving Show
@@ -40,6 +40,8 @@ data Field = Field {f_label::String, f_id::Int, f_parentId::Int, f_tuples::[Tupl
 
 data Tuple = Tuple {t_from::String, t_fromType::Int, t_to::String, t_toType::Int} deriving Show
 
+data Alias = Alias {l_label::String, l_alias::[String]} deriving Show
+
 
 parseSolution :: String -> Solution
 parseSolution xml =
@@ -47,17 +49,27 @@ parseSolution xml =
         rootElem   = CElem root noPos
         sigElems   = tag "alloy" /> tag "instance" /> tag "sig"
         fieldElems = tag "alloy" /> tag "instance" /> tag "field"
+        
+        (sigs, aliases) = partitionEithers (map parseSig $ sigElems rootElem)
+        fields = (map parseField $ fieldElems rootElem)
     in
-    Solution (map parseSig $ sigElems rootElem) (map parseField $ fieldElems rootElem)
+    Solution sigs aliases fields
 
 
-parseSig :: Content i -> Sig
+parseSig :: Content i -> Either Sig Alias
 parseSig content =
-    Sig
-        (findAttr "label" content)
-        (read $ findAttr "ID" content)
-        (read `liftM` findOptAttr "parentID" content)
-        (map parseAtom $ (keep /> tag "atom") content)
+    case (keep /> tag "type") content of
+        [] -> Left $
+            Sig
+                (findAttr "label" content)
+                (read $ findAttr "ID" content)
+                (read `liftM` findOptAttr "parentID" content)
+                (map parseAtom $ (keep /> tag "atom") content)
+        _ -> Right $
+            Alias (findAttr "label" content) atomLabels
+            where 
+            atomLabels = map (findAttr "label") $ (keep /> tag "atom") content
+            
     where
     parseAtom :: Content i -> Atom
     parseAtom = Atom . findAttr "label"
