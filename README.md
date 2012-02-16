@@ -39,15 +39,15 @@ claferIG <model file name>.cfr -all <scope>
 
 
 ### Interactive Session Usage
-In the interactive mode, the users can invoke the following commands by pressing the uppercase letter in boldface:
+In the interactive mode, the users can invoke the following commands by pressing the letter in boldface:
 
-* **N**ext - to produce the next instance if available or to output a message that no more instances exist within the given scope
-* **I**ncrease - to increase the maximum number of instances of a given clafer or all clafers (scope)
-* **S**ave - to save all instances displayed so far or a counterexample to files named `<model file name>-<instance number>.cfr.data`, one instance per file.
-* **Q**uit - to quit the interactive session
-* **N**elp - to display this menu options summary
+* **n**ext - to produce the next instance if available or to output a message that no more instances exist within the given scope
+* **i**ncrease - to increase the maximum number of instances of a given clafer or all clafers (scope)
+* **s**ave - to save all instances displayed so far or a counterexample to files named `<model file name>-<instance number>.cfr.data`, one instance per file
+* **q**uit - to quit the interactive session
+* **h**elp - to display this menu options summary
 
-The command 'i' allows to change the maximum number of instances for a given clafer or for all clafers as follows:
+The command '**i**ncrease' allows you to change the maximum number of instances for a given clafer or for all clafers as follows:
 
 * 'i' [enter] [enter] - to increase for all clafers by 1 
 * 'i' <name> [enter] - to increase for the clafer <name> by 1 
