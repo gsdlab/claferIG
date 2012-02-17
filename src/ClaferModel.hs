@@ -24,19 +24,18 @@ module ClaferModel (ClaferModel, Clafer(..), buildClaferModel) where
 
 import Data.List 
 import Data.Either
-import Data.Map as Map hiding (map)
+import Data.Map as Map hiding (map, mapMaybe)
 import Data.Maybe
 import Data.Set as Set hiding (map)
-import Debug.Trace
 import Solution
 
 
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
-data Clafer = Clafer {c_name::String, c_aliases::[String], c_value::Maybe Value, c_children::[Clafer]}
+data Clafer = Clafer {c_name::String, c_value::Maybe Value, c_children::[Clafer]} | Alias {c_name::String, c_alias::String}
 data Value = IntClafer {v_value::Int} deriving Show
 
-data FamilyTree = FamilyTree {roots::Set String, descendants::Map String [String]} deriving Show
-
+data FamilyTree = FamilyTree {roots::Set Node, descendants::Map String [Node]} deriving Show
+data Node = ClaferNode  {n_name::String} | AliasNode {n_name, n_alias::String} deriving (Eq, Ord, Show)
 
 instance Show ClaferModel where
     show (ClaferModel clafers) = concatMap show clafers
@@ -44,16 +43,16 @@ instance Show ClaferModel where
 instance Show Clafer where
     show clafer = displayClafer "" clafer
         where
-        displayClafer indent (Clafer name aliases value children) =
-            indent ++ name ++ displayAlias aliases ++ displayValue value ++
+        displayClafer indent (Clafer name value children) =
+            indent ++ name ++ displayValue value ++
             "\n" ++ concatMap (displayClafer (indent ++ "  ")) children
-        displayAlias [] = ""
-        displayAlias as = ',' : intercalate "," as
+        displayClafer indent (Alias name alias) =
+            indent ++ name ++ " = " ++ alias ++ "\n"
         displayValue Nothing = ""
         displayValue (Just (IntClafer value)) = " = " ++ show value
             
 
-addChild :: String -> String -> FamilyTree -> FamilyTree
+addChild :: String -> Node -> FamilyTree -> FamilyTree
 addChild parent child (FamilyTree roots descendants) =
     FamilyTree roots' descendants'
     where
@@ -61,33 +60,49 @@ addChild parent child (FamilyTree roots descendants) =
     descendants' = (insertWith (++) parent [child] descendants)
 
 
-getChildren :: String -> FamilyTree -> [String]
+getChildren :: String -> FamilyTree -> [Node]
 getChildren parent (FamilyTree _ descendants) = findWithDefault [] parent descendants
 
 
-getRoots :: FamilyTree -> [String]
+getRoots :: FamilyTree -> [Node]
 getRoots = Set.toList . roots 
 
 
-buildFamilyTree :: Solution -> FamilyTree
-buildFamilyTree (Solution sigs _ fields) =
-    buildTuples tuples
+getAliases :: [Sig] -> Set String
+getAliases sigs =
+    Set.fromList $ mapMaybe getAlias sigs
     where
-    tuples = concatMap f_tuples fields
-    atoms = concatMap s_atoms sigs
-    atomLabels = map a_label atoms
-    buildTuples [] = FamilyTree (Set.fromList atomLabels) Map.empty
-    buildTuples (t:ts) = addChild (t_from t) (t_to t) $ buildTuples ts
+    getAlias AliasSig{s_label=label} = Just $ aliasToName label
+    getAlias _ = Nothing
+
+
+buildFamilyTree :: Solution -> FamilyTree
+buildFamilyTree (Solution sigs fields) =
+    buildFields fields
+    where
+    asNodes Sig{s_atoms=atoms} = map ClaferNode $ map a_label atoms
+    asNodes AliasSig{s_label=label, s_atoms=atoms} = map (AliasNode $ aliasToName label) $ map a_label atoms
+    nodes = concatMap asNodes sigs
+    aliases = getAliases sigs
+    
+    buildFields [] = FamilyTree (Set.fromList nodes) Map.empty
+    buildFields (f:fs) =
+        buildTuples $ f_tuples f
+        where
+        label = f_label f
+        buildNode = if label `Set.member` aliases then AliasNode label else ClaferNode
+        buildTuples [] = buildFields fs 
+        buildTuples (t:ts) = addChild (t_from t) (buildNode $ t_to t) $ buildTuples ts
 
 
 -- A map of label -> Sig
 buildSigMap :: Solution -> Map String Sig
-buildSigMap (Solution sigs _ _) = Map.fromList $ zip (map s_label sigs) sigs
+buildSigMap (Solution sigs _) = Map.fromList $ zip (map s_label sigs) sigs
 
 
 -- A map of label -> ID
 buildTypeMap :: Solution -> Map String Int
-buildTypeMap (Solution sigs _ fields) =
+buildTypeMap (Solution sigs fields) =
     mapSigs `Map.union` mapTuples
     where
     buildSig :: Sig -> Map String Int
@@ -103,32 +118,14 @@ buildTypeMap (Solution sigs _ fields) =
     mapTuples = buildTuples $ concatMap f_tuples fields
     
 
--- A map of aliases
-buildAliasMap :: Solution -> Map String [String]
-buildAliasMap (Solution _ aliases _) =
-    buildAlias aliases
-    where
-    buildAlias :: [Alias] -> Map String [String]
-    buildAlias [] = Map.empty
-    buildAlias (a:as) =
-        foldr (flip (Map.insertWith (++)) [l_label a]) aa bb
-        where 
-            aa :: Map String [String]
-            aa = (buildAlias as)
-            
-            bb :: [String]
-            bb = (l_alias a)
-
-
 buildClaferModel :: Solution -> ClaferModel
 buildClaferModel solution =
-    trace (show $ buildAliasMap solution)
-    ClaferModel $ map (left . buildClafer) (getRoots ftree)
+    ClaferModel $ lefts $ map buildClafer (getRoots ftree)
     where
+    
     sigMap = buildSigMap solution
     typeMap = buildTypeMap solution
     ftree = buildFamilyTree solution
-    aliasMap = buildAliasMap solution
     
     intId = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
     isInt label = (findWithDefault (error $ "Missing label " ++ label) label typeMap) == intId
@@ -139,17 +136,18 @@ buildClaferModel solution =
     singleton [x] = Just x
     singleton xs = error $ "Received more than one value " ++ show xs
     
-    buildClafer :: String -> Either Clafer Value
-    buildClafer label = 
+    buildClafer :: Node -> Either Clafer Value
+    buildClafer (ClaferNode label) =
         if isInt label then
             Right $ IntClafer (read label)
         else
-            Left $ Clafer (simpleName label) (map simpleAlias aliases) (singleton valueChildren) claferChildren
-            where
-            aliases = Map.findWithDefault [] label aliasMap
-            children = map buildClafer (getChildren label ftree)
-            (claferChildren, valueChildren) = partitionEithers children
-    
+            Left $ Clafer (simpleName label) (singleton valueChildren) claferChildren
+        where
+        (claferChildren, valueChildren) = partitionEithers $ map buildClafer children
+        children = getChildren label ftree
+    buildClafer (AliasNode name label) =
+        Left $ Alias (simpleAlias name) (simpleName label)
+        
 
 -- Only keeps the substring between the '_' and '$' exclusive.
 simpleName :: String -> String
@@ -161,6 +159,12 @@ simpleName n =
         
 simpleAlias :: String -> String
 simpleAlias n =
-    case stripPrefix "this/" n of
+    case stripPrefix "r_" n of
         Just x -> simpleName x
+        Nothing -> error $ "Unexpected alias " ++ n
+        
+aliasToName :: String -> String
+aliasToName n =
+    case stripPrefix "this/" n of
+        Just x -> "r_" ++ x
         Nothing -> error $ "Unexpected alias name " ++ n
