@@ -2,6 +2,10 @@ all: alloyIG.jar install
 
 install:
 	cabal install --bindir=.
+
+newVersion:
+	ghc -isrc src/dateVer.hs -outputdir dist/build --make -o dateVer
+	./src/dateVer > src/Version.hs
 	
 # Build takes less time. For ease of development.
 build: alloyIG.jar

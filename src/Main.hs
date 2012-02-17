@@ -34,20 +34,23 @@ import System.IO
 import System.IO.Error
 import System.Process
 
+import Version
 
 data Process = Process{stdIn::Handle, stdOut::Handle, procHandle::ProcessHandle}
-
 
 data IGArgs = IGArgs {
     claferFile :: FilePath
 } deriving (Show, Data, Typeable)
 
 
-data Command = Next | Save | Quit
+data Command = Next | Increase | Save | Quit | Help | Version
 
 
 isNext Next = True
 isNext _ = False
+
+isIncrease Increase = True
+isIncrease _ = False
 
 isSave Save = True
 isSave _ = False
@@ -55,10 +58,18 @@ isSave _ = False
 isQuit Quit = True
 isQuit _ = False
 
+isHelp Help = True
+isHelp _ = False
+
+isVersion Version = True
+isVersion _ = False
+
+claferIGVersion =
+    "ClaferIG v" ++ version
 
 claferIG = IGArgs {
     claferFile = def &= argPos 0 &= typ "FILE"
-} &= summary "ClaferIG v0.0.1"
+} &= summary claferIGVersion
 
 
 -- Read the length, then the string
@@ -101,8 +112,13 @@ beginInterface file proc =
                         putStrLn $ show model
                         nextInterface saved (model:unsaved)
                     Nothing -> do
-                        putStrLn "No more instances found"
+                        putStrLn "No more instances found. Try increasing scope to get more instances."
                         nextInterface saved unsaved
+        topLevelInterface Increase saved unsaved =
+            do
+                putStrLn "Enter the name of the clafer to increase the maximum number of instances for or press [enter] to increase for all clafers"
+                nextInterface saved unsaved
+
         topLevelInterface Save saved unsaved =
             do
                 communicateCommand Save proc
@@ -112,7 +128,29 @@ beginInterface file proc =
             do
                 communicateCommand Quit proc
                 return ()
-                
+               
+        topLevelInterface Help saved unsaved =
+            do
+                putStrLn (
+                    "---------\n" ++
+                    "| Usage |\n" ++
+                    "---------\n\n" ++
+                    "You can invoke the following commands by pressing the first letter of the command name:\n" ++
+                    "next     - to produce the next instance if available or to output a message that no more \n" ++
+                    "           instances exist within the given scope\n" ++
+                    "increase - to increase the maximum number of instances of a given clafer or all clafers (scope)\n" ++
+                    "save     - to save all instances displayed so far or a counterexample to files named \n" ++
+                    "           <model file name>.cfr.<instance number>.data, one instance per file\n" ++
+                    "quit     - to quit the interactive session\n" ++
+                    "help     - to display this menu options summary\n" ++
+                    "version  - to display the version (including build date)\n")
+                nextInterface saved unsaved
+ 
+        topLevelInterface Version saved unsaved =
+            do
+                putStrLn claferIGVersion
+                nextInterface saved unsaved
+
         nextInterface :: [ClaferModel] -> [ClaferModel] -> IO ()
         nextInterface saved unsaved =
             do
@@ -126,7 +164,7 @@ beginInterface file proc =
                 writeFile saveName (show c)
                 putStrLn $ "Saved to " ++ saveName
                 save cs (counter + 1)
-            where saveName = file ++ (show counter) ++ ".data"
+            where saveName = file ++ "." ++ (show counter) ++ ".data"
                 
         
 -- Sends the command to the alloyIG subprocess
@@ -153,15 +191,19 @@ communicateCommand Save _ = return Nothing
 nextCommand :: IO Command
 nextCommand =
     do
-        putStr "n,q,s>"
+        putStr "n, i, s, q, h>"
         hFlush stdout
         op <- try getLine
         case op of
             -- User submitted eof. Quit process.
             Left e -> if isEOFError e then return Quit else ioError e
             Right "n" -> return Next
-            Right "q" -> return Quit
+            Right "i" -> return Increase
             Right "s" -> return Save
+            Right "q" -> return Quit
+            Right "h" -> return Help
+            Right "v" -> return Version
+
             _ -> putStrLn "Unknown command" >> nextCommand
 
 

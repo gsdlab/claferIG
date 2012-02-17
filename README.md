@@ -31,17 +31,18 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 
 `claferIG <model file name>.cfr -all <scope>`
 
-- opens a non-interactive session and saves all instances up to the provided scope or a counterexample to files named `<model file name>-<instance number>.cfr.data`, one instance per file.
+- opens a non-interactive session and saves all instances up to the provided scope or a counterexample to files named `<model file name>.cfr.<instance number>.data`, one instance per file.
 
 
 ### Interactive Session Usage
-In the interactive mode, the users can invoke the following commands by pressing the letter in boldface:
+In the interactive mode, the users can invoke the following commands by pressing the first letter of the command name:
 
 * **n**ext - to produce the next instance if available or to output a message that no more instances exist within the given scope
 * **i**ncrease - to increase the maximum number of instances of a given clafer or all clafers (scope)
-* **s**ave - to save all instances displayed so far or a counterexample to files named `<model file name>-<instance number>.cfr.data`, one instance per file
+* **s**ave - to save all instances displayed so far or a counterexample to files named `<model file name>.cfr.<instance number>.data`, one instance per file
 * **q**uit - to quit the interactive session
 * **h**elp - to display this menu options summary
+* **v**ersion - to display the version (including build date)
 
 The command '**i**ncrease' allows you to change the maximum number of instances for a given clafer or for all clafers as follows:
 
