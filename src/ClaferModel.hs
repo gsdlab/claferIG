@@ -85,12 +85,14 @@ buildFamilyTree (Solution sigs fields) =
     
     buildFields [] = FamilyTree (Set.fromList nodes) Map.empty
     buildFields (f:fs) =
-        buildTuples $ f_tuples f
+        buildTuples 1 $ f_tuples f
         where
         label = f_label f
-        buildNode = if label `Set.member` aliases then AliasNode label else ClaferNode
-        buildTuples [] = buildFields fs 
-        buildTuples (t:ts) = addChild (t_from t) (buildNode $ t_to t) $ buildTuples ts
+        buildTuples ordinal [] = buildFields fs 
+        buildTuples ordinal (t:ts) = addChild (t_from t) (buildNode $ t_to t) $ buildTuples (ordinal + 1) ts
+            where
+            -- Aliases do not have unique labels. Hence we need to append an ordinal to make them unique.
+            buildNode = if label `Set.member` aliases then AliasNode $ label ++ "$" ++ show ordinal else ClaferNode
 
 
 -- A map of label -> Sig
