@@ -26,6 +26,7 @@ import ClaferModel
 import Control.Monad
 import Data.Maybe
 import Solution
+import Sugarer
 import System.Cmd
 import System.Console.CmdArgs
 import System.Environment.Executable
@@ -178,7 +179,8 @@ communicateCommand Next proc =
                 xml <- getMessage proc
                 let solution = parseSolution xml
                 let claferModel = buildClaferModel solution
-                return $ Just claferModel
+                let sugarModel = sugarClaferModel claferModel
+                return $ Just sugarModel
             False -> return Nothing
 communicateCommand Quit proc =
     do
@@ -197,6 +199,7 @@ nextCommand =
         case op of
             -- User submitted eof. Quit process.
             Left e -> if isEOFError e then return Quit else ioError e
+            Right "" -> return Next
             Right "n" -> return Next
             Right "i" -> return Increase
             Right "s" -> return Save
@@ -221,6 +224,8 @@ main =
         
         alloyIG <- pipeCommand "java" ["-jar", execDir ++ "alloyIG.jar"]
         putMessage alloyIG claferOutput
+        numberOfSigs <- read `liftM` getMessage alloyIG
+        sigs <- mapM getMessage (replicate numberOfSigs alloyIG)
 
 
         beginInterface (claferFile args) alloyIG

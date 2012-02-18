@@ -107,3 +107,4 @@ findAttr name elem = fromJust $ show `fmap` lookup (N name) (getAttrs elem)
 
 getAttrs :: Content i -> [Attribute]
 getAttrs (CElem (Elem _ attributes _) _) = attributes
+

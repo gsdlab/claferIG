@@ -24,7 +24,9 @@ package org.clafer.ig;
 import edu.mit.csail.sdg.alloy4.A4Reporter;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorWarning;
+import edu.mit.csail.sdg.alloy4.SafeList;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;
+import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.parser.AlloyCompiler;
 import edu.mit.csail.sdg.alloy4compiler.parser.CompModule;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Options;
@@ -92,48 +94,50 @@ public final class AlloyInterface {
     }
 
     public static void main(String[] args) throws IOException, Err {
-        try {
-            String modelVerbatim = readMessage();
+        String modelVerbatim = readMessage();
 
-            // Parse+typecheck the model
-            CompModule world = AlloyCompiler.parse(rep, modelVerbatim);
+        // Parse+typecheck the model
+        CompModule world = AlloyCompiler.parse(rep, modelVerbatim);
 
-            // Choose some default options for how you want to execute the commands
-            A4Options options = new A4Options();
-            options.solver = A4Options.SatSolver.SAT4J;
-
-            for (Command command : world.getAllCommands()) {
-                // Execute the command
-                A4Solution ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
-
-                // If satisfiable...
-                while (ans.satisfiable()) {
-
-                    writeMessage("True");
-
-                    // Read the input inside here so that we don't block
-                    // before computing. Hide some of the latency.
-                    if (!interact(readMessage())) {
-                        return;
-                    }
-
-                    StringWriter xml = new StringWriter();
-                    ans.writeXML(new PrintWriter(xml), null, null);
-                    writeMessage(xml.toString());
-
-                    A4Solution nextAns = ans.next();
-                    if (nextAns == ans) {
-                        break;
-                    }
-                    ans = nextAns;
-                }
-            }
-
-            do {
-                writeMessage("False");
-            } while (interact(readMessage()));
-        } catch (EOFException e) {
-            // EOF likely because parent process exited. Stop this process too.
+        SafeList<Sig> sigs = world.getAllSigs();
+        writeMessage(Integer.toString(sigs.size()));
+        for(Sig sig : sigs) {
+            writeMessage(sig.label);
         }
+
+        // Choose some default options for how you want to execute the commands
+        A4Options options = new A4Options();
+        options.solver = A4Options.SatSolver.MiniSatProverJNI;
+
+        for (Command command : world.getAllCommands()) {
+            // Execute the command
+            A4Solution ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
+
+            // If satisfiable...
+            while (ans.satisfiable()) {
+
+                writeMessage("True");
+
+                // Read the input inside here so that we don't block
+                // before computing. Hide some of the latency.
+                if (!interact(readMessage())) {
+                    return;
+                }
+
+                StringWriter xml = new StringWriter();
+                ans.writeXML(new PrintWriter(xml), null, null);
+                writeMessage(xml.toString());
+
+                A4Solution nextAns = ans.next();
+                if (nextAns == ans) {
+                    break;
+                }
+                ans = nextAns;
+            }
+        }
+
+        do {
+            writeMessage("False");
+        } while (interact(readMessage()));
     }
 }

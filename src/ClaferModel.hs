@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module ClaferModel (ClaferModel, Clafer(..), buildClaferModel) where
+module ClaferModel (ClaferModel(..), Clafer(..), Value(..), buildClaferModel) where
 
 import Data.List 
 import Data.Either
@@ -31,8 +31,8 @@ import Solution
 
 
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
-data Clafer = Clafer {c_name::String, c_value::Maybe Value, c_children::[Clafer]} | Alias {c_name::String, c_alias::String}
-data Value = IntClafer {v_value::Int} deriving Show
+data Clafer = Clafer {c_name::String, c_value::Maybe Value, c_children::[Clafer]}
+data Value = AliasValue {c_alias::String} | IntValue {v_value::Int} deriving Show
 
 data FamilyTree = FamilyTree {roots::Set Node, descendants::Map String [Node]} deriving Show
 data Node = ClaferNode  {n_name::String} | AliasNode {n_name, n_alias::String} deriving (Eq, Ord, Show)
@@ -44,12 +44,10 @@ instance Show Clafer where
     show clafer = displayClafer "" clafer
         where
         displayClafer indent (Clafer name value children) =
-            indent ++ name ++ displayValue value ++
+            indent ++ name ++ (maybe "" displayValue value) ++
             "\n" ++ concatMap (displayClafer (indent ++ "  ")) children
-        displayClafer indent (Alias name alias) =
-            indent ++ name ++ " = " ++ alias ++ "\n"
-        displayValue Nothing = ""
-        displayValue (Just (IntClafer value)) = " = " ++ show value
+        displayValue (AliasValue alias) = " = " ++ alias
+        displayValue (IntValue value) = " = " ++ show value
             
 
 addChild :: String -> Node -> FamilyTree -> FamilyTree
@@ -130,39 +128,32 @@ buildClaferModel solution =
     intId = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
     isInt label = (findWithDefault (error $ "Missing label " ++ label) label typeMap) == intId
     
-    left (Left x) = x
-    
     singleton [] = Nothing
     singleton [x] = Just x
     singleton xs = error $ "Received more than one value " ++ show xs
     
     buildClafer :: Node -> Either Clafer Value
-    buildClafer (ClaferNode label) =
-        if isInt label then
-            Right $ IntClafer (read label)
+    buildClafer (ClaferNode name) =
+        if isInt name then
+            Right $ IntValue (read name)
         else
-            Left $ Clafer (simpleName label) (singleton valueChildren) claferChildren
+            Left $ Clafer name (singleton valueChildren) claferChildren
         where
         (claferChildren, valueChildren) = partitionEithers $ map buildClafer children
-        children = getChildren label ftree
-    buildClafer (AliasNode name label) =
-        Left $ Alias (simpleAlias name) (simpleName label)
+        children = getChildren name ftree
+    buildClafer (AliasNode name alias) =
+        Left $ Clafer (simpleAlias name) (Just $ AliasValue alias) []
         
 
--- Only keeps the substring between the '_' and '$' exclusive.
-simpleName :: String -> String
-simpleName n =
-    fst $ break ('$' ==) $
-    case snd $ break ('_' ==) n of
-        [] ->  n
-        x -> tail x
-        
+-- Alters an alias name to a normal clafer name.
+-- We need to do this step to unify the alloy names.
 simpleAlias :: String -> String
 simpleAlias n =
     case stripPrefix "r_" n of
-        Just x -> simpleName x
+        Just x -> x
         Nothing -> error $ "Unexpected alias " ++ n
-        
+
+
 aliasToName :: String -> String
 aliasToName n =
     case stripPrefix "this/" n of
