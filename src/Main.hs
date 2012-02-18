@@ -47,24 +47,6 @@ data IGArgs = IGArgs {
 data Command = Next | Increase | Save | Quit | Help | Version
 
 
-isNext Next = True
-isNext _ = False
-
-isIncrease Increase = True
-isIncrease _ = False
-
-isSave Save = True
-isSave _ = False
-
-isQuit Quit = True
-isQuit _ = False
-
-isHelp Help = True
-isHelp _ = False
-
-isVersion Version = True
-isVersion _ = False
-
 claferIGVersion =
     "ClaferIG v" ++ version
 
@@ -91,8 +73,8 @@ putMessage process message =
 
 
 -- Start another process and return the piped std_in, std_out stream
-pipeCommand :: FilePath -> [String] -> IO Process
-pipeCommand exec args =
+pipeProcess :: FilePath -> [String] -> IO Process
+pipeProcess exec args =
     do
         (Just stdIn, Just stdOut, _, procHandle) <- createProcess process
         hSetNewlineMode stdIn noNewlineTranslation
@@ -107,7 +89,7 @@ beginInterface file proc =
         topLevelInterface :: Command -> [ClaferModel] -> [ClaferModel] -> IO ()
         topLevelInterface Next saved unsaved =
             do
-                answer <- communicateCommand Next proc
+                answer <- communicateNextCommand proc
                 case answer of
                     Just model -> do
                         putStrLn $ show model
@@ -122,12 +104,11 @@ beginInterface file proc =
 
         topLevelInterface Save saved unsaved =
             do
-                communicateCommand Save proc
                 save unsaved (length saved)
                 nextInterface (unsaved ++ saved) []
         topLevelInterface Quit _ _ =
             do
-                communicateCommand Quit proc
+                communicateQuitCommand proc
                 return ()
                
         topLevelInterface Help saved unsaved =
@@ -167,10 +148,19 @@ beginInterface file proc =
                 save cs (counter + 1)
             where saveName = file ++ "." ++ (show counter) ++ ".data"
                 
-        
--- Sends the command to the alloyIG subprocess
-communicateCommand :: Command -> Process -> IO (Maybe ClaferModel)
-communicateCommand Next proc =
+
+-- Get a list of all the sigs from alloyIG
+communicateSigCommand :: Process -> IO [String]
+communicateSigCommand proc =
+    do
+        putMessage proc "s"
+        numberOfSigs <- read `liftM` getMessage proc
+        mapM getMessage (replicate numberOfSigs proc)
+
+
+-- Get the next solution from alloyIG
+communicateNextCommand :: Process -> IO (Maybe ClaferModel)
+communicateNextCommand proc =
     do
         putMessage proc "n"
         status <- read `liftM` getMessage proc
@@ -182,11 +172,13 @@ communicateCommand Next proc =
                 let sugarModel = sugarClaferModel claferModel
                 return $ Just sugarModel
             False -> return Nothing
-communicateCommand Quit proc =
+
+
+-- Tell alloyIG to quit
+communicateQuitCommand :: Process -> IO ()
+communicateQuitCommand proc =
     do
         putMessage proc "q"
-        return Nothing
-communicateCommand Save _ = return Nothing
 
 
 -- Retrieve the next user input command
@@ -216,16 +208,14 @@ main =
         args <- cmdArgs claferIG
 
         
-        claferProc <- pipeCommand (execDir ++ "clafer") ["-o", "-s", claferFile args]
+        claferProc <- pipeProcess (execDir ++ "clafer") ["-o", "-s", claferFile args]
         claferOutput <- hGetContents $ stdOut claferProc
         claferExit <- waitForProcess (procHandle claferProc)
         when (claferExit /= ExitSuccess) (print "clafer unexpectedly terminated" >> exitWith claferExit)
         
         
-        alloyIG <- pipeCommand "java" ["-jar", execDir ++ "alloyIG.jar"]
+        alloyIG <- pipeProcess "java" ["-jar", execDir ++ "alloyIG.jar"]
         putMessage alloyIG claferOutput
-        numberOfSigs <- read `liftM` getMessage alloyIG
-        sigs <- mapM getMessage (replicate numberOfSigs alloyIG)
 
 
         beginInterface (claferFile args) alloyIG

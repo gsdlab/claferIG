@@ -45,7 +45,7 @@ public final class AlloyInterface {
     private static BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
     private static PrintStream output = System.out;
 
-    public static String readMessage() throws IOException {
+    private static String readMessage() throws IOException {
         String line = input.readLine();
         if (line == null) {
             throw new EOFException();
@@ -67,7 +67,7 @@ public final class AlloyInterface {
         return new String(buf);
     }
 
-    public static void writeMessage(String message) throws IOException {
+    private static void writeMessage(String message) throws IOException {
         output.println(message.length());
         output.print(message);
     }
@@ -82,15 +82,27 @@ public final class AlloyInterface {
         }
     };
 
-    public static boolean interact(String op) throws IOException {
+    private static interface Operation {
+    }
+
+    private static class NextOperation implements Operation {
+    }
+
+    private static class QuitOperation implements Operation {
+    }
+
+    private static class SigsOperation implements Operation {
+    }
+
+    private static Operation parseOperation(String op) throws IOException {
         if (op == null || op.equals("q")) {
-            return false;
+            return new QuitOperation();
         } else if (op.equals("n")) {
-            // continue
-        } else {
-            throw new IOException("Unknown op " + op);
+            return new NextOperation();
+        } else if (op.equals("s")) {
+            return new SigsOperation();
         }
-        return true;
+        throw new IOException("Unknown op " + op);
     }
 
     public static void main(String[] args) throws IOException, Err {
@@ -99,45 +111,41 @@ public final class AlloyInterface {
         // Parse+typecheck the model
         CompModule world = AlloyCompiler.parse(rep, modelVerbatim);
 
-        SafeList<Sig> sigs = world.getAllSigs();
-        writeMessage(Integer.toString(sigs.size()));
-        for(Sig sig : sigs) {
-            writeMessage(sig.label);
-        }
-
         // Choose some default options for how you want to execute the commands
         A4Options options = new A4Options();
         options.solver = A4Options.SatSolver.MiniSatProverJNI;
 
-        for (Command command : world.getAllCommands()) {
-            // Execute the command
-            A4Solution ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
+        Command command = world.getAllCommands().get(0);
+        // Execute the command
+        A4Solution ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
 
-            // If satisfiable...
-            while (ans.satisfiable()) {
+        while (true) {
+            Operation operation = parseOperation(readMessage());
 
-                writeMessage("True");
+            if (operation instanceof NextOperation) {
+                if (ans.satisfiable()) {
+                    writeMessage("True");
+                    StringWriter xml = new StringWriter();
+                    ans.writeXML(new PrintWriter(xml), null, null);
+                    writeMessage(xml.toString());
 
-                // Read the input inside here so that we don't block
-                // before computing. Hide some of the latency.
-                if (!interact(readMessage())) {
-                    return;
+                    A4Solution nextAns = ans.next();
+                    if (nextAns == ans) {
+                        break;
+                    }
+                    ans = nextAns;
+                } else {
+                    writeMessage("False");
                 }
-
-                StringWriter xml = new StringWriter();
-                ans.writeXML(new PrintWriter(xml), null, null);
-                writeMessage(xml.toString());
-
-                A4Solution nextAns = ans.next();
-                if (nextAns == ans) {
-                    break;
+            } else if (operation instanceof SigsOperation) {
+                SafeList<Sig> sigs = world.getAllSigs();
+                writeMessage(Integer.toString(sigs.size()));
+                for (Sig sig : sigs) {
+                    writeMessage(sig.label);
                 }
-                ans = nextAns;
+            } else if (operation instanceof QuitOperation) {
+                break;
             }
         }
-
-        do {
-            writeMessage("False");
-        } while (interact(readMessage()));
     }
 }
