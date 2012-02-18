@@ -25,6 +25,7 @@ module Main where
 import ClaferModel
 import Control.Monad
 import Data.Maybe
+import Process
 import Solution
 import Sugarer
 import System.Cmd
@@ -33,11 +34,8 @@ import System.Environment.Executable
 import System.Exit
 import System.IO
 import System.IO.Error
-import System.Process
 
 import Version
-
-data Process = Process{stdIn::Handle, stdOut::Handle, procHandle::ProcessHandle}
 
 data IGArgs = IGArgs {
     claferFile :: FilePath
@@ -54,33 +52,6 @@ claferIG = IGArgs {
     claferFile = def &= argPos 0 &= typ "FILE"
 } &= summary claferIGVersion
 
-
--- Read the length, then the string
-getMessage :: Process -> IO String
-getMessage process =
-    do
-        length <- read `liftM` hGetLine (stdOut process)
-        mapM hGetChar $ replicate length (stdOut process)
-        
-
--- Put the length, then the string
-putMessage :: Process -> String -> IO ()
-putMessage process message =
-    do
-        hPutStrLn (stdIn process) (show $ length message)
-        hPutStr (stdIn process) message
-        hFlush (stdIn process)
-
-
--- Start another process and return the piped std_in, std_out stream
-pipeProcess :: FilePath -> [String] -> IO Process
-pipeProcess exec args =
-    do
-        (Just stdIn, Just stdOut, _, procHandle) <- createProcess process
-        hSetNewlineMode stdIn noNewlineTranslation
-        return $ Process stdIn stdOut procHandle -- Pipe always has a handle according to docs
-    where process = (proc exec args) { std_in = CreatePipe, std_out = CreatePipe }
-    
 
 beginInterface :: FilePath -> Process -> IO ()
 beginInterface file proc =
@@ -109,7 +80,6 @@ beginInterface file proc =
         topLevelInterface Quit _ _ =
             do
                 communicateQuitCommand proc
-                return ()
                
         topLevelInterface Help saved unsaved =
             do
@@ -176,9 +146,7 @@ communicateNextCommand proc =
 
 -- Tell alloyIG to quit
 communicateQuitCommand :: Process -> IO ()
-communicateQuitCommand proc =
-    do
-        putMessage proc "q"
+communicateQuitCommand proc = putMessage proc "q"
 
 
 -- Retrieve the next user input command
@@ -209,8 +177,8 @@ main =
 
         
         claferProc <- pipeProcess (execDir ++ "clafer") ["-o", "-s", claferFile args]
-        claferOutput <- hGetContents $ stdOut claferProc
-        claferExit <- waitForProcess (procHandle claferProc)
+        claferOutput <- getContentsVerbatim claferProc
+        claferExit <- waitFor claferProc
         when (claferExit /= ExitSuccess) (print "clafer unexpectedly terminated" >> exitWith claferExit)
         
         
