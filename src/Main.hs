@@ -60,7 +60,7 @@ beginInterface file proc =
         topLevelInterface :: Command -> [ClaferModel] -> [ClaferModel] -> IO ()
         topLevelInterface Next saved unsaved =
             do
-                answer <- communicateNextCommand proc
+                answer <- sendNextCommand proc
                 case answer of
                     Just model -> do
                         putStrLn $ show model
@@ -68,18 +68,21 @@ beginInterface file proc =
                     Nothing -> do
                         putStrLn "No more instances found. Try increasing scope to get more instances."
                         nextInterface saved unsaved
-        topLevelInterface Increase saved unsaved =
-            do
-                putStrLn "Enter the name of the clafer to increase the maximum number of instances for or press [enter] to increase for all clafers"
-                nextInterface saved unsaved
 
         topLevelInterface Save saved unsaved =
             do
                 save unsaved (length saved)
                 nextInterface (unsaved ++ saved) []
+                
         topLevelInterface Quit _ _ =
             do
-                communicateQuitCommand proc
+                sendQuitCommand proc
+               
+        topLevelInterface Increase saved unsaved =
+            do
+                newScope <- sendIncreaseGlobalScopeCommand 1 proc
+                putStrLn $ "Global scope increased to " ++ show newScope
+                nextInterface saved unsaved
                
         topLevelInterface Help saved unsaved =
             do
@@ -120,8 +123,8 @@ beginInterface file proc =
                 
 
 -- Get a list of all the sigs from alloyIG
-communicateSigCommand :: Process -> IO [String]
-communicateSigCommand proc =
+sendSigCommand :: Process -> IO [String]
+sendSigCommand proc =
     do
         putMessage proc "s"
         numberOfSigs <- read `liftM` getMessage proc
@@ -129,8 +132,8 @@ communicateSigCommand proc =
 
 
 -- Get the next solution from alloyIG
-communicateNextCommand :: Process -> IO (Maybe ClaferModel)
-communicateNextCommand proc =
+sendNextCommand :: Process -> IO (Maybe ClaferModel)
+sendNextCommand proc =
     do
         putMessage proc "n"
         status <- read `liftM` getMessage proc
@@ -144,9 +147,19 @@ communicateNextCommand proc =
             False -> return Nothing
 
 
+-- Tell alloyIG to increase the scope
+sendIncreaseGlobalScopeCommand :: Int -> Process -> IO Int
+sendIncreaseGlobalScopeCommand increment proc =
+    do
+        putMessage proc "i"
+        putMessage proc (show increment)
+        newScope <- getMessage proc
+        return $ read newScope
+
+
 -- Tell alloyIG to quit
-communicateQuitCommand :: Process -> IO ()
-communicateQuitCommand proc = putMessage proc "q"
+sendQuitCommand :: Process -> IO ()
+sendQuitCommand proc = putMessage proc "q"
 
 
 -- Retrieve the next user input command

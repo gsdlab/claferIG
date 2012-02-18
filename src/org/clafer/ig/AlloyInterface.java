@@ -94,13 +94,30 @@ public final class AlloyInterface {
     private static class SigsOperation implements Operation {
     }
 
-    private static Operation parseOperation(String op) throws IOException {
+    private static class IncreaseScopeOperation implements Operation {
+
+        private final int increment;
+
+        public IncreaseScopeOperation(int increment) {
+            this.increment = increment;
+        }
+
+        public int getIncrement() {
+            return increment;
+        }
+    }
+
+    private static Operation nextOperation() throws IOException {
+        String op = readMessage();
         if (op == null || op.equals("q")) {
             return new QuitOperation();
         } else if (op.equals("n")) {
             return new NextOperation();
         } else if (op.equals("s")) {
             return new SigsOperation();
+        } else if (op.equals("i")) {
+            int increment = Integer.parseInt(readMessage());
+            return new IncreaseScopeOperation(increment);
         }
         throw new IOException("Unknown op " + op);
     }
@@ -120,7 +137,7 @@ public final class AlloyInterface {
         A4Solution ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
 
         while (true) {
-            Operation operation = parseOperation(readMessage());
+            Operation operation = nextOperation();
 
             if (operation instanceof NextOperation) {
                 if (ans.satisfiable()) {
@@ -143,6 +160,18 @@ public final class AlloyInterface {
                 for (Sig sig : sigs) {
                     writeMessage(sig.label);
                 }
+            } else if (operation instanceof IncreaseScopeOperation) {
+                IncreaseScopeOperation increaseScope = (IncreaseScopeOperation) operation;
+                int increment = increaseScope.getIncrement();
+
+                Command c = command;
+                command = new Command(c.pos, c.label, c.check, c.overall + increment, c.bitwidth, c.maxseq, c.expects, c.scope, c.additionalExactScopes, c.formula, c.parent);
+
+                writeMessage(Integer.toString(command.overall));
+
+                // Reexecute the command
+                ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
+                
             } else if (operation instanceof QuitOperation) {
                 break;
             }
