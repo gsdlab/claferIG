@@ -23,8 +23,8 @@ package org.clafer.ig;
 
 import edu.mit.csail.sdg.alloy4.A4Reporter;
 import edu.mit.csail.sdg.alloy4.Err;
+import edu.mit.csail.sdg.alloy4.ErrorSyntax;
 import edu.mit.csail.sdg.alloy4.ErrorWarning;
-import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;
 import edu.mit.csail.sdg.alloy4compiler.ast.CommandScope;
@@ -95,52 +95,121 @@ public final class AlloyIG {
     private static class QuitOperation implements Operation {
     }
 
-    private static class SigsOperation implements Operation {
-    }
+    private static class SetGlobalScopeOperation implements Operation {
 
-    private static class IncreaseGlobalScopeOperation implements Operation {
+        private final int scopeSize;
 
-        private final int increment;
-
-        public IncreaseGlobalScopeOperation(int increment) {
-            this.increment = increment;
+        public SetGlobalScopeOperation(int scopeSize) {
+            this.scopeSize = scopeSize;
         }
 
-        public int getIncrement() {
-            return increment;
+        public int getScopeSize() {
+            return scopeSize;
         }
     }
 
-    private static class IncreaseScopeOperation implements Operation {
-        
+    private static class SetScopeOperation implements Operation {
+
+        private final String sig;
+        private final int scopeSize;
+
+        public SetScopeOperation(String sig, int scopeSize) {
+            if (sig == null) {
+                throw new NullPointerException();
+            }
+            this.sig = sig;
+            this.scopeSize = scopeSize;
+        }
+
+        public String getSig() {
+            return sig;
+        }
+
+        public int getScopeSize() {
+            return scopeSize;
+        }
     }
 
     private static Operation nextOperation() throws IOException {
         String op = readMessage();
-        if (op == null || op.equals("q")) {
+        if (op == null || op.equals("quit")) {
             return new QuitOperation();
-        } else if (op.equals("n")) {
+        } else if (op.equals("next")) {
             return new NextOperation();
-        } else if (op.equals("s")) {
-            return new SigsOperation();
-        } else if (op.equals("ig")) {
-            int increment = Integer.parseInt(readMessage());
-            return new IncreaseGlobalScopeOperation(increment);
+        } else if (op.equals("setGlobalScope")) {
+            int scopeSize = Integer.parseInt(readMessage());
+            return new SetGlobalScopeOperation(scopeSize);
+        } else if (op.equals("setScope")) {
+            String sig = readMessage();
+            int scopeSize = Integer.parseInt(readMessage());
+            return new SetScopeOperation(sig, scopeSize);
         }
-        throw new IOException("Unknown op " + op);
+        throw new AlloyIGException("Unknown op " + op);
+    }
+
+    private static CommandScope setCommandScopeSize(int scopeSize, CommandScope cs) throws ErrorSyntax {
+        return new CommandScope(
+                cs.pos, cs.sig, cs.isExact, scopeSize, scopeSize, cs.increment);
+    }
+
+    private static Sig findSig(String name, Iterable<Sig> sigs) {
+        for (Sig sig : sigs) {
+            if (name.equals(sig.label)) {
+                return sig;
+            }
+        }
+        throw new AlloyIGException("Unknown sig " + name);
+    }
+
+    private static List<CommandScope> setScopeSize(Sig sig, int scopeSize, List<CommandScope> scope) throws ErrorSyntax {
+        List<CommandScope> newScope = new ArrayList<CommandScope>();
+
+        boolean found = false;
+        for (CommandScope cs : scope) {
+            if (sig.equals(cs.sig)) {
+                found = true;
+                newScope.add(setCommandScopeSize(scopeSize, cs));
+            } else {
+                newScope.add(cs);
+            }
+        }
+
+        if (!found) {
+            newScope.add(new CommandScope(sig, false, scopeSize));
+        }
+
+        return newScope;
     }
 
     public static void main(String[] args) throws IOException, Err {
+        try {
+            run(args);
+        } catch (EOFException e) {
+            System.err.println("AlloyIG stream closed.");
+        }
+    }
+
+    public static void run(String[] args) throws IOException, Err {
         String modelVerbatim = readMessage();
 
         // Parse+typecheck the model
         CompModule world = AlloyCompiler.parse(rep, modelVerbatim);
+        SafeList<Sig> sigs = world.getAllSigs();
 
         // Choose some default options for how you want to execute the commands
         A4Options options = new A4Options();
         options.solver = A4Options.SatSolver.MiniSatProverJNI;
 
         Command command = world.getAllCommands().get(0);
+
+        // Send back all the sigs
+        writeMessage(Integer.toString(sigs.size()));
+        for (Sig sig : sigs) {
+            writeMessage(sig.label);
+        }
+        // Send back the global scope
+        writeMessage(Integer.toString(command.overall));
+
         // Execute the command
         A4Solution ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
 
@@ -162,30 +231,27 @@ public final class AlloyIG {
                 } else {
                     writeMessage("False");
                 }
-            } else if (operation instanceof SigsOperation) {
-                SafeList<Sig> sigs = world.getAllSigs();
-                writeMessage(Integer.toString(sigs.size()));
-                for (Sig sig : sigs) {
-                    writeMessage(sig.label);
-                }
-            } else if (operation instanceof IncreaseGlobalScopeOperation) {
-                IncreaseGlobalScopeOperation increaseScope = (IncreaseGlobalScopeOperation) operation;
-                int increment = increaseScope.getIncrement();
+            } else if (operation instanceof SetGlobalScopeOperation) {
+                SetGlobalScopeOperation increaseScope = (SetGlobalScopeOperation) operation;
+                int scopeSize = increaseScope.getScopeSize();
 
                 Command c = command;
                 List<CommandScope> scope = new ArrayList<CommandScope>();
                 for (CommandScope cs : c.scope) {
-                    scope.add(new CommandScope(
-                            cs.pos, cs.sig, cs.isExact, cs.startingScope + increment,
-                            cs.endingScope + increment, cs.increment));
+                    scope.add(setCommandScopeSize(scopeSize, cs));
                 }
 
-                command = new Command(c.pos, c.label, c.check, c.overall + increment, c.bitwidth, c.maxseq, c.expects, scope, c.additionalExactScopes, c.formula, c.parent);
-
-                writeMessage(Integer.toString(command.overall));
+                command = new Command(c.pos, c.label, c.check, scopeSize, c.bitwidth, c.maxseq, c.expects, scope, c.additionalExactScopes, c.formula, c.parent);
 
                 // Reexecute the command
                 ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
+            } else if (operation instanceof SetScopeOperation) {
+                SetScopeOperation increaseScope = (SetScopeOperation) operation;
+                String sigName = increaseScope.getSig();
+                int scopeSize = increaseScope.getScopeSize();
+
+                Command c = command;
+                c.getScope(findSig(sigName, sigs));
 
             } else if (operation instanceof QuitOperation) {
                 break;

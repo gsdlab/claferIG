@@ -40,7 +40,7 @@ poll fullName (Census sample counts) =
     where
     name = simpleName fullName
     counts' = insertWith (+) name 1 counts
-    ordinal' = Map.findWithDefault (error $ "Did not find " ++ name ++ " in counts.") name counts'
+    ordinal' = findWithDefault (error $ "Did not find " ++ name ++ " in counts.") name counts'
     sample' = insertWith (error $ "Polled " ++ fullName ++ " twice in the census.") fullName (ordinal', name) sample
 
 
@@ -66,8 +66,8 @@ sugarClaferModel model@(ClaferModel topLevel) =
         else
             simpleName ++ show ordinal
         where
-        (ordinal, simpleName) = Map.findWithDefault (error $ "Sample lookup " ++ fullName ++ " failed.") fullName sample
-        count = Map.findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts
+        (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ fullName ++ " failed.") fullName sample
+        count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts
     
     sugarClafer (Clafer fullName value children) = Clafer (sugarName fullName) (sugarValue `liftM` value) (map sugarClafer children)
 
