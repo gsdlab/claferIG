@@ -1,3 +1,3 @@
-Main-Class: org.clafer.ig.AlloyInterface
+Main-Class: org.clafer.ig.AlloyIG
 Class-Path: alloy4.jar
 

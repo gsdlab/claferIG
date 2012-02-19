@@ -24,8 +24,10 @@ package org.clafer.ig;
 import edu.mit.csail.sdg.alloy4.A4Reporter;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorWarning;
+import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;
+import edu.mit.csail.sdg.alloy4compiler.ast.CommandScope;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.parser.AlloyCompiler;
 import edu.mit.csail.sdg.alloy4compiler.parser.CompModule;
@@ -39,8 +41,10 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.List;
 
-public final class AlloyInterface {
+public final class AlloyIG {
 
     private static BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
     private static PrintStream output = System.out;
@@ -94,17 +98,21 @@ public final class AlloyInterface {
     private static class SigsOperation implements Operation {
     }
 
-    private static class IncreaseScopeOperation implements Operation {
+    private static class IncreaseGlobalScopeOperation implements Operation {
 
         private final int increment;
 
-        public IncreaseScopeOperation(int increment) {
+        public IncreaseGlobalScopeOperation(int increment) {
             this.increment = increment;
         }
 
         public int getIncrement() {
             return increment;
         }
+    }
+
+    private static class IncreaseScopeOperation implements Operation {
+        
     }
 
     private static Operation nextOperation() throws IOException {
@@ -115,9 +123,9 @@ public final class AlloyInterface {
             return new NextOperation();
         } else if (op.equals("s")) {
             return new SigsOperation();
-        } else if (op.equals("i")) {
+        } else if (op.equals("ig")) {
             int increment = Integer.parseInt(readMessage());
-            return new IncreaseScopeOperation(increment);
+            return new IncreaseGlobalScopeOperation(increment);
         }
         throw new IOException("Unknown op " + op);
     }
@@ -160,18 +168,25 @@ public final class AlloyInterface {
                 for (Sig sig : sigs) {
                     writeMessage(sig.label);
                 }
-            } else if (operation instanceof IncreaseScopeOperation) {
-                IncreaseScopeOperation increaseScope = (IncreaseScopeOperation) operation;
+            } else if (operation instanceof IncreaseGlobalScopeOperation) {
+                IncreaseGlobalScopeOperation increaseScope = (IncreaseGlobalScopeOperation) operation;
                 int increment = increaseScope.getIncrement();
 
                 Command c = command;
-                command = new Command(c.pos, c.label, c.check, c.overall + increment, c.bitwidth, c.maxseq, c.expects, c.scope, c.additionalExactScopes, c.formula, c.parent);
+                List<CommandScope> scope = new ArrayList<CommandScope>();
+                for (CommandScope cs : c.scope) {
+                    scope.add(new CommandScope(
+                            cs.pos, cs.sig, cs.isExact, cs.startingScope + increment,
+                            cs.endingScope + increment, cs.increment));
+                }
+
+                command = new Command(c.pos, c.label, c.check, c.overall + increment, c.bitwidth, c.maxseq, c.expects, scope, c.additionalExactScopes, c.formula, c.parent);
 
                 writeMessage(Integer.toString(command.overall));
 
                 // Reexecute the command
                 ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
-                
+
             } else if (operation instanceof QuitOperation) {
                 break;
             }
