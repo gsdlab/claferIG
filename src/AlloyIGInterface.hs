@@ -28,7 +28,7 @@ import Data.Map as Map
 import Process
 
 
-data AlloyIG = AlloyIG{proc::Process, sigMap::Map String Multiplicity, scopes::IORef (Map String Int), globalScope::IORef Int}
+data AlloyIG = AlloyIG{proc::Process, alloyModel::String, sigMap::Map String Multiplicity, scopes::IORef (Map String Int), globalScope::IORef Int}
 
 data Multiplicity = One | Lone | Some | Any deriving (Eq, Read, Show)
 
@@ -52,7 +52,7 @@ initAlloyIG alloyModel proc =
         scopesRef <- newIORef Map.empty        
         globalScopeRef <- newIORef globalScope
         
-        return $ AlloyIG proc (fromList sigs) scopesRef globalScopeRef
+        return $ AlloyIG proc alloyModel (fromList sigs) scopesRef globalScopeRef
     where
     readSig :: Process -> IO (String, Multiplicity)
     readSig proc =

@@ -154,6 +154,8 @@ runCommandLine filePath alloyIG =
                         Nothing -> outputStrLn $ "\"" ++ name ++ "\" not found in the model."
                 []  -> outputStrLn $ "No instance"
             nextLoop context
+            
+    loop ShowAlloyModel context = outputStrLn (alloyModel alloyIG) >> nextLoop context
 
     nextLoop context =
         do
