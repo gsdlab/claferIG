@@ -214,7 +214,7 @@ public final class AlloyIG {
 
         // Choose some default options for how you want to execute the commands
         A4Options options = new A4Options();
-        options.solver = A4Options.SatSolver.MiniSatProverJNI;
+        options.solver = A4Options.SatSolver.SAT4J;
 
         Command command = world.getAllCommands().get(0);
 
