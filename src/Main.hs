@@ -42,7 +42,7 @@ data IGArgs = IGArgs {
 } deriving (Show, Data, Typeable)
 
 
-data Command = Next | Increase | Save | Quit | Help | Version
+data Command = Next | Increase | Save | Quit | Help
 
 
 claferIGVersion =
@@ -87,9 +87,9 @@ beginInterface file proc =
         topLevelInterface Help saved unsaved =
             do
                 putStrLn (
-                    "---------\n" ++
-                    "| Usage |\n" ++
-                    "---------\n\n" ++
+                    "-----------------------------\n" ++
+                    "| " ++ claferIGVersion ++ " |\n" ++
+                    "-----------------------------\n\n" ++
                     "You can invoke the following commands by pressing the first letter of the command name:\n" ++
                     "next     - to produce the next instance if available or to output a message that no more \n" ++
                     "           instances exist within the given scope\n" ++
@@ -97,15 +97,9 @@ beginInterface file proc =
                     "save     - to save all instances displayed so far or a counterexample to files named \n" ++
                     "           <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                     "quit     - to quit the interactive session\n" ++
-                    "help     - to display this menu options summary\n" ++
-                    "version  - to display the version (including build date)\n")
+                    "help     - to display this menu options summary\n")
                 nextInterface saved unsaved
  
-        topLevelInterface Version saved unsaved =
-            do
-                putStrLn claferIGVersion
-                nextInterface saved unsaved
-
         nextInterface :: [ClaferModel] -> [ClaferModel] -> IO ()
         nextInterface saved unsaved =
             do
@@ -178,7 +172,6 @@ nextCommand =
             Right "s" -> return Save
             Right "q" -> return Quit
             Right "h" -> return Help
-            Right "v" -> return Version
 
             _ -> putStrLn "Unknown command" >> nextCommand
 
