@@ -117,20 +117,23 @@ runCommandLine filePath alloyIG =
                     do
                         scope <- lift $ getScope sig alloyIG
                         let scope' = scope + i
-                        -- Alloy has a fit when trying to set a scope outside its multiplicity
-                        -- Don't send command if outside its multiplicity but continue the illusion that
-                        -- the scope was set
-                        when (withinRange scope' $ fromJust $ sigMultiplicity sig alloyIG) $
-                            do
-                                lift $ sendSetScopeCommand sig scope' alloyIG
-                                lift $ sendResolveCommand alloyIG
+                        lift $ sendSetScopeCommand sig scope' alloyIG
+                        lift $ sendResolveCommand alloyIG
                         outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scope')
                 Nothing -> outputStrLn ("Unknown clafer " ++ name)
+            nextLoop context
+            
+    loop ShowScope context =
+        do
+            globalScope <- lift $ getGlobalScope alloyIG
+            outputStrLn $ "Global scope = " ++ show globalScope
+            scopes <- lift $ getScopes alloyIG
+            mapM_ (\(name, scope) -> outputStrLn $ "  " ++ sigToClaferName name ++ " scope = " ++ show scope) scopes
             nextLoop context
 
     nextLoop context =
         do
-            minput <- getInputLine "n, i, s, q, h>"
+            minput <- getInputLine "claferIG> "
             case minput of
                 Nothing -> loop Quit context
                 Just input ->
@@ -190,7 +193,7 @@ evalComplete clafers prev next =
         
 
 autoComplete :: [String] -> String -> AutoComplete -> [Completion]
-autoComplete clafers word Auto_Command = completePrefix word ["n", "i", "s", "q", "h", "v"]
+autoComplete clafers word Auto_Command = completePrefix word commandStrings
 autoComplete clafers word Auto_Clafer = completePrefix word clafers
 autoComplete clafers word Auto_Digit = [] -- Don't auto complete numbers.
 autoComplete clafers word Auto_Space = [simpleCompletion $ word]

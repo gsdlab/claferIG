@@ -66,10 +66,6 @@ sigs :: AlloyIG -> [String]
 sigs alloyIG = keys (sigMap alloyIG)
 
 
-sigMultiplicity :: String -> AlloyIG -> Maybe Multiplicity
-sigMultiplicity sig alloyIG = Map.lookup sig (sigMap alloyIG)
-
-
 -- Get the next solution from alloyIG
 sendNextCommand :: AlloyIG -> IO (Maybe String)
 sendNextCommand AlloyIG{proc=proc} =
@@ -101,11 +97,16 @@ getScopes alloyIG =
 
 -- Tell alloyIG to change the scope of a sig
 sendSetScopeCommand :: String -> Int -> AlloyIG -> IO ()
-sendSetScopeCommand sig scope AlloyIG{proc=proc, scopes=scopes} =
+sendSetScopeCommand sig scope AlloyIG{proc=proc, scopes=scopes, sigMap=sigMap} =
     do
-        putMessage proc "setScope"
-        putMessage proc sig
-        putMessage proc (show scope)
+        -- Alloy has a fit when trying to set a scope outside its multiplicity
+        -- Don't send command if outside its multiplicity but continue the illusion that
+        -- the scope was set
+        when (withinRange scope $ sigMap ! sig) $
+            do
+                putMessage proc "setScope"
+                putMessage proc sig
+                putMessage proc (show scope)
         rscopes <- readIORef scopes
         writeIORef scopes (Map.insert sig scope rscopes)
         

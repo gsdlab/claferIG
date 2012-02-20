@@ -20,13 +20,14 @@
  SOFTWARE.
 -}
 
-module CommandLineParser (Command(..), parseCommandLine, parseCommandLineAutoComplete, expectedMessage, unexpectedMessage, errorMessages) where
+module CommandLineParser (Command(..), parseCommandLine, parseCommandLineAutoComplete, commandStrings, expectedMessage, unexpectedMessage, errorMessages) where
 
+import Control.Monad
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Error
 
 
-data Command = Next | IncreaseGlobalScope Int | IncreaseScope String Int | Save | Quit | Help | Version deriving Show
+data Command = Next | IncreaseGlobalScope Int | IncreaseScope String Int | Save | Quit | Help | Version | Find String | ShowScope | ShowClaferModel | ShowAlloyModel | ShowAlloyInstance deriving Show
 
 
 
@@ -70,19 +71,50 @@ parseCommandLineAutoComplete input =
 
 
 commandLine :: Parser Command
-commandLine = choice [helpCommand, increaseCommand, nextCommand, quitCommand, saveCommand, versionCommand]
+commandLine = 
+    do
+        name <- command
+        case lookup name commandMap of
+            Just x  -> x
+            Nothing -> fail $ "Unknown command \"" ++ name ++ "\""
+            
+
+command :: Parser String
+command = many1 (letter <?> "command")
 
 
-helpCommand     = command 'h' >> return Help
-increaseCommand = command 'i' >> increaseGlobalScope
-nextCommand     = command 'n' >> return Next
-quitCommand     = command 'q' >> return Quit
-saveCommand     = command 's' >> return Save
-versionCommand  = command 'v' >> return Version
+-- Used by the autocomplete algorithm
+commandStrings :: [String]
+commandStrings = map fst commandMap
 
 
-command :: Char -> Parser Char
-command c = (char c) <?> "command"
+commandMap :: [(String, Parser Command)]
+commandMap =
+    ("h", helpCommand):
+    ("i", increaseCommand):
+    ("n", nextCommand):
+    ("f", findCommand):
+    ("q", quitCommand):
+    ("s", saveCommand):
+    ("v", versionCommand):
+    ("scope", scopeCommand):
+    ("claferModel", claferModelCommand):
+    ("alloyModel", alloyModelCommand):
+    ("alloyInstance", alloyInstanceCommand):
+    []
+
+
+helpCommand          = return Help
+increaseCommand      = increaseGlobalScope
+nextCommand          = return Next
+quitCommand          = return Quit
+saveCommand          = return Save
+versionCommand       = return Version
+findCommand          = Find `liftM` clafer
+scopeCommand         = return ShowScope
+claferModelCommand   = return ShowClaferModel
+alloyModelCommand    = return ShowAlloyModel
+alloyInstanceCommand = return ShowAlloyInstance
 
 
 increaseGlobalScope :: Parser Command
@@ -120,7 +152,4 @@ explicitIncreaseScope name =
 
 
 clafer :: Parser String        
-clafer =
-    do
-        name <- many1 (letter <?> "clafer")
-        return name
+clafer = many1 (letter <?> "clafer")
