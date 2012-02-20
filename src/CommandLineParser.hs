@@ -42,31 +42,35 @@ expectedMessage _ = Nothing
 parseCommandLine :: String -> Either ParseError Command
 parseCommandLine input =
     if null input then Right Next
-    else parse commandLine "claferIG" input
+    else parse doParse "claferIG" input
+    where
+    doParse =
+        do
+            skipMany (space <?> "")
+            c <- commandLine
+            skipMany (space <?> "")
+            eof
+            return c
 
 
 -- This function uses the expected/unexpected messages to understand what to autocomplete.
 -- Any unexpected character means parse did not reach the end of the input, hence cannot autocomplete.
 parseCommandLineAutoComplete :: String -> ParseError
 parseCommandLineAutoComplete input =
-    -- Force the parse to fail to gather expected/unexpected messages
-    case parse (commandLine >> fail "reached end") "claferIG autocomplete" input of
+    case parse doParse "claferIG autocomplete" input of
         Left e  -> e
         Right _ -> error "Failed at failing."
+    where
+    doParse =
+        do
+            skipMany (space <?> "")
+            commandLine
+            -- Force the parse to fail to gather expected/unexpected messages
+            fail "reached end"
 
 
 commandLine :: Parser Command
-commandLine = 
-    do
-        skipMany (space <?> "")
-        c <- commands
-        skipMany (space <?> "")
-        eof <?> "[enter]"
-        return c
-
-
-commands :: Parser Command
-commands = choice [helpCommand, increaseCommand, nextCommand, quitCommand, saveCommand, versionCommand]
+commandLine = choice [helpCommand, increaseCommand, nextCommand, quitCommand, saveCommand, versionCommand]
 
 
 helpCommand     = command 'h' >> return Help

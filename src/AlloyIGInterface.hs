@@ -75,3 +75,10 @@ sendSetGlobalScopeCommand scope AlloyIG{proc=proc, globalScope=globalScope} =
 -- Tell alloyIG to quit
 sendQuitCommand :: AlloyIG -> IO ()
 sendQuitCommand AlloyIG{proc=proc} = putMessage proc "quit"
+
+
+sigToClaferName :: String -> String
+sigToClaferName n =
+    case snd $ break ('_' ==) n of
+        [] ->  n
+        x -> tail x

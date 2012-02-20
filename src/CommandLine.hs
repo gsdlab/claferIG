@@ -126,7 +126,7 @@ runCommandLine filePath alloyIG =
     
     settings =
         Settings {
-            complete = completeFunc ["Bob", "Bobette", "Alice", "ZZ", "Alex", "Alison"],
+            complete = completeFunc (map sigToClaferName $ sigs alloyIG),
             historyFile = Nothing,
             autoAddHistory = True
         }
