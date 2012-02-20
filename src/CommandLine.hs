@@ -25,6 +25,7 @@ module CommandLine where
 import AlloyIGInterface
 import ClaferModel
 import CommandLineParser
+import Control.Monad
 import Control.Monad.Trans
 import Data.Char
 import Data.List
@@ -116,8 +117,13 @@ runCommandLine filePath alloyIG =
                     do
                         scope <- lift $ getScope sig alloyIG
                         let scope' = scope + i
-                        lift $ sendSetScopeCommand sig scope' alloyIG
-                        lift $ sendResolveCommand alloyIG
+                        -- Alloy has a fit when trying to set a scope outside its multiplicity
+                        -- Don't send command if outside its multiplicity but continue the illusion that
+                        -- the scope was set
+                        when (withinRange scope' $ fromJust $ sigMultiplicity sig alloyIG) $
+                            do
+                                lift $ sendSetScopeCommand sig scope' alloyIG
+                                lift $ sendResolveCommand alloyIG
                         outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scope')
                 Nothing -> outputStrLn ("Unknown clafer " ++ name)
             nextLoop context

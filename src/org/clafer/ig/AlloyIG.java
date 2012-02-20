@@ -186,6 +186,17 @@ public final class AlloyIG {
         return newScope;
     }
 
+    private static String multiplicity(Sig sig) {
+        if(sig.isOne != null) {
+            return "One";
+        } else if(sig.isLone != null) {
+            return "Lone";
+        } else if(sig.isSome != null) {
+            return "Some";
+        }
+        return "Any";
+    }
+
     public static void main(String[] args) throws IOException, Err {
         try {
             run(args);
@@ -211,6 +222,7 @@ public final class AlloyIG {
         writeMessage(Integer.toString(sigs.size()));
         for (Sig sig : sigs) {
             writeMessage(sig.label);
+            writeMessage(multiplicity(sig));
         }
         // Send back the global scope
         writeMessage(Integer.toString(command.overall));
@@ -248,7 +260,8 @@ public final class AlloyIG {
                 String sigName = increaseScope.getSig();
                 int scopeSize = increaseScope.getScopeSize();
 
-                List<CommandScope> scope = setScopeSize(findSig(sigName, sigs), scopeSize, command.scope);
+                Sig sig = findSig(sigName, sigs);
+                List<CommandScope> scope = setScopeSize(sig, scopeSize, command.scope);
 
                 Command c = command;
                 command = new Command(c.pos, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.expects, scope, c.additionalExactScopes, c.formula, c.parent);

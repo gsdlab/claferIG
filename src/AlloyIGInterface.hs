@@ -28,8 +28,17 @@ import Data.Map as Map
 import Process
 
 
-data AlloyIG = AlloyIG{proc::Process, sigs::[String], scopes::IORef (Map String Int), globalScope::IORef Int}
+data AlloyIG = AlloyIG{proc::Process, sigMap::Map String Multiplicity, scopes::IORef (Map String Int), globalScope::IORef Int}
 
+data Multiplicity = One | Lone | Some | Any deriving (Eq, Read, Show)
+
+
+
+withinRange :: Int -> Multiplicity -> Bool
+withinRange scope One = scope == 1
+withinRange scope Lone = scope == 0 || scope == 1
+withinRange scope Some = scope >= 1
+withinRange scope Any = True
 
 
 initAlloyIG :: String -> Process -> IO AlloyIG
@@ -37,13 +46,28 @@ initAlloyIG alloyModel proc =
     do
         putMessage proc alloyModel
         numberOfSigs <- read `liftM` getMessage proc
-        sigs <- mapM getMessage (replicate numberOfSigs proc)
+        sigs <- mapM readSig (replicate numberOfSigs proc)
         globalScope <- read `liftM` getMessage proc
 
         scopesRef <- newIORef Map.empty        
         globalScopeRef <- newIORef globalScope
         
-        return $ AlloyIG proc sigs scopesRef globalScopeRef
+        return $ AlloyIG proc (fromList sigs) scopesRef globalScopeRef
+    where
+    readSig :: Process -> IO (String, Multiplicity)
+    readSig proc =
+        do
+            sig <- getMessage proc 
+            multiplicity <- read `liftM` getMessage proc
+            return (sig, multiplicity)
+            
+
+sigs :: AlloyIG -> [String]
+sigs alloyIG = keys (sigMap alloyIG)
+
+
+sigMultiplicity :: String -> AlloyIG -> Maybe Multiplicity
+sigMultiplicity sig alloyIG = Map.lookup sig (sigMap alloyIG)
 
 
 -- Get the next solution from alloyIG
