@@ -42,7 +42,7 @@ data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_Spac
 
 data AutoCompleteContext = AutoCompleteContext {clafers::IORef [String], claferInstances::IORef [String]}
 
-data Context = Context {saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
+data Context = Context {claferModel::String, saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
 
 
 
@@ -55,12 +55,14 @@ runCommandLine filePath alloyIG =
     do
         clafers <- newIORef $ map sigToClaferName (sigs alloyIG)
         claferInstances <- newIORef []
+        claferModel <- readFile filePath
+        
         let autoCompleteContext = AutoCompleteContext clafers claferInstances
         runInputT Settings {
             complete = completeFunc autoCompleteContext,
             historyFile = Nothing,
             autoAddHistory = True
-        } $ loop Next (Context [] [] autoCompleteContext)
+        } $ loop Next (Context claferModel [] [] autoCompleteContext)
     where 
     loop :: Command -> Context -> InputT IO ()
     
@@ -154,6 +156,8 @@ runCommandLine filePath alloyIG =
                         Nothing -> outputStrLn $ "\"" ++ name ++ "\" not found in the model."
                 []  -> outputStrLn $ "No instance"
             nextLoop context
+
+    loop ShowClaferModel context = outputStrLn (claferModel context) >> nextLoop context
             
     loop ShowAlloyModel context = outputStrLn (alloyModel alloyIG) >> nextLoop context
 
