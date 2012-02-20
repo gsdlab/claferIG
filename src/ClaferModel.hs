@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module ClaferModel (ClaferModel(..), Clafer(..), Value(..), buildClaferModel) where
+module ClaferModel (ClaferModel(..), Clafer(..), Value(..), buildClaferModel, traverse) where
 
 import Data.List 
 import Data.Either
@@ -49,6 +49,17 @@ instance Show Clafer where
         displayValue (AliasValue alias) = " = " ++ alias
         displayValue (IntValue value) = " = " ++ show value
             
+
+
+traverse :: ClaferModel -> [Clafer]
+traverse (ClaferModel clafers) =
+    traverseClafers clafers
+    where
+    traverseClafers :: [Clafer] -> [Clafer]
+    traverseClafers clafers = concatMap traverseClafer clafers
+    traverseClafer :: Clafer -> [Clafer]
+    traverseClafer clafer = clafer : traverseClafers (c_children clafer)
+
 
 addChild :: String -> Node -> FamilyTree -> FamilyTree
 addChild parent child (FamilyTree roots descendants) =

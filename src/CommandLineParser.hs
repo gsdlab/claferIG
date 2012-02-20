@@ -110,17 +110,20 @@ nextCommand          = return Next
 quitCommand          = return Quit
 saveCommand          = return Save
 versionCommand       = return Version
-findCommand          = Find `liftM` clafer
+findCommand          = Find `liftM` (gap >> claferInstance)
 scopeCommand         = return ShowScope
 claferModelCommand   = return ShowClaferModel
 alloyModelCommand    = return ShowAlloyModel
 alloyInstanceCommand = return ShowAlloyInstance
 
 
+gap = skipMany1 space
+
+
 increaseGlobalScope :: Parser Command
 increaseGlobalScope =
     do
-        try (skipMany1 space >> explicitIncreaseGlobalScope)
+        try (gap >> explicitIncreaseGlobalScope)
         <|>
         return (IncreaseGlobalScope 1)
 
@@ -139,7 +142,7 @@ increaseScope =
     do
         name <- clafer
         do
-            try (skipMany1 space >> explicitIncreaseScope name)
+            try (gap >> explicitIncreaseScope name)
             <|>
             return (IncreaseScope name 1)
             
@@ -153,3 +156,7 @@ explicitIncreaseScope name =
 
 clafer :: Parser String        
 clafer = many1 (letter <?> "clafer")
+
+
+claferInstance :: Parser String
+claferInstance = many1 (alphaNum <?> "claferInstance")

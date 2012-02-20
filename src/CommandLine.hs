@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module CommandLine where
+module CommandLine (claferIGVersion, runCommandLine) where
 
 import AlloyIGInterface
 import ClaferModel
@@ -28,6 +28,7 @@ import CommandLineParser
 import Control.Monad
 import Control.Monad.Trans
 import Data.Char
+import Data.IORef
 import Data.List
 import qualified Data.Map as Map
 import Data.Maybe
@@ -37,9 +38,11 @@ import System.Console.Haskeline
 import Version
 
 
-data AutoComplete = Auto_Command | Auto_Clafer | Auto_Space | Auto_Digit | No_Auto deriving Show
+data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_Space | Auto_Digit | No_Auto deriving Show
 
-data Context = Context {saved::[ClaferModel], unsaved::[ClaferModel]} deriving Show
+data AutoCompleteContext = AutoCompleteContext {clafers::IORef [String], claferInstances::IORef [String]}
+
+data Context = Context {saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
 
 
 
@@ -49,7 +52,15 @@ claferIGVersion =
 
 runCommandLine :: FilePath -> AlloyIG -> IO ()
 runCommandLine filePath alloyIG =
-    runInputT settings $ loop Next (Context [] [])
+    do
+        clafers <- newIORef $ map sigToClaferName (sigs alloyIG)
+        claferInstances <- newIORef []
+        let autoCompleteContext = AutoCompleteContext clafers claferInstances
+        runInputT Settings {
+            complete = completeFunc autoCompleteContext,
+            historyFile = Nothing,
+            autoAddHistory = True
+        } $ loop Next (Context [] [] autoCompleteContext)
     where 
     loop :: Command -> Context -> InputT IO ()
     
@@ -63,6 +74,9 @@ runCommandLine filePath alloyIG =
                     let solution = parseSolution xml
                     let claferModel = buildClaferModel solution
                     let sugarModel = sugarClaferModel claferModel
+                    
+                    lift $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse sugarModel)
+                    
                     outputStrLn $ show sugarModel
                     nextLoop context{unsaved=sugarModel:(unsaved context)}
                 Nothing -> do
@@ -131,6 +145,16 @@ runCommandLine filePath alloyIG =
             mapM_ (\(name, scope) -> outputStrLn $ "  " ++ sigToClaferName name ++ " scope = " ++ show scope) scopes
             nextLoop context
 
+    loop (Find name) context =
+        do
+            case (unsaved context ++ saved context) of
+                model:_ ->
+                    case find ((name ==) . c_name) $ traverse model of
+                        Just clafer -> outputStrLn $ show clafer
+                        Nothing -> outputStrLn $ "\"" ++ name ++ "\" not found in the model."
+                []  -> outputStrLn $ "No instance"
+            nextLoop context
+
     nextLoop context =
         do
             minput <- getInputLine "claferIG> "
@@ -150,13 +174,6 @@ runCommandLine filePath alloyIG =
             save cs (counter + 1)
         where saveName = filePath ++ "." ++ (show counter) ++ ".data"
     
-    settings =
-        Settings {
-            complete = completeFunc (map sigToClaferName $ sigs alloyIG),
-            historyFile = Nothing,
-            autoAddHistory = True
-        }
-
     apply x y = y x
     
     claferToSigNameMap = Map.fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- (sigs alloyIG)]
@@ -172,10 +189,10 @@ isOpen prev [] = True
 isOpen prev (x:_) = isSpace x
 
 
-completeFunc :: Monad m => [String] -> CompletionFunc m
-completeFunc clafers (prev, next) = 
+completeFunc :: MonadIO m => AutoCompleteContext -> CompletionFunc m
+completeFunc context (prev, next) = 
     if isOpen prev next then
-        return $ evalComplete clafers prev next
+        liftIO $ evalComplete context prev next
     else
         return (prev, [])
 
@@ -183,8 +200,11 @@ completeFunc clafers (prev, next) =
 completePrefix prefix choices = map simpleCompletion $ filter (prefix `isPrefixOf`) choices
 
 
-evalComplete clafers prev next = 
-    (reverseRest, autoComplete clafers word auto)
+evalComplete :: AutoCompleteContext -> String -> String -> IO (String, [Completion])
+evalComplete context prev next = 
+    do
+        completion <- autoComplete context word auto
+        return (reverseRest, completion)
     where
     input = reverse prev
     (reverseWord, reverseRest) = break isSpace prev
@@ -192,12 +212,19 @@ evalComplete clafers prev next =
     auto = autoCompleteDetect $ parseCommandLineAutoComplete input
         
 
-autoComplete :: [String] -> String -> AutoComplete -> [Completion]
-autoComplete clafers word Auto_Command = completePrefix word commandStrings
-autoComplete clafers word Auto_Clafer = completePrefix word clafers
-autoComplete clafers word Auto_Digit = [] -- Don't auto complete numbers.
-autoComplete clafers word Auto_Space = [simpleCompletion $ word]
-autoComplete clafers word No_Auto = []
+autoComplete :: AutoCompleteContext -> String -> AutoComplete -> IO [Completion]
+autoComplete context word Auto_Command = return $ completePrefix word commandStrings
+autoComplete context word Auto_Clafer =
+    do
+        c <- readIORef $ clafers context
+        return $ completePrefix word c
+autoComplete context word Auto_ClaferInstance =
+    do
+        ci <- readIORef $ claferInstances context
+        return $ completePrefix word ci
+autoComplete context word Auto_Digit = return [] -- Don't auto complete numbers.
+autoComplete context word Auto_Space = return [simpleCompletion $ word]
+autoComplete context word No_Auto = return []
 
 
 autoCompleteDetect error
@@ -205,6 +232,7 @@ autoCompleteDetect error
     | any (not . null) unexpectedMessages = No_Auto
     | any (== "command") expectedMessages = Auto_Command
     | any (== "clafer") expectedMessages = Auto_Clafer
+    | any (== "claferInstance") expectedMessages = Auto_ClaferInstance
     | any (== "digit") expectedMessages = Auto_Digit
     | any (== "space") expectedMessages = Auto_Space
     | otherwise = No_Auto
