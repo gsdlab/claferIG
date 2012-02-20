@@ -89,6 +89,9 @@ public final class AlloyIG {
     private static interface Operation {
     }
 
+    private static class ResolveOperation implements Operation {
+    }
+
     private static class NextOperation implements Operation {
     }
 
@@ -143,6 +146,8 @@ public final class AlloyIG {
             String sig = readMessage();
             int scopeSize = Integer.parseInt(readMessage());
             return new SetScopeOperation(sig, scopeSize);
+        } else if (op.equals("resolve")) {
+            return new ResolveOperation();
         }
         throw new AlloyIGException("Unknown op " + op);
     }
@@ -210,13 +215,14 @@ public final class AlloyIG {
         // Send back the global scope
         writeMessage(Integer.toString(command.overall));
 
-        // Execute the command
-        A4Solution ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
+        A4Solution ans = null;
+        Operation operation = new ResolveOperation();
 
-        while (true) {
-            Operation operation = nextOperation();
-
-            if (operation instanceof NextOperation) {
+        while (!(operation instanceof QuitOperation)) {
+            if (operation instanceof ResolveOperation) {
+                // Reexecute the command
+                ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
+            } else if (operation instanceof NextOperation) {
                 if (ans.satisfiable()) {
                     writeMessage("True");
                     StringWriter xml = new StringWriter();
@@ -236,26 +242,19 @@ public final class AlloyIG {
                 int scopeSize = increaseScope.getScopeSize();
 
                 Command c = command;
-                List<CommandScope> scope = new ArrayList<CommandScope>();
-                for (CommandScope cs : c.scope) {
-                    scope.add(setCommandScopeSize(scopeSize, cs));
-                }
-
-                command = new Command(c.pos, c.label, c.check, scopeSize, c.bitwidth, c.maxseq, c.expects, scope, c.additionalExactScopes, c.formula, c.parent);
-
-                // Reexecute the command
-                ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
+                command = new Command(c.pos, c.label, c.check, scopeSize, c.bitwidth, c.maxseq, c.expects, c.scope, c.additionalExactScopes, c.formula, c.parent);
             } else if (operation instanceof SetScopeOperation) {
                 SetScopeOperation increaseScope = (SetScopeOperation) operation;
                 String sigName = increaseScope.getSig();
                 int scopeSize = increaseScope.getScopeSize();
 
-                Command c = command;
-                c.getScope(findSig(sigName, sigs));
+                List<CommandScope> scope = setScopeSize(findSig(sigName, sigs), scopeSize, command.scope);
 
-            } else if (operation instanceof QuitOperation) {
-                break;
+                Command c = command;
+                command = new Command(c.pos, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.expects, scope, c.additionalExactScopes, c.formula, c.parent);
             }
+
+            operation = nextOperation();
         }
     }
 }

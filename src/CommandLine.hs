@@ -28,7 +28,9 @@ import CommandLineParser
 import Control.Monad.Trans
 import Data.Char
 import Data.List
+import qualified Data.Map as Map
 import Data.Maybe
+import Solution
 import Sugarer
 import System.Console.Haskeline
 import Version
@@ -54,10 +56,11 @@ runCommandLine filePath alloyIG =
     
     loop Next context =
         do
-            solution <- lift $ sendNextCommand alloyIG
-            case solution of
-                Just s -> do
-                    let claferModel = buildClaferModel s
+            xmlSolution <- lift $ sendNextCommand alloyIG
+            case xmlSolution of
+                Just xml -> do
+                    let solution = parseSolution xml
+                    let claferModel = buildClaferModel solution
                     let sugarModel = sugarClaferModel claferModel
                     outputStrLn $ show sugarModel
                     nextLoop context{unsaved=sugarModel:(unsaved context)}
@@ -96,13 +99,27 @@ runCommandLine filePath alloyIG =
         do
             globalScope <- lift $ getGlobalScope alloyIG
             let globalScope' = globalScope + i
+
             lift $ sendSetGlobalScopeCommand globalScope' alloyIG
+            scopes <- lift $ getScopes alloyIG
+            let scopes' = map (\(x, y)->(x, y + i)) scopes
+            lift $ mapM (apply alloyIG) (map (uncurry sendSetScopeCommand) scopes')
+            lift $ sendResolveCommand alloyIG
+            
             outputStrLn ("Global scope increased to " ++ show globalScope')
             nextLoop context
             
-    loop (IncreaseScope _ i) context =
+    loop (IncreaseScope name i) context =
         do
-            outputStrLn ("sc:" ++ show i)
+            case Map.lookup name claferToSigNameMap of
+                Just sig ->
+                    do
+                        scope <- lift $ getScope sig alloyIG
+                        let scope' = scope + i
+                        lift $ sendSetScopeCommand sig scope' alloyIG
+                        lift $ sendResolveCommand alloyIG
+                        outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scope')
+                Nothing -> outputStrLn ("Unknown clafer " ++ name)
             nextLoop context
 
     nextLoop context =
@@ -130,6 +147,12 @@ runCommandLine filePath alloyIG =
             historyFile = Nothing,
             autoAddHistory = True
         }
+
+    apply x y = y x
+    
+    claferToSigNameMap = Map.fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- (sigs alloyIG)]
+
+
 
 
 -- i Ali|ce

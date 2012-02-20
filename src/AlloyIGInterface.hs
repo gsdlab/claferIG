@@ -24,11 +24,11 @@ module AlloyIGInterface where
 
 import Control.Monad
 import Data.IORef
+import Data.Map as Map
 import Process
-import Solution
 
 
-data AlloyIG = AlloyIG{proc::Process, sigs::[String], globalScope::IORef Int}
+data AlloyIG = AlloyIG{proc::Process, sigs::[String], scopes::IORef (Map String Int), globalScope::IORef Int}
 
 
 
@@ -39,14 +39,15 @@ initAlloyIG alloyModel proc =
         numberOfSigs <- read `liftM` getMessage proc
         sigs <- mapM getMessage (replicate numberOfSigs proc)
         globalScope <- read `liftM` getMessage proc
+
+        scopesRef <- newIORef Map.empty        
+        globalScopeRef <- newIORef globalScope
         
-        scopeRef <- newIORef globalScope
-        
-        return $ AlloyIG proc sigs scopeRef
+        return $ AlloyIG proc sigs scopesRef globalScopeRef
 
 
 -- Get the next solution from alloyIG
-sendNextCommand :: AlloyIG -> IO (Maybe Solution)
+sendNextCommand :: AlloyIG -> IO (Maybe String)
 sendNextCommand AlloyIG{proc=proc} =
     do
         putMessage proc "next"
@@ -54,22 +55,53 @@ sendNextCommand AlloyIG{proc=proc} =
         case status of
             True -> do
                 xml <- getMessage proc
-                let solution = parseSolution xml
-                return $ Just solution
+                return $ Just xml
             False -> return Nothing
 
+
+getScope :: String -> AlloyIG -> IO Int
+getScope sig alloyIG =
+    do
+        rscopes <- readIORef (scopes alloyIG)
+        case Map.lookup sig rscopes of
+            Just scope -> return scope
+            Nothing  -> readIORef (globalScope alloyIG)
+        
+
+getScopes :: AlloyIG -> IO [(String, Int)]
+getScopes alloyIG =
+    do
+        rscopes <- readIORef (scopes alloyIG)
+        return $ toList rscopes
+            
+
+-- Tell alloyIG to change the scope of a sig
+sendSetScopeCommand :: String -> Int -> AlloyIG -> IO ()
+sendSetScopeCommand sig scope AlloyIG{proc=proc, scopes=scopes} =
+    do
+        putMessage proc "setScope"
+        putMessage proc sig
+        putMessage proc (show scope)
+        rscopes <- readIORef scopes
+        writeIORef scopes (Map.insert sig scope rscopes)
+        
 
 getGlobalScope :: AlloyIG -> IO Int
 getGlobalScope alloyIG = readIORef $ globalScope alloyIG
 
 
--- Tell alloyIG to change the scope
+-- Tell alloyIG to change the global scope
 sendSetGlobalScopeCommand :: Int -> AlloyIG -> IO ()
 sendSetGlobalScopeCommand scope AlloyIG{proc=proc, globalScope=globalScope} =
     do
         putMessage proc "setGlobalScope"
         putMessage proc (show scope)
         writeIORef globalScope scope
+
+
+-- Tell alloyIG to recalculate the solution
+sendResolveCommand :: AlloyIG -> IO ()
+sendResolveCommand AlloyIG{proc=proc} = putMessage proc "resolve"
 
 
 -- Tell alloyIG to quit
