@@ -15,7 +15,7 @@ Dependencies
 * The Haskell libraries: haxml, cmdargs, executable-path
 
 ```
-cabal install haxml cmdargs executable-path
+cabal install
 ```
 
 Usage
@@ -35,20 +35,29 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 
 
 ### Interactive Session Usage
-In the interactive mode, the users can invoke the following commands by pressing the first letter of the command name:
+In the interactive mode, the users can invoke the following commands by pressing the first letter of the command name or the whole command as marked by boldface:
 
-* **n**ext - to produce the next instance if available or to output a message that no more instances exist within the given scope
+* [tab] - print the available commands or auto-complete command name, a clafer name, or clafer instance name in a given context
+* **n**ext or **[enter]** - to produce the next instance if available or to output a message that no more instances exist within the given scope
 * **i**ncrease - to increase the maximum number of instances of a given clafer or all clafers (scope)
 * **s**ave - to save all instances displayed so far or a counterexample to files named `<model file name>.cfr.<instance number>.data`, one instance per file
 * **q**uit - to quit the interactive session
 * **h**elp - to display this menu options summary
-* **v**ersion - to display the version (including build date)
+* **scope** - to print out the values of the global scope and individual Clafer scopes
+* **claferModel** - to print out the original Clafer model verbatim
+* **alloyModel** - to print out the output of Clafer translator verbatim
+* **alloyInstance** - to print out the Alloy xml document of the most recent solution
+* **f**ind - to print a Clafer with given name found in the most recent solution
 
 The command '**i**ncrease' allows you to change the maximum number of instances for a given clafer or for all clafers as follows:
 
-* `'i' [enter] [enter]` - to increase for all clafers by `1` 
+* `'i' [enter]` - to increase for all clafers by `1` 
 * `'i' <name> [enter]` - to increase for the clafer `<name>` by `1` 
 * `'i' <name> <number>` - to increase for the clafer `<name>` by `<number>`
+
+The command '**f**ind' allows you find a clafer with the given name and print it:
+
+* `'f' <name>` 
 
 Output format
 -------------
@@ -136,3 +145,7 @@ The Clafer instance generator:
 * invokes Alloy Analyzer to produce an instance or find a counterexample
 * translates the instance or the counterexample data produced by Alloy Analyzer to Clafer instance data format using the name map from IR in a reverse direction,
 * for a counterexample, translates the counter example in Alloy to Claefr instance data and constraint violations in Alloy into constraint violations in Clafer model
+
+Need help?
+----------
+Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `claferig` (so that we know what they are related to) and with `jimmy-liang` (so that Jimmy gets a notification).
