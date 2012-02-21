@@ -91,14 +91,27 @@ runCommandLine filePath alloyIG =
                 "---------------------------\n" ++
                 "| " ++ claferIGVersion ++ " |\n" ++
                 "---------------------------\n\n" ++
-                "You can invoke the following commands by pressing the first letter of the command name:\n" ++
-                "next     - to produce the next instance if available or to output a message that no more \n" ++
-                "           instances exist within the given scope\n" ++
-                "increase - to increase the maximum number of instances of a given clafer or all clafers (scope)\n" ++
-                "save     - to save all instances displayed so far or a counterexample to files named \n" ++
-                "           <model file name>.cfr.<instance number>.data, one instance per file\n" ++
-                "quit     - to quit the interactive session\n" ++
-                "help     - to display this menu options summary\n")
+                "You can invoke the following commands as indicated by single quotes:\n" ++
+                "[tab]           - print the available commands\n" ++ 
+                "                - auto-complete command name, a clafer name, or clafer instance name in a given context\n" ++
+                "'n'ext, [enter] - to produce the next instance if available or to output a message that no more \n" ++
+                "                  instances exist within the given scope\n" ++
+                "'i'ncrease      - to increase the maximum number of instances of a given clafer or all clafers (scope)\n" ++
+                "'s'ave          - to save all instances displayed so far or a counterexample to files named \n" ++
+                "                  <model file name>.cfr.<instance number>.data, one instance per file\n" ++
+                "'q'uit          - to quit the interactive session\n" ++
+                "'h'elp          - to display this menu options summary\n" ++
+                "'scope'         - to print out the values of the global scope and individual Clafer scopes\n" ++
+                "'claferModel'   - to print out the original Clafer model verbatim\n" ++
+                "'alloyModel'    - to print out the output of Clafer translator verbatim\n" ++
+                "'alloyInstance' - to print out the Alloy xml document of the most recent solution\n" ++
+                "'f'ind          - to print a Clafer with given name found in the most recent solution\n\n" ++
+                "Parameterized command usage:\n" ++
+                "'i' [enter]         - to increase for all clafers by 1\n" ++
+                "'i' <name> [enter]  - to increase for the clafer <name> by 1\n" ++
+                "'i' <name> <number> - to increase for the clafer <name> by <number>\n" ++
+                "'f' <name>          - to display a clafer <name>\n")
+                
             nextLoop context
             
     loop Save context@Context{saved=saved, unsaved=unsaved} =
