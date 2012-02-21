@@ -42,7 +42,7 @@ data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_Spac
 
 data AutoCompleteContext = AutoCompleteContext {clafers::IORef [String], claferInstances::IORef [String]}
 
-data Context = Context {claferModel::String, saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
+data Context = Context {claferModel::String, currentAlloyInstance::Maybe String, saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
 
 
 
@@ -62,7 +62,7 @@ runCommandLine filePath alloyIG =
             complete = completeFunc autoCompleteContext,
             historyFile = Nothing,
             autoAddHistory = True
-        } $ loop Next (Context claferModel [] [] autoCompleteContext)
+        } $ loop Next (Context claferModel Nothing [] [] autoCompleteContext)
     where 
     loop :: Command -> Context -> InputT IO ()
     
@@ -80,7 +80,7 @@ runCommandLine filePath alloyIG =
                     lift $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse sugarModel)
                     
                     outputStrLn $ show sugarModel
-                    nextLoop context{unsaved=sugarModel:(unsaved context)}
+                    nextLoop context{unsaved=sugarModel:(unsaved context), currentAlloyInstance=Just xml}
                 Nothing -> do
                     outputStrLn "No more instances found. Try increasing scope to get more instances."
                     nextLoop context
@@ -160,6 +160,13 @@ runCommandLine filePath alloyIG =
     loop ShowClaferModel context = outputStrLn (claferModel context) >> nextLoop context
             
     loop ShowAlloyModel context = outputStrLn (alloyModel alloyIG) >> nextLoop context
+
+    loop ShowAlloyInstance context =
+        do
+            case currentAlloyInstance context of
+                Just alloyInstance -> outputStrLn alloyInstance
+                Nothing -> outputStrLn $ "No instance"
+            nextLoop context
 
     nextLoop context =
         do
