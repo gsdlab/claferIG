@@ -28,7 +28,7 @@ import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Error
 
 
-data Command = Next | IncreaseGlobalScope Int | IncreaseScope String Int | Save | Quit | Help | Version | Find String | ShowScope | ShowClaferModel | ShowAlloyModel | ShowAlloyInstance deriving Show
+data Command = Next | IncreaseGlobalScope Int | IncreaseScope String Int | Save | Quit | Help | Find String | ShowScope | ShowClaferModel | ShowAlloyModel | ShowAlloyInstance deriving Show
 
 
 
@@ -103,7 +103,6 @@ commandMap =
     ("f", findCommand):
     ("q", quitCommand):
     ("s", saveCommand):
-    ("v", versionCommand):
     ("scope", scopeCommand):
     ("claferModel", claferModelCommand):
     ("alloyModel", alloyModelCommand):
@@ -116,7 +115,6 @@ increaseCommand      = increaseGlobalScope
 nextCommand          = return Next
 quitCommand          = return Quit
 saveCommand          = return Save
-versionCommand       = return Version
 findCommand          = Find `liftM` (gap >> claferInstance)
 scopeCommand         = return ShowScope
 claferModelCommand   = return ShowClaferModel

@@ -47,7 +47,7 @@ data Context = Context {claferModel::String, currentAlloyInstance::Maybe String,
 
 
 claferIGVersion =
-    "ClaferIG v" ++ version
+    "ClaferIG " ++ version
 
 
 runCommandLine :: FilePath -> AlloyIG -> IO ()
@@ -88,9 +88,9 @@ runCommandLine filePath alloyIG =
     loop Help context =
         do
             outputStrLn (
-                "---------\n" ++
-                "| Usage |\n" ++
-                "---------\n\n" ++
+                "---------------------------\n" ++
+                "| " ++ claferIGVersion ++ " |\n" ++
+                "---------------------------\n\n" ++
                 "You can invoke the following commands by pressing the first letter of the command name:\n" ++
                 "next     - to produce the next instance if available or to output a message that no more \n" ++
                 "           instances exist within the given scope\n" ++
@@ -98,13 +98,7 @@ runCommandLine filePath alloyIG =
                 "save     - to save all instances displayed so far or a counterexample to files named \n" ++
                 "           <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                 "quit     - to quit the interactive session\n" ++
-                "help     - to display this menu options summary\n" ++
-                "version  - to display the version (including build date)\n")
-            nextLoop context
-            
-    loop Version context =
-        do
-            outputStrLn claferIGVersion
+                "help     - to display this menu options summary\n")
             nextLoop context
             
     loop Save context@Context{saved=saved, unsaved=unsaved} =
