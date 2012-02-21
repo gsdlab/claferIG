@@ -75,7 +75,7 @@ runCommandLine filePath alloyIG =
                 Just xml -> do
                     let solution = parseSolution xml
                     let claferModel = buildClaferModel solution
-                    let sugarModel = claferModel --sugarClaferModel claferModel
+                    let sugarModel = sugarClaferModel claferModel
                     
                     lift $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse sugarModel)
                     

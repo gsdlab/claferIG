@@ -28,20 +28,21 @@ import Data.List as List hiding (map)
 import Data.Map as Map hiding (map)
 
 
--- Sample: maps the full name to the its simple name and the number of times its simple name appeared in the census before it
+-- Sample: maps the id to the its simple name and the number of times its simple name appeared in the census before it
 -- Count: maps the simple name to the total count of the simple name
-data Census = Census {sample::Map String (Int, String), counts::Map String Int} deriving Show
+data Census = Census {sample::Map Id (Int, String), counts::Map String Int} deriving Show
 
 
 -- Adds the full name to the census
-poll :: String -> Census -> Census
-poll fullName (Census sample counts) =
+poll :: Id -> Census -> Census
+poll id (Census sample counts) =
     Census sample' counts'
     where
+    fullName = i_name id
     name = simpleName fullName
     counts' = insertWith (+) name 1 counts
     ordinal' = findWithDefault (error $ "Did not find " ++ name ++ " in counts.") name counts'
-    sample' = insertWith (error $ "Polled " ++ fullName ++ " twice in the census.") fullName (ordinal', name) sample
+    sample' = insertWith (error $ "Polled " ++ fullName ++ " twice in the census.") id (ordinal', name) sample
 
 
 -- Count the number of each clafer
@@ -50,29 +51,31 @@ claferModelCensus (ClaferModel topLevel) =
     clafersCensus (Census Map.empty Map.empty) topLevel
     where
     clafersCensus = foldl claferCensus
-    claferCensus census Clafer{c_id=id, c_children=children} = poll (i_name id) (clafersCensus census children) 
+    claferCensus census Clafer{c_id=id, c_children=children} = poll id (clafersCensus census children) 
 
 
 -- Rewrite the model into a human-friendlier format
 sugarClaferModel:: ClaferModel -> ClaferModel
-sugarClaferModel model@(ClaferModel topLevel) = model
-    {-ClaferModel $ map sugarClafer topLevel
+sugarClaferModel model@(ClaferModel topLevel) =
+    ClaferModel $ map sugarClafer topLevel
     where
     Census sample counts = claferModelCensus model
     
-    sugarName fullName =
+    sugarId :: Id -> Id
+    sugarId id =
         if count == 1 then
-            simpleName
+            Id simpleName 0
         else
-            simpleName ++ show ordinal
+            Id (simpleName ++ show ordinal) 0
         where
-        (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ fullName ++ " failed.") fullName sample
+        fullName = i_name id
+        (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample
         count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts
     
-    sugarClafer (Clafer fullName value children) = Clafer (sugarName fullName) (sugarValue `liftM` value) (map sugarClafer children)
+    sugarClafer (Clafer id value children) = Clafer (sugarId id) (sugarValue `liftM` value) (map sugarClafer children)
 
-    sugarValue (AliasValue alias) = AliasValue $ sugarName alias
-    sugarValue x = x-}
+    sugarValue (AliasValue alias) = AliasValue $ sugarId alias
+    sugarValue x = x
 
 
 -- Only keeps the substring between the '_' and '$' exclusive.
