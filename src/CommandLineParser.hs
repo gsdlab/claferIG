@@ -83,7 +83,7 @@ commandLine =
                 quote x = '"' : x ++ "\""
                 didYouMean = filter (name `isPrefixOf`) commandStrings
                 hint [] = ""
-                hint hints = ", did you mean " ++ concat (intersperse " or " $ map quote didYouMean) ++ "?"
+                hint hints = ", did you mean " ++ intercalate " or " (map quote didYouMean) ++ "?"
             
 
 command :: Parser String

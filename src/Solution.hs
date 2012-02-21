@@ -34,14 +34,14 @@ data Solution = Solution{s_sigs::[Sig], s_fields::[Field]} deriving Show
 -- The univ sig does not have a parent
 data Sig =
     Sig {s_label::String, s_id::Int, s_parentId::Maybe Int, s_atoms::[Atom]} |
-    AliasSig {s_label::String, s_sid::Int, s_atoms::[Atom]}
+    AliasSig {s_label::String, s_id::Int, as_parentId::Int, s_atoms::[Atom]}
     deriving Show
 
 data Atom = Atom {a_label::String} deriving Show
 
 data Field = Field {f_label::String, f_id::Int, f_parentId::Int, f_tuples::[Tuple]} deriving Show
 
-data Tuple = Tuple {t_from::String, t_fromType::Int, t_to::String, t_toType::Int} deriving Show
+data Tuple = Tuple {t_from::Atom, t_fromType::Int, t_to::Atom, t_toType::Int} deriving Show
 
 
 parseSolution :: String -> Solution
@@ -62,17 +62,22 @@ parseSig content =
     case (keep /> tag "type") content of
         [] ->
             Sig label id parentId atoms
+            where
+            parentId = read `liftM` findOptAttr "parentID" content
+        [x] ->
+            AliasSig label id parentId atoms
+            where
+            parentId = read $ findAttr "ID" x
         _ ->
-            AliasSig label id atoms
-            
+            error $ "Unexpected multiple type in sig " ++ label
     where
     label = findAttr "label" content
     id = read $ findAttr "ID" content
-    parentId = read `liftM` findOptAttr "parentID" content
     atoms = map parseAtom $ (keep /> tag "atom") content
     
-    parseAtom :: Content i -> Atom
-    parseAtom = Atom . findAttr "label"
+
+parseAtom :: Content i -> Atom
+parseAtom = Atom . findAttr "label"
 
 
 parseField :: Content i -> Field
@@ -94,7 +99,7 @@ parseField content =
     parseTuple :: Content i -> Tuple
     parseTuple content =
         Tuple (toFrom !! 0) fromType (toFrom !! 1) toType
-        where toFrom = map (findAttr "label") $ (keep /> tag "atom") content
+        where toFrom = map parseAtom $ (keep /> tag "atom") content
 
 
 findOptAttr :: String -> Content i -> Maybe String

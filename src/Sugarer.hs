@@ -46,17 +46,17 @@ poll fullName (Census sample counts) =
 
 -- Count the number of each clafer
 claferModelCensus :: ClaferModel -> Census
-claferModelCensus c@(ClaferModel topLevel) =
+claferModelCensus (ClaferModel topLevel) =
     clafersCensus (Census Map.empty Map.empty) topLevel
     where
     clafersCensus = foldl claferCensus
-    claferCensus census Clafer{c_name=name, c_children=children} = poll name (clafersCensus census children) 
+    claferCensus census Clafer{c_id=id, c_children=children} = poll (i_name id) (clafersCensus census children) 
 
 
 -- Rewrite the model into a human-friendlier format
 sugarClaferModel:: ClaferModel -> ClaferModel
-sugarClaferModel model@(ClaferModel topLevel) =
-    ClaferModel $ map sugarClafer topLevel
+sugarClaferModel model@(ClaferModel topLevel) = model
+    {-ClaferModel $ map sugarClafer topLevel
     where
     Census sample counts = claferModelCensus model
     
@@ -72,7 +72,7 @@ sugarClaferModel model@(ClaferModel topLevel) =
     sugarClafer (Clafer fullName value children) = Clafer (sugarName fullName) (sugarValue `liftM` value) (map sugarClafer children)
 
     sugarValue (AliasValue alias) = AliasValue $ sugarName alias
-    sugarValue x = x
+    sugarValue x = x-}
 
 
 -- Only keeps the substring between the '_' and '$' exclusive.
