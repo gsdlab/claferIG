@@ -23,6 +23,7 @@
 module CommandLineParser (Command(..), parseCommandLine, parseCommandLineAutoComplete, commandStrings, expectedMessage, unexpectedMessage, errorMessages) where
 
 import Control.Monad
+import Data.List
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Error
 
@@ -76,7 +77,13 @@ commandLine =
         name <- command
         case lookup name commandMap of
             Just x  -> x
-            Nothing -> fail $ "Unknown command \"" ++ name ++ "\""
+            Nothing ->
+                fail $ "Unknown command \"" ++ name ++ "\"" ++ hint didYouMean
+                where
+                quote x = '"' : x ++ "\""
+                didYouMean = filter (name `isPrefixOf`) commandStrings
+                hint [] = ""
+                hint hints = ", did you mean " ++ concat (intersperse " or " $ map quote didYouMean) ++ "?"
             
 
 command :: Parser String
