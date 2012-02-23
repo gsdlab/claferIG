@@ -133,9 +133,3 @@ sendResolveCommand AlloyIG{proc=proc} = putMessage proc "resolve"
 sendQuitCommand :: AlloyIG -> IO ()
 sendQuitCommand AlloyIG{proc=proc} = putMessage proc "quit"
 
-
-sigToClaferName :: String -> String
-sigToClaferName n =
-    case snd $ break ('_' ==) n of
-        [] ->  n
-        x -> tail x

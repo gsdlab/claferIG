@@ -22,20 +22,9 @@
 
 module Main where
 
-import AlloyIGInterface
-import ClaferModel
+import qualified ClaferIG as ClaferIG
 import CommandLine
-import Control.Monad
-import Data.Maybe
-import Process
-import Solution
-import Sugarer
-import System.Cmd
 import System.Console.CmdArgs
-import System.Environment.Executable
-import System.Exit
-import System.IO
-import System.IO.Error
 
 
 data IGArgs = IGArgs {
@@ -51,16 +40,8 @@ claferIG = IGArgs {
 
 main =
     do
-        (execDir, _) <- splitExecutablePath
         args <- cmdArgs claferIG
 
+        claferIG <- ClaferIG.initClaferIG $ claferFile args
         
-        claferProc <- pipeProcess (execDir ++ "clafer") ["-o", "-s", claferFile args]
-        claferOutput <- getContentsVerbatim claferProc
-        claferExit <- waitFor claferProc
-        when (claferExit /= ExitSuccess) (print "clafer unexpectedly terminated" >> exitWith claferExit)
-        
-        alloyIGProc <- pipeProcess "java" ["-jar", execDir ++ "alloyIG.jar"]
-        alloyIG <- initAlloyIG claferOutput alloyIGProc
-        
-        runCommandLine (claferFile args) alloyIG
+        runCommandLine claferIG

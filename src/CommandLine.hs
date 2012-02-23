@@ -22,7 +22,7 @@
 
 module CommandLine (claferIGVersion, runCommandLine) where
 
-import AlloyIGInterface
+import ClaferIG
 import ClaferModel
 import CommandLineParser
 import Control.Monad
@@ -32,57 +32,45 @@ import Data.IORef
 import Data.List
 import qualified Data.Map as Map
 import Data.Maybe
-import Solution
-import Sugarer
 import System.Console.Haskeline
-import Version
 
 
 data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_Space | Auto_Digit | No_Auto deriving Show
 
 data AutoCompleteContext = AutoCompleteContext {clafers::IORef [String], claferInstances::IORef [String]}
 
-data Context = Context {claferModel::String, currentAlloyInstance::Maybe String, saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
+data Context = Context {currentAlloyInstance::Maybe String, saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
 
 
 
-claferIGVersion =
-    "ClaferIG " ++ version
-
-
-runCommandLine :: FilePath -> AlloyIG -> IO ()
-runCommandLine filePath alloyIG =
+runCommandLine :: ClaferIG -> IO ()
+runCommandLine claferIG =
     do
-        clafers <- newIORef $ map sigToClaferName (sigs alloyIG)
-        claferInstances <- newIORef []
-        claferModel <- readFile filePath
-
-        sendResolveCommand alloyIG
+        solve claferIG
         
+        clafers <- newIORef $ getClafers claferIG
+        claferInstances <- newIORef []
+
         let autoCompleteContext = AutoCompleteContext clafers claferInstances
         runInputT Settings {
             complete = completeFunc autoCompleteContext,
             historyFile = Nothing,
             autoAddHistory = True
-        } $ loop Next (Context claferModel Nothing [] [] autoCompleteContext)
+        } $ loop Next (Context Nothing [] [] autoCompleteContext)
     where 
     loop :: Command -> Context -> InputT IO ()
     
-    loop Quit _ = lift $ sendQuitCommand alloyIG
+    loop Quit _ = lift $ quit claferIG
     
     loop Next context =
         do
-            xmlSolution <- lift $ sendNextCommand alloyIG
-            case xmlSolution of
-                Just xml -> do
-                    let solution = parseSolution xml
-                    let claferModel = buildClaferModel solution
-                    let sugarModel = sugarClaferModel claferModel
+            solution <- lift $ nextWithAlloyInstance claferIG
+            case solution of
+                Just (xml, claferModel) -> do
+                    lift $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse claferModel)
                     
-                    lift $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse sugarModel)
-                    
-                    outputStrLn $ show sugarModel
-                    nextLoop context{unsaved=sugarModel:(unsaved context), currentAlloyInstance=Just xml}
+                    outputStrLn $ show claferModel
+                    nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 Nothing -> do
                     outputStrLn "No more instances found. Try increasing scope to get more instances."
                     nextLoop context
@@ -123,38 +111,44 @@ runCommandLine filePath alloyIG =
                     
     loop (IncreaseGlobalScope i) context =
         do
-            globalScope <- lift $ getGlobalScope alloyIG
+            globalScope <- lift $ getGlobalScope claferIG
             let globalScope' = globalScope + i
-
-            lift $ sendSetGlobalScopeCommand globalScope' alloyIG
-            scopes <- lift $ getScopes alloyIG
-            let scopes' = map (\(x, y)->(x, y + i)) scopes
-            lift $ mapM (flip (uncurry sendSetScopeCommand) alloyIG) scopes'
-            lift $ sendResolveCommand alloyIG
+            lift $ setGlobalScope globalScope' claferIG
+            
+            scopes <- lift $ getScopes claferIG
+            lift $ mapM (increaseScope i) scopes
+            lift $ solve claferIG
             
             outputStrLn ("Global scope increased to " ++ show globalScope')
             nextLoop context
             
     loop (IncreaseScope name i) context =
         do
-            case Map.lookup name claferToSigNameMap of
-                Just sig ->
+            case getScope name claferIG of
+                Just scope ->
                     do
-                        scope <- lift $ getScope sig alloyIG
-                        let scope' = scope + i
-                        lift $ sendSetScopeCommand sig scope' alloyIG
-                        lift $ sendResolveCommand alloyIG
+                        lift $ increaseScope i scope
+                        scope' <- lift $ valueOfScope scope
+                        lift $ solve claferIG
                         outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scope')
                 Nothing -> outputStrLn ("Unknown clafer " ++ name)
             nextLoop context
             
     loop ShowScope context =
         do
-            globalScope <- lift $ getGlobalScope alloyIG
+            globalScope <- lift $ getGlobalScope claferIG
             outputStrLn $ "Global scope = " ++ show globalScope
-            scopes <- lift $ getScopes alloyIG
-            mapM_ (\(name, scope) -> outputStrLn $ "  " ++ sigToClaferName name ++ " scope = " ++ show scope) scopes
+            scopes <- lift $ getScopes claferIG
+            mapM_ printScope scopes
             nextLoop context
+            
+            where
+            printScope scope =
+                do
+                    let name = nameOfScope scope
+                    value <- lift $ valueOfScope scope
+                    outputStrLn $ "  " ++ name ++ " scope = " ++ show value
+                    
 
     loop (Find name) context =
         do
@@ -166,9 +160,9 @@ runCommandLine filePath alloyIG =
                 []  -> outputStrLn $ "No instance"
             nextLoop context
 
-    loop ShowClaferModel context = outputStrLn (claferModel context) >> nextLoop context
+    loop ShowClaferModel context = outputStrLn (claferModel claferIG) >> nextLoop context
             
-    loop ShowAlloyModel context = outputStrLn (alloyModel alloyIG) >> nextLoop context
+    loop ShowAlloyModel context = outputStrLn (alloyModel claferIG) >> nextLoop context
 
     loop ShowAlloyInstance context =
         do
@@ -194,12 +188,10 @@ runCommandLine filePath alloyIG =
             writeFile saveName (show c)
             putStrLn $ "Saved to " ++ saveName
             save cs (counter + 1)
-        where saveName = filePath ++ "." ++ (show counter) ++ ".data"
+        where saveName = (claferFile claferIG) ++ "." ++ (show counter) ++ ".data"
     
     apply x y = y x
     
-    claferToSigNameMap = Map.fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- (sigs alloyIG)]
-
 
 
 
