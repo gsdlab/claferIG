@@ -41,18 +41,20 @@ withinRange scope Some = scope >= 1
 withinRange scope Any = True
 
 
-initAlloyIG :: String -> Process -> IO AlloyIG
-initAlloyIG alloyModel proc =
+initAlloyIG :: String -> IO AlloyIG
+initAlloyIG alloyModel =
     do
-        putMessage proc alloyModel
-        numberOfSigs <- read `liftM` getMessage proc
-        sigs <- mapM readSig (replicate numberOfSigs proc)
-        globalScope <- read `liftM` getMessage proc
+        execPath <- executableDirectory
+        alloyIGProc <- pipeProcess "java" ["-jar", execPath ++ "alloyIG.jar"]
+        putMessage alloyIGProc alloyModel
+        numberOfSigs <- read `liftM` getMessage alloyIGProc
+        sigs <- mapM readSig (replicate numberOfSigs alloyIGProc)
+        globalScope <- read `liftM` getMessage alloyIGProc
 
         scopesRef <- newIORef Map.empty        
         globalScopeRef <- newIORef globalScope
         
-        return $ AlloyIG proc alloyModel (fromList sigs) scopesRef globalScopeRef
+        return $ AlloyIG alloyIGProc alloyModel (fromList sigs) scopesRef globalScopeRef
     where
     readSig :: Process -> IO (String, Multiplicity)
     readSig proc =

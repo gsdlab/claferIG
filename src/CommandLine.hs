@@ -60,7 +60,7 @@ runCommandLine claferIG =
     where 
     loop :: Command -> Context -> InputT IO ()
     
-    loop Quit _ = lift $ quit claferIG
+    loop Quit _ = return ()
     
     loop Next context =
         do
@@ -190,9 +190,6 @@ runCommandLine claferIG =
             save cs (counter + 1)
         where saveName = (claferFile claferIG) ++ "." ++ (show counter) ++ ".data"
     
-    apply x y = y x
-    
-
 
 
 -- i Ali|ce

@@ -20,9 +20,10 @@
  SOFTWARE.
 -}
 
-module Process (Process, waitFor, getContentsVerbatim, getMessage, putMessage, pipeProcess) where
+module Process (Process, executableDirectory, waitFor, getContentsVerbatim, getMessage, putMessage, pipeProcess) where
 
 import Control.Monad
+import System.Environment.Executable
 import System.IO
 import System.Process
 
@@ -30,14 +31,18 @@ data Process = Process{stdIn::Handle, stdOut::Handle, procHandle::ProcessHandle}
 
 
 
+executableDirectory :: IO FilePath
+executableDirectory = fst `liftM` splitExecutablePath
+
+
 -- Start another process and return the piped std_in, std_out stream
 pipeProcess :: FilePath -> [String] -> IO Process
 pipeProcess exec args =
     do
+        let process = (proc exec args) { std_in = CreatePipe, std_out = CreatePipe }
         (Just stdIn, Just stdOut, _, procHandle) <- createProcess process
         hSetNewlineMode stdIn noNewlineTranslation
         return $ Process stdIn stdOut procHandle -- Pipe always has a handle according to docs
-    where process = (proc exec args) { std_in = CreatePipe, std_out = CreatePipe }
     
     
 -- Wait until the process terminates

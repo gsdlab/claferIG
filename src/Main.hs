@@ -22,26 +22,57 @@
 
 module Main where
 
-import qualified ClaferIG as ClaferIG
+import ClaferIG
 import CommandLine
+import Prelude hiding (all)
 import System.Console.CmdArgs
 
 
 data IGArgs = IGArgs {
-    claferFile :: FilePath
+    all :: Maybe Int,
+    claferModelFile :: FilePath
 } deriving (Show, Data, Typeable)
 
 
 
 claferIG = IGArgs {
-    claferFile = def &= argPos 0 &= typ "FILE"
+    all             = def &= help "Saves all instances up to the provided scope or a counterexample." &= name "all",
+    claferModelFile = def &= argPos 0 &= typ "FILE"
 } &= summary claferIGVersion
 
 
 main =
     do
         args <- cmdArgs claferIG
-
-        claferIG <- ClaferIG.initClaferIG $ claferFile args
+        claferIG <- initClaferIG $ claferModelFile args
         
-        runCommandLine claferIG
+        case all args of
+            Just scope ->
+                do
+                    setGlobalScope scope claferIG
+                    solve claferIG
+                    
+                    let saveNames = map (saveName $ claferModelFile args) [1,2..]
+                    saveAll saveNames claferIG
+                    return ()
+            Nothing    -> runCommandLine claferIG
+            
+        quit claferIG
+        
+        
+saveName :: FilePath -> Int -> FilePath
+saveName file counter = file ++ "." ++ (show counter) ++ ".data"
+
+
+saveAll :: [FilePath] -> ClaferIG -> IO [FilePath]
+saveAll [] _ = fail "No more filepaths"
+saveAll (f:fs) claferIG =
+    do
+        solution <- next claferIG
+        case solution of
+            Just nextSolution ->
+                do
+                    writeFile f (show nextSolution)
+                    saved <- saveAll fs claferIG
+                    return $ f:saved
+            Nothing           -> return []

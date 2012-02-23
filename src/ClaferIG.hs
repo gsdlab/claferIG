@@ -29,7 +29,6 @@ import Data.Map as Map hiding (map)
 import Process
 import Solution
 import Sugarer
-import System.Environment.Executable
 import System.Exit
 import Version
 
@@ -45,16 +44,14 @@ claferIGVersion =
 initClaferIG :: FilePath -> IO ClaferIG
 initClaferIG claferFile = 
     do
-        (execDir, _) <- splitExecutablePath
-        
-        claferProc <- pipeProcess (execDir ++ "clafer") ["-o", "-s", claferFile]
+        execPath <- executableDirectory
+        claferProc <- pipeProcess (execPath ++ "clafer") ["-o", "-s", claferFile]
         claferOutput <- getContentsVerbatim claferProc
         claferExit <- waitFor claferProc
         when (claferExit /= ExitSuccess) (fail "clafer unexpectedly terminated")
         claferModel <- readFile claferFile
         
-        alloyIGProc <- pipeProcess "java" ["-jar", execDir ++ "alloyIG.jar"]
-        alloyIG <- AlloyIG.initAlloyIG claferOutput alloyIGProc
+        alloyIG <- AlloyIG.initAlloyIG claferOutput
         
         let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- (AlloyIG.sigs alloyIG)]
         
@@ -115,9 +112,9 @@ setScope scope Scope{sigName = sigName, claferIG = claferIG} = AlloyIG.sendSetSc
 
 
 next :: ClaferIG -> IO (Maybe ClaferModel)
-next alloyIG = 
+next claferIG = 
     do
-        solution <- nextWithAlloyInstance alloyIG
+        solution <- nextWithAlloyInstance claferIG
         return $ snd `liftM` solution 
 
 
