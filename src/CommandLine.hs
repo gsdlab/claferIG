@@ -56,6 +56,8 @@ runCommandLine filePath alloyIG =
         clafers <- newIORef $ map sigToClaferName (sigs alloyIG)
         claferInstances <- newIORef []
         claferModel <- readFile filePath
+
+        sendResolveCommand alloyIG
         
         let autoCompleteContext = AutoCompleteContext clafers claferInstances
         runInputT Settings {
@@ -127,7 +129,7 @@ runCommandLine filePath alloyIG =
             lift $ sendSetGlobalScopeCommand globalScope' alloyIG
             scopes <- lift $ getScopes alloyIG
             let scopes' = map (\(x, y)->(x, y + i)) scopes
-            lift $ mapM (apply alloyIG) (map (uncurry sendSetScopeCommand) scopes')
+            lift $ mapM (flip (uncurry sendSetScopeCommand) alloyIG) scopes'
             lift $ sendResolveCommand alloyIG
             
             outputStrLn ("Global scope increased to " ++ show globalScope')

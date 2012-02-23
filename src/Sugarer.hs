@@ -78,10 +78,9 @@ sugarClaferModel model@(ClaferModel topLevel) =
     sugarValue x = x
 
 
--- Only keeps the substring between the '_' and '$' exclusive.
+-- Transforms c2_name -> name
 simpleName :: String -> String
 simpleName n =
-    fst $ break ('$' ==) $
     case snd $ break ('_' ==) n of
-        [] ->  n
+        [] ->  error "Unexpected Clafer name " ++ n
         x -> tail x

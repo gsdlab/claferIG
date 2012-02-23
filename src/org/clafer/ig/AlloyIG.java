@@ -187,11 +187,11 @@ public final class AlloyIG {
     }
 
     private static String multiplicity(Sig sig) {
-        if(sig.isOne != null) {
+        if (sig.isOne != null) {
             return "One";
-        } else if(sig.isLone != null) {
+        } else if (sig.isLone != null) {
             return "Lone";
-        } else if(sig.isSome != null) {
+        } else if (sig.isSome != null) {
             return "Some";
         }
         return "Any";
@@ -212,10 +212,6 @@ public final class AlloyIG {
         CompModule world = AlloyCompiler.parse(rep, modelVerbatim);
         SafeList<Sig> sigs = world.getAllSigs();
 
-        // Choose some default options for how you want to execute the commands
-        A4Options options = new A4Options();
-        options.solver = A4Options.SatSolver.SAT4J;
-
         Command command = world.getAllCommands().get(0);
 
         // Send back all the sigs
@@ -228,9 +224,15 @@ public final class AlloyIG {
         writeMessage(Integer.toString(command.overall));
 
         A4Solution ans = null;
-        Operation operation = new ResolveOperation();
+        Operation operation = null;
+
+        // Choose some default options for how you want to execute the commands
+        A4Options options = new A4Options();
+        options.solver = A4Options.SatSolver.SAT4J;
 
         while (!(operation instanceof QuitOperation)) {
+            operation = nextOperation();
+            
             if (operation instanceof ResolveOperation) {
                 // Reexecute the command
                 ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
@@ -266,8 +268,6 @@ public final class AlloyIG {
                 Command c = command;
                 command = new Command(c.pos, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.expects, scope, c.additionalExactScopes, c.formula, c.parent);
             }
-
-            operation = nextOperation();
         }
     }
 }
