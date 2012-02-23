@@ -1,0 +1,8 @@
+abstract Person
+	head
+	hand 2
+		finger 5
+
+Alice : Person
+
+Bob : Person

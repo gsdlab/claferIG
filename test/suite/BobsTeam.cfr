@@ -1,0 +1,17 @@
+abstract Team
+	leader -> Person
+		[ this.member = parent ]
+TeamA : Team
+
+TeamB : Team
+
+abstract Person
+	member -> Team ?
+	leader ?
+		[ some t : Team | t.leader = parent ]
+
+Bob : Person
+	[ Bob.leader ]
+
+Member : Person 5
+

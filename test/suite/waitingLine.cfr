@@ -1,0 +1,16 @@
+abstract Person
+	name : string
+
+Alice : Person
+	[ name = "Alice" ]
+
+Bob : Person
+	[ name = "Bob" ]
+
+BobsTeamMember : Person 3
+
+WaitingLine -> Person 2..7
+
+[ Alice in WaitingLine
+   Bob in WaitingLine
+   BobsTeamMember in WaitingLine ]
