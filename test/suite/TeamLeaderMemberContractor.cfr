@@ -1,0 +1,18 @@
+abstract Person
+
+Alice : Person
+Bob : Person
+Carol : Person
+Dave : Person
+Ed : Person
+Fred : Person
+Genny : Person
+
+Team
+	Leader -> Person
+	Member -> Person 2..*
+	Contractor -> Person *
+	[ Leader in Member ]
+	[ no Contractor & Member ]
+	[ Leader not in Contractor]
+	[ # Member <=3 => no Contractor ]

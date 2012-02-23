@@ -1,0 +1,11 @@
+abstract A
+	b ?
+	c : integer ?
+
+abstract D
+	e ?
+
+`D
+	`A
+	[ b ]
+	[c = 5 ]
