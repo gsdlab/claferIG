@@ -127,10 +127,15 @@ runCommandLine claferIG =
             case getScope name claferIG of
                 Just scope ->
                     do
-                        lift $ increaseScope i scope
-                        scope' <- lift $ valueOfScope scope
-                        lift $ solve claferIG
-                        outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scope')
+                        error <- lift $ increaseScope i scope
+                        case error of
+                            Just subset ->
+                                outputStrLn $ "Cannot increase scope of the reference Clafer \"" ++ name ++ "\". Try increasing the scope of its refered Clafer \"" ++ subset ++ "\"."
+                            Nothing ->
+                                do
+                                    scope' <- lift $ valueOfScope scope
+                                    lift $ solve claferIG
+                                    outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scope')
                 Nothing -> outputStrLn ("Unknown clafer " ++ name)
             nextLoop context
             

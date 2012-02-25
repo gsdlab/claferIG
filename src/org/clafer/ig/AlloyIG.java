@@ -205,6 +205,14 @@ public final class AlloyIG {
         }
     }
 
+    private static String removeCurly(String string) {
+        int length = string.length();
+        if (length > 0 && string.charAt(0) == '{' && string.charAt(length - 1) == '}') {
+            return string.substring(1, length - 1);
+        }
+        throw new IllegalArgumentException("\"" + string + "\" is not surrounded by curly brackets.");
+    }
+
     public static void run(String[] args) throws IOException, Err {
         String modelVerbatim = readMessage();
 
@@ -219,6 +227,7 @@ public final class AlloyIG {
         for (Sig sig : sigs) {
             writeMessage(sig.label);
             writeMessage(multiplicity(sig));
+            writeMessage(sig instanceof Sig.PrimSig ? "" : removeCurly (sig.type().toString()));
         }
         // Send back the global scope
         writeMessage(Integer.toString(command.overall));
@@ -232,7 +241,7 @@ public final class AlloyIG {
 
         while (!(operation instanceof QuitOperation)) {
             operation = nextOperation();
-            
+
             if (operation instanceof ResolveOperation) {
                 // Reexecute the command
                 ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);

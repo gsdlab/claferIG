@@ -24,12 +24,12 @@ module AlloyIGInterface where
 
 import Control.Monad
 import Data.IORef
-import Data.Map as Map
+import Data.Map as Map hiding (null)
 import Process
 
 
-data AlloyIG = AlloyIG{proc::Process, alloyModel::String, sigMap::Map String Multiplicity, scopes::IORef (Map String Int), globalScope::IORef Int}
-
+data AlloyIG = AlloyIG{proc::Process, alloyModel::String, sigMap::Map String Sig, scopes::IORef (Map String Int), globalScope::IORef Int}
+data Sig = Sig{s_name::String, s_multiplicity::Multiplicity, s_subset::Maybe String}
 data Multiplicity = One | Lone | Some | Any deriving (Eq, Read, Show)
 
 
@@ -54,14 +54,15 @@ initAlloyIG alloyModel =
         scopesRef <- newIORef Map.empty        
         globalScopeRef <- newIORef globalScope
         
-        return $ AlloyIG alloyIGProc alloyModel (fromList sigs) scopesRef globalScopeRef
+        return $ AlloyIG alloyIGProc alloyModel (fromList [(s_name sig, sig) | sig <- sigs]) scopesRef globalScopeRef
     where
-    readSig :: Process -> IO (String, Multiplicity)
+    readSig :: Process -> IO Sig
     readSig proc =
         do
             sig <- getMessage proc 
             multiplicity <- read `liftM` getMessage proc
-            return (sig, multiplicity)
+            subset <- getMessage proc
+            return $ Sig sig multiplicity (if null subset then Nothing else Just subset)
             
 
 sigs :: AlloyIG -> [String]
@@ -98,19 +99,27 @@ getScopes alloyIG =
             
 
 -- Tell alloyIG to change the scope of a sig
-sendSetScopeCommand :: String -> Int -> AlloyIG -> IO ()
+sendSetScopeCommand :: String -> Int -> AlloyIG -> IO (Maybe String)
 sendSetScopeCommand sig scope AlloyIG{proc=proc, scopes=scopes, sigMap=sigMap} =
     do
         -- Alloy has a fit when trying to set a scope outside its multiplicity
         -- Don't send command if outside its multiplicity but continue the illusion that
         -- the scope was set
-        when (withinRange scope $ sigMap ! sig) $
-            do
-                putMessage proc "setScope"
-                putMessage proc sig
-                putMessage proc (show scope)
-        rscopes <- readIORef scopes
-        writeIORef scopes (Map.insert sig scope rscopes)
+        case subset of
+            Nothing ->
+                do
+                    when (withinRange scope multiplicity) $
+                        do
+                            putMessage proc "setScope"
+                            putMessage proc sig
+                            putMessage proc (show scope)
+                    rscopes <- readIORef scopes
+                    writeIORef scopes (Map.insert sig scope rscopes)
+                    return $ Nothing
+            Just sub ->
+                return $ Just sub
+    where
+    Sig{s_multiplicity = multiplicity, s_subset = subset} = sigMap ! sig
         
 
 getGlobalScope :: AlloyIG -> IO Int

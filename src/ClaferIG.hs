@@ -99,7 +99,7 @@ valueOfScope :: Scope -> IO Int
 valueOfScope Scope{sigName = sigName, claferIG = claferIG} = AlloyIG.getScope sigName (alloyIG claferIG)
 
 
-increaseScope :: Int -> Scope -> IO ()
+increaseScope :: Int -> Scope -> IO (Maybe String)
 increaseScope increment scope =
     do
         value <- valueOfScope scope
@@ -107,8 +107,11 @@ increaseScope increment scope =
         setScope value' scope
     
 
-setScope :: Int -> Scope -> IO ()
-setScope scope Scope{sigName = sigName, claferIG = claferIG} = AlloyIG.sendSetScopeCommand sigName scope (alloyIG claferIG)
+setScope :: Int -> Scope -> IO (Maybe String)
+setScope scope Scope{sigName = sigName, claferIG = claferIG} =
+    do
+        subset <- AlloyIG.sendSetScopeCommand sigName scope (alloyIG claferIG)
+        return $ sigToClaferName `liftM` subset
 
 
 next :: ClaferIG -> IO (Maybe ClaferModel)
