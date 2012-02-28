@@ -39,6 +39,7 @@ import edu.mit.csail.sdg.alloy4compiler.parser.CompModule;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Options;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Solution;
 import edu.mit.csail.sdg.alloy4compiler.translator.TranslateAlloyToKodkod;
+import edu.mit.csail.sdg.alloy4whole.SimpleGUI;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.IOException;
@@ -276,6 +277,11 @@ public final class AlloyIG {
     }
 
     public static void main(String[] args) throws IOException, Err {
+        try {
+            System.loadLibrary("minisatprover");
+        } catch (UnsatisfiedLinkError e) {
+            System.loadLibrary("minisatproverx1");
+        }
         try {
             run(args);
         } catch (EOFException e) {

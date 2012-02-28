@@ -1,4 +1,4 @@
-all: alloyIG.jar install
+all: alloyIG.jar lib install
 
 install:
 	cabal install --bindir=.
@@ -6,6 +6,11 @@ install:
 newVersion:
 	ghc -isrc src/dateVer.hs -outputdir dist/build --make -o dateVer
 	./src/dateVer > src/Version.hs
+
+lib:
+	unzip alloy4.jar x86-linux/* -d lib
+	unzip alloy4.jar x86-windows/* -d lib
+	unzip alloy4.jar x86-mac/* -d lib
 	
 # Build takes less time. For ease of development.
 build: alloyIG.jar
@@ -23,3 +28,4 @@ clean:
 	rm -rf dist
 	rm -f alloyIG.jar
 	rm -f claferIG
+	rm -rf lib

@@ -47,7 +47,7 @@ initAlloyIG :: String -> IO AlloyIG
 initAlloyIG alloyModel =
     do
         execPath <- executableDirectory
-        alloyIGProc <- pipeProcess "java" ["-jar", execPath ++ "alloyIG.jar"]
+        alloyIGProc <- pipeProcess "java" ["-Djava.library.path=" ++ execPath ++ "lib/x86-linux:" ++ execPath ++ "lib/x86-windows:" ++ execPath ++ "lib/x86-mac" , "-jar", execPath ++ "alloyIG.jar"]
         putMessage alloyIGProc alloyModel
         numberOfSigs <- read `liftM` getMessage alloyIGProc
         sigs <- mapM readSig (replicate numberOfSigs alloyIGProc)
