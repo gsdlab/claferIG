@@ -32,6 +32,8 @@ data AlloyIG = AlloyIG{proc::Process, alloyModel::String, sigMap::Map String Sig
 data Sig = Sig{s_name::String, s_multiplicity::Multiplicity, s_subset::Maybe String}
 data Multiplicity = One | Lone | Some | Any deriving (Eq, Read, Show)
 
+data UnsatCore = UnsatCore{core::[String], subcore::[String]} deriving Show
+
 
 
 withinRange :: Int -> Multiplicity -> Bool
@@ -76,9 +78,7 @@ sendNextCommand AlloyIG{proc=proc} =
         putMessage proc "next"
         status <- read `liftM` getMessage proc
         case status of
-            True -> do
-                xml <- getMessage proc
-                return $ Just xml
+            True -> Just `liftM` getMessage proc
             False -> return Nothing
 
 
@@ -137,7 +137,34 @@ sendSetGlobalScopeCommand scope AlloyIG{proc=proc, globalScope=globalScope} =
 
 -- Tell alloyIG to recalculate the solution
 sendResolveCommand :: AlloyIG -> IO ()
-sendResolveCommand AlloyIG{proc=proc} = putMessage proc "resolve"
+sendResolveCommand AlloyIG{proc = proc} = putMessage proc "resolve"
+
+
+-- Tell alloyIG to return the unsat core
+sendUnsatCoreCommand :: AlloyIG -> IO UnsatCore
+sendUnsatCoreCommand AlloyIG{proc = proc} =
+    do
+        putMessage proc "unsatCore"
+        coreLength <- read `liftM` getMessage proc
+        cores <- mapM getMessage (replicate coreLength proc)
+        subcoreLength <- read `liftM` getMessage proc
+        subcores <- mapM getMessage (replicate subcoreLength proc)
+        return $ UnsatCore cores subcores
+        
+        
+-- Get the counterexample of the unsatisfiable solution from alloyIG
+sendCounterexampleCommand :: AlloyIG -> IO (Maybe String)
+sendCounterexampleCommand AlloyIG{proc=proc} =
+    do
+        putMessage proc "counterexample"
+        status <- read `liftM` getMessage proc
+        case status of
+            True ->
+                do
+                    removedConstraints <- getMessage proc
+                    putStrLn $ "Alloy unsat (temporary for debugging) = " ++ removedConstraints
+                    Just `liftM` getMessage proc
+            False -> return Nothing        
 
 
 -- Tell alloyIG to quit

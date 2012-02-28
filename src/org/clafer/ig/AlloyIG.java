@@ -25,9 +25,14 @@ import edu.mit.csail.sdg.alloy4.A4Reporter;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
 import edu.mit.csail.sdg.alloy4.ErrorWarning;
+import edu.mit.csail.sdg.alloy4.Pair;
+import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
+import edu.mit.csail.sdg.alloy4compiler.ast.Browsable;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;
 import edu.mit.csail.sdg.alloy4compiler.ast.CommandScope;
+import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprList;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.parser.AlloyCompiler;
 import edu.mit.csail.sdg.alloy4compiler.parser.CompModule;
@@ -42,12 +47,16 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 public final class AlloyIG {
 
     private static BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
     private static PrintStream output = System.out;
+    private static int minimizedBefore;
+    private static int minimizedAfter;
 
     private static String readMessage() throws IOException {
         String line = input.readLine();
@@ -71,12 +80,18 @@ public final class AlloyIG {
         return new String(buf);
     }
 
+    private static void writeMessage(int message) throws IOException {
+        writeMessage(Integer.toString(message));
+    }
+
     private static void writeMessage(String message) throws IOException {
         output.println(message.length());
         output.print(message);
     }
-    // Alloy4 sends diagnostic messages and progress reports to the A4Reporter.
-    // By default, the A4Reporter ignores all these events (but you can extend the A4Reporter to display the event for the user)
+    // The only to detect unsatisfiability to is wait for the minimized callback to be called.
+    // If it is called, then unsatisfiable. Otherwise not. Very strange way of doing things
+    // but that's how its done in Alloy as far as I can tell.
+    // See alloy4whole/SimpleReporter.java for details.
     private static final A4Reporter rep = new A4Reporter() {
 
         @Override
@@ -84,7 +99,54 @@ public final class AlloyIG {
             System.err.print("Relevance Warning:\n" + (msg.toString().trim()) + "\n\n");
             System.err.flush();
         }
+
+        @Override
+        public void minimized(Object command, int before, int after) {
+            minimizedBefore = before;
+            minimizedAfter = after;
+            super.minimized(command, before, after);
+        }
     };
+
+    private static Pair<Pos,Command> removeConstraint(Set<Pos> core, Set<Pos> subcore, Command command) {
+        for (Pos pos : core) {
+            Command newCommand = removeConstraint(pos, command);
+            if (newCommand != null) {
+                return new Pair<Pos, Command>(pos, newCommand);
+            }
+        }
+        for (Pos pos : subcore) {
+            Command newCommand = removeConstraint(pos, command);
+            if (newCommand != null) {
+                return new Pair<Pos, Command>(pos, newCommand);
+            }
+        }
+        throw new AlloyIGException("core:" + core + ", subcore=" + subcore + " does not match any formula in " + command.getSubnodes());
+    }
+
+    private static Command removeConstraint(Pos pos, Command c) {
+        ExprList formula = (ExprList) c.formula;
+        List<Expr> newSubnodes = removeSubnode(pos, formula.args);
+        if (newSubnodes == null) {
+            return null;
+        }
+        ExprList newFormula = ExprList.make(formula.pos, formula.closingBracket, formula.op, newSubnodes);
+
+        return new Command(c.pos, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.expects, c.scope, c.additionalExactScopes, newFormula, c.parent);
+    }
+
+    private static List<Expr> removeSubnode(Pos pos, List<Expr> subnodes) {
+        List<Expr> result = new ArrayList<Expr>(subnodes);
+        Iterator<Expr> iter = result.iterator();
+        while (iter.hasNext()) {
+            Browsable next = iter.next();
+            if (pos.equals(next.span())) {
+                iter.remove();
+                return result;
+            }
+        }
+        return null;
+    }
 
     private static interface Operation {
     }
@@ -93,6 +155,12 @@ public final class AlloyIG {
     }
 
     private static class NextOperation implements Operation {
+    }
+
+    private static class UnsatCoreOperation implements Operation {
+    }
+
+    private static class CounterexampleOperation implements Operation {
     }
 
     private static class QuitOperation implements Operation {
@@ -148,6 +216,10 @@ public final class AlloyIG {
             return new SetScopeOperation(sig, scopeSize);
         } else if (op.equals("resolve")) {
             return new ResolveOperation();
+        } else if (op.equals("unsatCore")) {
+            return new UnsatCoreOperation();
+        } else if (op.equals("counterexample")) {
+            return new CounterexampleOperation();
         }
         throw new AlloyIGException("Unknown op " + op);
     }
@@ -184,6 +256,12 @@ public final class AlloyIG {
         }
 
         return newScope;
+    }
+
+    private static String toXml(A4Solution ans) throws Err, IOException {
+        StringWriter xml = new StringWriter();
+        ans.writeXML(new PrintWriter(xml), null, null);
+        return xml.toString();
     }
 
     private static String multiplicity(Sig sig) {
@@ -227,7 +305,7 @@ public final class AlloyIG {
         for (Sig sig : sigs) {
             writeMessage(sig.label);
             writeMessage(multiplicity(sig));
-            writeMessage(sig instanceof Sig.PrimSig ? "" : removeCurly (sig.type().toString()));
+            writeMessage(sig instanceof Sig.PrimSig ? "" : removeCurly(sig.type().toString()));
         }
         // Send back the global scope
         writeMessage(Integer.toString(command.overall));
@@ -237,12 +315,15 @@ public final class AlloyIG {
 
         // Choose some default options for how you want to execute the commands
         A4Options options = new A4Options();
-        options.solver = A4Options.SatSolver.SAT4J;
+        options.coreMinimization = 0;
+        options.solver = A4Options.SatSolver.MiniSatProverJNI;
 
         while (!(operation instanceof QuitOperation)) {
             operation = nextOperation();
 
             if (operation instanceof ResolveOperation) {
+                minimizedBefore = 0;
+                minimizedAfter = 0;
                 // Reexecute the command
                 ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
             } else if (operation instanceof NextOperation) {
@@ -276,6 +357,45 @@ public final class AlloyIG {
 
                 Command c = command;
                 command = new Command(c.pos, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.expects, scope, c.additionalExactScopes, c.formula, c.parent);
+            } else if (operation instanceof UnsatCoreOperation) {
+                // Without this check, the highLevelCore can return gibberish.
+                // Learned the hard way.
+                if (minimizedAfter > 0) {
+                    Pair<Set<Pos>, Set<Pos>> unsatCore = ans.highLevelCore();
+                    writeMessage(unsatCore.a.size());
+                    for (Pos pos : unsatCore.a) {
+                        writeMessage(pos.toString());
+                    }
+                    writeMessage(unsatCore.b.size());
+                    for (Pos pos : unsatCore.b) {
+                        writeMessage(pos.toString());
+                    }
+                } else {
+                    writeMessage(0);
+                    writeMessage(0);
+                }
+            } else if (operation instanceof CounterexampleOperation) {
+                // Without this check, the highLevelCore can return gibberish.
+                // Learned the hard way.
+                if (minimizedAfter > 0) {
+                    A4Solution a4 = ans;
+                    Command counterExample = command;
+                    List<Pos> removed = new ArrayList<Pos>();
+                    do {
+                        minimizedBefore = 0;
+                        minimizedAfter = 0;
+
+                        Pair<Pos, Command> removedPair = removeConstraint(a4.highLevelCore().a, a4.highLevelCore().b, counterExample);
+                        removed.add(removedPair.a);
+                        counterExample = removedPair.b;
+                        a4 = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), counterExample, options);
+                    } while (minimizedAfter > 0);
+                    writeMessage("True");
+                    writeMessage(removed.toString());
+                    writeMessage(toXml(a4));
+                } else {
+                    writeMessage("False");
+                }
             }
         }
     }

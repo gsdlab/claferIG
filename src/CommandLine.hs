@@ -73,6 +73,13 @@ runCommandLine claferIG =
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 Nothing -> do
                     outputStrLn "No more instances found. Try increasing scope to get more instances."
+                    counter <- lift $ counterexample claferIG
+                    case counter of
+                        Just example -> 
+                            do
+                                outputStrLn "Found a counterexample."
+                                outputStrLn $ show example
+                        Nothing -> return ()
                     nextLoop context
                     
     loop Help context =

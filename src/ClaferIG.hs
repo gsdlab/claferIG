@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module ClaferIG (ClaferIG(claferModel, claferFile), Scope, claferIGVersion, initClaferIG, alloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, nextWithAlloyInstance, quit) where
+module ClaferIG (ClaferIG(claferModel, claferFile), Scope, claferIGVersion, initClaferIG, alloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, nextWithAlloyInstance, unsatCore, counterexample, quit) where
 
 import qualified AlloyIGInterface as AlloyIG
 import ClaferModel
@@ -124,7 +124,6 @@ next claferIG =
 nextWithAlloyInstance :: ClaferIG -> IO (Maybe (String, ClaferModel))
 nextWithAlloyInstance ClaferIG{alloyIG = alloyIG} =
     do
-        AlloyIG.sendNextCommand alloyIG
         xmlSolution <- AlloyIG.sendNextCommand alloyIG
         return $
             do
@@ -133,6 +132,23 @@ nextWithAlloyInstance ClaferIG{alloyIG = alloyIG} =
                 let claferModel = buildClaferModel solution
                 let sugarModel = sugarClaferModel claferModel
                 return (xml, sugarModel)
+
+
+unsatCore :: ClaferIG -> IO AlloyIG.UnsatCore
+unsatCore ClaferIG{alloyIG = alloyIG} = AlloyIG.sendUnsatCoreCommand alloyIG
+
+
+counterexample :: ClaferIG -> IO (Maybe ClaferModel)
+counterexample ClaferIG{alloyIG = alloyIG} =
+    do
+        xmlSolution <- AlloyIG.sendCounterexampleCommand alloyIG
+        return $
+            do
+                xml <- xmlSolution
+                let solution = parseSolution xml
+                let claferModel = buildClaferModel solution
+                let sugarModel = sugarClaferModel claferModel
+                return sugarModel
 
 
 quit :: ClaferIG -> IO ()
