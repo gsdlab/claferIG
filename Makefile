@@ -3,9 +3,10 @@ all: alloyIG.jar lib install
 install:
 	cabal install --bindir=.
 
+# this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs 
 newVersion:
-	ghc -isrc src/dateVer.hs -outputdir dist/build --make -o dateVer
-	./src/dateVer > src/Version.hs
+	ghc -isrc src/dateVer.hs dist/build/autogen/Paths_claferIG.hs -outputdir dist/build --make -o dateVer
+	./dateVer > src/Version.hs
 
 lib:
 	unzip alloy4.jar x86-linux/* -d lib
