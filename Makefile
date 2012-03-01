@@ -7,7 +7,8 @@ ifeq ($(UNAME), linux)
         LIB := x86-linux/libminisatprover*
     endif
 	ifeq ($(MNAME), x86_64)
-        LIB := x86-linux/libminisatprover*
+        # amd64 is a nickname for x86_64
+        LIB := amd64/libminisatprover*
     endif
 endif
 ifeq ($(UNAME), windows)

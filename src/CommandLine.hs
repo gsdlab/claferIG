@@ -64,22 +64,20 @@ runCommandLine claferIG =
     
     loop Next context =
         do
-            solution <- lift $ nextWithAlloyInstance claferIG
+            solution <- lift $ next claferIG
             case solution of
-                Just (xml, claferModel) -> do
+                Instance claferModel xml -> do
                     lift $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse claferModel)
                     
                     outputStrLn $ show claferModel
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
-                Nothing -> do
+                Counterexample claferModel _ xml -> do
                     outputStrLn "No more instances found. Try increasing scope to get more instances."
-                    counter <- lift $ counterexample claferIG
-                    case counter of
-                        Just example -> 
-                            do
-                                outputStrLn "Found a counterexample."
-                                outputStrLn $ show example
-                        Nothing -> return ()
+                    outputStrLn "Found a counterexample."
+                    outputStrLn $ show claferModel
+                    nextLoop context
+                NoInstance -> do
+                    outputStrLn "No more instances found. Try increasing scope to get more instances."
                     nextLoop context
                     
     loop Help context =
