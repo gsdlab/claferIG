@@ -1,3 +1,41 @@
+UNAME := $(shell uname | tr "A-Z" "a-z")
+ONAME := $(shell uname -o | tr "A-Z" "a-z")
+MNAME := $(shell uname -m | tr "A-Z" "a-z")
+
+ifeq ($(UNAME), linux)
+	ifeq ($(MNAME), i686)
+        LIB := x86-linux/libminisatprover*
+    endif
+	ifeq ($(MNAME), x86_64)
+        LIB := x86-linux/libminisatprover*
+    endif
+endif
+ifeq ($(UNAME), windows)
+	ifeq ($(MNAME), i686)
+        LIB := x86-windows/minisatprover*
+    endif
+	ifeq ($(MNAME), x86_64)
+        LIB := x86-windows/minisatprover*
+    endif
+endif
+ifeq ($(ONAME), cygwin)
+	ifeq ($(MNAME), i686)
+        LIB := x86-windows/minisatprover*
+    endif
+	ifeq ($(MNAME), x86_64)
+        LIB := x86-windows/minisatprover*
+    endif
+endif
+ifeq ($(UNAME), darwin)
+	ifeq ($(MNAME), i686)
+        LIB := x86-mac/libminisatprover*
+    endif
+	ifeq ($(MNAME), x86_64)
+        LIB := x86-mac/libminisatprover*
+    endif
+endif
+
+
 all: alloyIG.jar lib install
 
 install:
@@ -9,9 +47,13 @@ newVersion:
 	./dateVer > src/Version.hs
 
 lib:
-	unzip alloy4.jar x86-linux/* -d lib
-	unzip alloy4.jar x86-windows/* -d lib
-	unzip alloy4.jar x86-mac/* -d lib
+	@if test -z $(LIB); then \
+		echo "[WARNING] Did not find a minisat prover binary suitable for your system. You may need to build the binary yourself."; \
+	else \
+		unzip alloy4.jar $(LIB) -d lib; \
+		chmod +x lib/$(LIB); \
+		cp lib/$(LIB) lib; \
+	fi
 	
 # Build takes less time. For ease of development.
 build: alloyIG.jar
