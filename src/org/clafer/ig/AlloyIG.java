@@ -387,36 +387,34 @@ public final class AlloyIG {
                 reporter.minimizedBefore = rep.minimizedBefore;
                 reporter.minimizedAfter = rep.minimizedAfter;
 
+                A4Solution a4 = ans;
+                Command counterExample = command;
+                List<Pos> removed = new ArrayList<Pos>();
+
                 // Without this check, the highLevelCore can return gibberish.
                 // Learned the hard way.
-                if (reporter.minimizedAfter > 0) {
-                    A4Solution a4 = ans;
-                    Command counterExample = command;
-                    List<Pos> removed = new ArrayList<Pos>();
-                    do {
-                        reporter.minimizedBefore = 0;
-                        reporter.minimizedAfter = 0;
+                while (reporter.minimizedAfter > 0) {
+                    reporter.minimizedBefore = 0;
+                    reporter.minimizedAfter = 0;
 
-                        Pair<Pos, Command> removedPair = removeConstraint(a4.highLevelCore().a, a4.highLevelCore().b, counterExample);
-                        if (removedPair == null) {
-                            writeMessage("False");
-                            removed = null;
-                            break;
-                        }
-                        removed.add(removedPair.a);
-                        counterExample = removedPair.b;
-                        a4 = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), counterExample, options);
-                    } while (reporter.minimizedAfter > 0);
-                    if (removed != null) {
-                        writeMessage("True");
-                        writeMessage(removed.size());
-                        for (Pos r : removed) {
-                            writeMessage(r.toString());
-                        }
-                        writeMessage(toXml(a4));
+                    Pair<Pos, Command> removedPair = removeConstraint(a4.highLevelCore().a, a4.highLevelCore().b, counterExample);
+                    if (removedPair == null) {
+                        removed.clear();
+                        break;
                     }
-                } else {
+                    removed.add(removedPair.a);
+                    counterExample = removedPair.b;
+                    a4 = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), counterExample, options);
+                }
+                if (removed.isEmpty()) {
                     writeMessage("False");
+                } else {
+                    writeMessage("True");
+                    writeMessage(removed.size());
+                    for (Pos r : removed) {
+                        writeMessage(r.toString());
+                    }
+                    writeMessage(toXml(a4));
                 }
             }
         }
