@@ -71,10 +71,16 @@ runCommandLine claferIG =
                     
                     outputStrLn $ show claferModel
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
-                Counterexample claferModel _ xml -> do
+                Counterexample claferModel constraints xml -> do
                     outputStrLn "No more instances found. Try increasing scope to get more instances."
-                    outputStrLn "Found a counterexample."
+                    outputStrLn "Removing the following constraints produced a counterexample."
+                    mapM (outputStrLn . ("  " ++) . show) constraints
                     outputStrLn $ show claferModel
+                    nextLoop context
+                Unsat constraints -> do
+                    outputStrLn "No more instances found. Try increasing scope to get more instances."
+                    outputStrLn "The following set of constraints cannot be satisfied in the current scope."
+                    mapM (outputStrLn . ("  " ++) . show) constraints
                     nextLoop context
                 NoInstance -> do
                     outputStrLn "No more instances found. Try increasing scope to get more instances."

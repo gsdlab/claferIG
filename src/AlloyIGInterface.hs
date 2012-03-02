@@ -153,7 +153,7 @@ sendUnsatCoreCommand AlloyIG{proc = proc} =
         
         
 -- Get the counterexample of the unsatisfiable solution from alloyIG
-sendCounterexampleCommand :: AlloyIG -> IO (Maybe String)
+sendCounterexampleCommand :: AlloyIG -> IO (Maybe ([String], String))
 sendCounterexampleCommand AlloyIG{proc=proc} =
     do
         putMessage proc "counterexample"
@@ -161,9 +161,10 @@ sendCounterexampleCommand AlloyIG{proc=proc} =
         case status of
             True ->
                 do
-                    removedConstraints <- getMessage proc
-                    putStrLn $ "Alloy unsat (temporary for debugging) = " ++ removedConstraints
-                    Just `liftM` getMessage proc
+                    length <- read `liftM` getMessage proc
+                    removedConstraints <- mapM getMessage (replicate length proc)
+                    xml <- getMessage proc
+                    return $ Just (removedConstraints, xml)
             False -> return Nothing        
 
 

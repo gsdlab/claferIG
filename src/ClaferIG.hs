@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module ClaferIG (ClaferIG(claferModel, claferFile), Scope, Constraint(..), Instance(..), claferIGVersion, initClaferIG, alloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, nextWithAlloyInstance, unsatCore, quit) where
+module ClaferIG (ClaferIG(claferModel, claferFile), Scope, Constraint(..), Instance(..), claferIGVersion, initClaferIG, alloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, nextWithAlloyInstance, quit) where
 
 import qualified AlloyIGInterface as AlloyIG
 import ClaferModel
@@ -35,10 +35,11 @@ import Version
 
 data ClaferIG = ClaferIG{claferModel::String, claferFile::FilePath, claferToSigNameMap::Map String String, alloyIG::AlloyIG.AlloyIG}
 data Scope = Scope {name::String, sigName::String, claferIG::ClaferIG}
-data Constraint = Constraint String
+data Constraint = Constraint String deriving Show
 data Instance =
     Instance {modelInstance::ClaferModel, alloyModelInstance::String} |
     Counterexample {modelInstance::ClaferModel, unsatConstraints::[Constraint], alloyModelInstance::String} |
+    Unsat {unsatConstraints::[Constraint]} |
     NoInstance
 
 
@@ -132,8 +133,16 @@ next ClaferIG{alloyIG = alloyIG} =
         do
             xmlSolution <- AlloyIG.sendCounterexampleCommand alloyIG
             case xmlSolution of
-                Just xml -> return $ Counterexample (xmlToModel xml) [] xml
-                Nothing  -> return NoInstance
+                Just (constraints, xml) -> return $ Counterexample (xmlToModel xml) (map Constraint constraints) xml
+                Nothing  -> unsatCore
+                
+    unsatCore :: IO Instance
+    unsatCore =
+        do
+            AlloyIG.UnsatCore core subcore <- AlloyIG.sendUnsatCoreCommand alloyIG
+            case core ++ subcore of
+                [] -> return NoInstance
+                c  -> return $ Unsat $ map Constraint c
                 
     xmlToModel xml = sugarClaferModel $ buildClaferModel $ parseSolution xml
 
@@ -149,13 +158,6 @@ nextWithAlloyInstance ClaferIG{alloyIG = alloyIG} =
                 let claferModel = buildClaferModel solution
                 let sugarModel = sugarClaferModel claferModel
                 return (xml, sugarModel)
-
-
-unsatCore :: ClaferIG -> IO [Constraint]
-unsatCore ClaferIG{alloyIG = alloyIG} =
-    do
-        AlloyIG.UnsatCore core subcore <- AlloyIG.sendUnsatCoreCommand alloyIG
-        return $ map Constraint (core ++ subcore)
 
 
 quit :: ClaferIG -> IO ()
