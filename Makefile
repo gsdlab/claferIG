@@ -72,3 +72,4 @@ clean:
 	rm -f alloyIG.jar
 	rm -f claferIG
 	rm -rf lib
+	rm -f dateVer*
