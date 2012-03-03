@@ -7,7 +7,8 @@ ifeq ($(UNAME), linux)
         LIB := x86-linux/libminisatprover*
     endif
 	ifeq ($(MNAME), x86_64)
-        LIB := x86-linux/libminisatprover*
+        # amd64 is a nickname for x86_64
+        LIB := amd64/libminisatprover*
     endif
 endif
 ifeq ($(UNAME), windows)
@@ -66,6 +67,14 @@ alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/cl
 	mkdir -p dist/javabuild
 	javac -cp "alloy4.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	jar cfm alloyIG.jar src/manifest -C dist/javabuild org/clafer/ig/ -C dist/javabuild edu
+
+runTests:
+    # Only test a subset of the suite. The other cases do not work yet.
+	./claferIG --all=4 -s dist/run test/suite/backquoted.cfr
+	./claferIG --all=4 -s dist/run test/suite/BobsTeam.cfr
+	./claferIG --all=4 -s dist/run test/suite/inconsistent.cfr
+	./claferIG --all=4 -s dist/run test/suite/PersonFingers.cfr
+	./claferIG --all=4 -s dist/run test/suite/waitingLine.cfr
 	
 clean:
 	rm -rf dist

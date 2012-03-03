@@ -39,7 +39,6 @@ import edu.mit.csail.sdg.alloy4compiler.parser.CompModule;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Options;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Solution;
 import edu.mit.csail.sdg.alloy4compiler.translator.TranslateAlloyToKodkod;
-import edu.mit.csail.sdg.alloy4whole.SimpleGUI;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.IOException;
@@ -56,8 +55,6 @@ public final class AlloyIG {
 
     private static BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
     private static PrintStream output = System.out;
-    private static int minimizedBefore;
-    private static int minimizedAfter;
 
     private static String readMessage() throws IOException {
         String line = input.readLine();
@@ -89,11 +86,15 @@ public final class AlloyIG {
         output.println(message.length());
         output.print(message);
     }
+
     // The only to detect unsatisfiability to is wait for the minimized callback to be called.
     // If it is called, then unsatisfiable. Otherwise not. Very strange way of doing things
     // but that's how its done in Alloy as far as I can tell.
     // See alloy4whole/SimpleReporter.java for details.
-    private static final A4Reporter rep = new A4Reporter() {
+    private static class AlloyIGReporter extends A4Reporter {
+
+        private int minimizedBefore;
+        private int minimizedAfter;
 
         @Override
         public void warning(ErrorWarning msg) {
@@ -109,7 +110,7 @@ public final class AlloyIG {
         }
     };
 
-    private static Pair<Pos,Command> removeConstraint(Set<Pos> core, Set<Pos> subcore, Command command) {
+    private static Pair<Pos, Command> removeConstraint(Set<Pos> core, Set<Pos> subcore, Command command) {
         for (Pos pos : core) {
             Command newCommand = removeConstraint(pos, command);
             if (newCommand != null) {
@@ -122,7 +123,7 @@ public final class AlloyIG {
                 return new Pair<Pos, Command>(pos, newCommand);
             }
         }
-        throw new AlloyIGException("core:" + core + ", subcore=" + subcore + " does not match any formula in " + command.getSubnodes());
+        return null;
     }
 
     private static Command removeConstraint(Pos pos, Command c) {
@@ -298,6 +299,7 @@ public final class AlloyIG {
     }
 
     public static void run(String[] args) throws IOException, Err {
+        AlloyIGReporter rep = new AlloyIGReporter();
         String modelVerbatim = readMessage();
 
         // Parse+typecheck the model
@@ -328,8 +330,8 @@ public final class AlloyIG {
             operation = nextOperation();
 
             if (operation instanceof ResolveOperation) {
-                minimizedBefore = 0;
-                minimizedAfter = 0;
+                rep.minimizedBefore = 0;
+                rep.minimizedAfter = 0;
                 // Reexecute the command
                 ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
             } else if (operation instanceof NextOperation) {
@@ -366,7 +368,7 @@ public final class AlloyIG {
             } else if (operation instanceof UnsatCoreOperation) {
                 // Without this check, the highLevelCore can return gibberish.
                 // Learned the hard way.
-                if (minimizedAfter > 0) {
+                if (rep.minimizedAfter > 0) {
                     Pair<Set<Pos>, Set<Pos>> unsatCore = ans.highLevelCore();
                     writeMessage(unsatCore.a.size());
                     for (Pos pos : unsatCore.a) {
@@ -381,26 +383,38 @@ public final class AlloyIG {
                     writeMessage(0);
                 }
             } else if (operation instanceof CounterexampleOperation) {
+                AlloyIGReporter reporter = new AlloyIGReporter();
+                reporter.minimizedBefore = rep.minimizedBefore;
+                reporter.minimizedAfter = rep.minimizedAfter;
+
+                A4Solution a4 = ans;
+                Command counterExample = command;
+                List<Pos> removed = new ArrayList<Pos>();
+
                 // Without this check, the highLevelCore can return gibberish.
                 // Learned the hard way.
-                if (minimizedAfter > 0) {
-                    A4Solution a4 = ans;
-                    Command counterExample = command;
-                    List<Pos> removed = new ArrayList<Pos>();
-                    do {
-                        minimizedBefore = 0;
-                        minimizedAfter = 0;
+                while (reporter.minimizedAfter > 0) {
+                    reporter.minimizedBefore = 0;
+                    reporter.minimizedAfter = 0;
 
-                        Pair<Pos, Command> removedPair = removeConstraint(a4.highLevelCore().a, a4.highLevelCore().b, counterExample);
-                        removed.add(removedPair.a);
-                        counterExample = removedPair.b;
-                        a4 = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), counterExample, options);
-                    } while (minimizedAfter > 0);
-                    writeMessage("True");
-                    writeMessage(removed.toString());
-                    writeMessage(toXml(a4));
-                } else {
+                    Pair<Pos, Command> removedPair = removeConstraint(a4.highLevelCore().a, a4.highLevelCore().b, counterExample);
+                    if (removedPair == null) {
+                        removed.clear();
+                        break;
+                    }
+                    removed.add(removedPair.a);
+                    counterExample = removedPair.b;
+                    a4 = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), counterExample, options);
+                }
+                if (removed.isEmpty()) {
                     writeMessage("False");
+                } else {
+                    writeMessage("True");
+                    writeMessage(removed.size());
+                    for (Pos r : removed) {
+                        writeMessage(r.toString());
+                    }
+                    writeMessage(toXml(a4));
                 }
             }
         }

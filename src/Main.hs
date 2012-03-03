@@ -90,10 +90,10 @@ saveAll :: IO FilePath -> ClaferIG -> IO ()
 saveAll nextFile claferIG =
     do
         file <- nextFile
+        createDirectoryIfMissing True $ takeDirectory file
         solution <- next claferIG
         case solution of
-            Just nextSolution ->
-                do
-                    writeFile file (show nextSolution)
-                    saveAll nextFile claferIG
-            Nothing           -> return ()
+            Instance{modelInstance = modelInstance} -> do
+                writeFile file (show modelInstance)
+                saveAll nextFile claferIG
+            _ -> return ()
