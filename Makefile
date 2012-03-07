@@ -1,5 +1,12 @@
 UNAME := $(shell uname | tr "A-Z" "a-z")
-ONAME := $(shell uname -o | tr "A-Z" "a-z")
+
+ifeq ($(UNAME), darwin)
+	ONAME := $(shell uname -s | tr "A-Z" "a-z")
+else
+	ONAME := $(shell uname -o | tr "A-Z" "a-z")
+endif
+
+
 MNAME := $(shell uname -m | tr "A-Z" "a-z")
 
 ifeq ($(UNAME), linux)
