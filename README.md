@@ -12,11 +12,19 @@ Dependencies
 * [Clafer translator](https://github.com/gsdlab/clafer) (to produce Alloy models (.als) and Clafer IR (.xml) from Clafer models)
 * [Alloy 4.2](http://alloy.mit.edu/alloy/) (backend reasoner)
 * MiniSAT (SAT solver used by Alloy that can produce Unsat Core, bundled with Alloy)
-* The Haskell libraries: haxml, cmdargs, executable-path
+* Some Haskell libraries (installed automatically)
 
-```
-cabal install
-```
+### Building
+
+1. execute `git clone git://github.com/gsdlab/claferIG.git`
+2. copy `alloy4.jar` into the newly created `claferIG` directory
+3. execute `make`
+
+### Installation
+
+1. install the [Clafer translator](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
+2. back in `claferIG`, execute `make deploy to=<target directory>`
+3. make sure the `<target directory>` is on your command PATH
 
 Usage
 -----

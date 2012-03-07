@@ -82,3 +82,10 @@ clean:
 	rm -f claferIG
 	rm -rf lib
 	rm -f dateVer*
+
+deploy: 
+	mkdir -p $(to)
+	cp -R lib $(to)
+	cp alloyIG.jar $(to)
+	cp claferIG* $(to)
+	cp README.md $(to)
