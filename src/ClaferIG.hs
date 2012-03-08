@@ -38,8 +38,7 @@ data Scope = Scope {name::String, sigName::String, claferIG::ClaferIG}
 data Constraint = Constraint String deriving Show
 data Instance =
     Instance {modelInstance::ClaferModel, alloyModelInstance::String} |
-    Counterexample {modelInstance::ClaferModel, unsatConstraints::[Constraint], alloyModelInstance::String} |
-    Unsat {unsatConstraints::[Constraint]} |
+    Counterexample {unsatConstraints::[Constraint], removedConstraints::[Constraint], modelInstance::ClaferModel, alloyModelInstance::String} |
     NoInstance
 
 
@@ -133,16 +132,9 @@ next ClaferIG{alloyIG = alloyIG} =
         do
             xmlSolution <- AlloyIG.sendCounterexampleCommand alloyIG
             case xmlSolution of
-                Just (constraints, xml) -> return $ Counterexample (xmlToModel xml) (map Constraint constraints) xml
-                Nothing  -> unsatCore
-                
-    unsatCore :: IO Instance
-    unsatCore =
-        do
-            AlloyIG.UnsatCore core subcore <- AlloyIG.sendUnsatCoreCommand alloyIG
-            case core ++ subcore of
-                [] -> return NoInstance
-                c  -> return $ Unsat $ map Constraint c
+                Just (AlloyIG.UnsatCore core removed xml) ->
+                    return $ Counterexample (map Constraint core) (map Constraint removed) (xmlToModel xml) xml
+                Nothing -> return NoInstance
                 
     xmlToModel xml = sugarClaferModel $ buildClaferModel $ parseSolution xml
 

@@ -32,7 +32,7 @@ data AlloyIG = AlloyIG{proc::Process, alloyModel::String, sigMap::Map String Sig
 data Sig = Sig{s_name::String, s_multiplicity::Multiplicity, s_subset::Maybe String}
 data Multiplicity = One | Lone | Some | Any deriving (Eq, Read, Show)
 
-data UnsatCore = UnsatCore{core::[String], subcore::[String]} deriving Show
+data UnsatCore = UnsatCore{core::[String], removed::[String], counterexample::String} deriving Show
 
 
 
@@ -140,20 +140,8 @@ sendResolveCommand :: AlloyIG -> IO ()
 sendResolveCommand AlloyIG{proc = proc} = putMessage proc "resolve"
 
 
--- Tell alloyIG to return the unsat core
-sendUnsatCoreCommand :: AlloyIG -> IO UnsatCore
-sendUnsatCoreCommand AlloyIG{proc = proc} =
-    do
-        putMessage proc "unsatCore"
-        coreLength <- read `liftM` getMessage proc
-        cores <- mapM getMessage (replicate coreLength proc)
-        subcoreLength <- read `liftM` getMessage proc
-        subcores <- mapM getMessage (replicate subcoreLength proc)
-        return $ UnsatCore cores subcores
-        
-        
 -- Get the counterexample of the unsatisfiable solution from alloyIG
-sendCounterexampleCommand :: AlloyIG -> IO (Maybe ([String], String))
+sendCounterexampleCommand :: AlloyIG -> IO (Maybe UnsatCore)
 sendCounterexampleCommand AlloyIG{proc=proc} =
     do
         putMessage proc "counterexample"
@@ -161,11 +149,13 @@ sendCounterexampleCommand AlloyIG{proc=proc} =
         case status of
             True ->
                 do
-                    length <- read `liftM` getMessage proc
+                    coreLength         <- read `liftM` getMessage proc
+                    core               <- mapM getMessage (replicate coreLength proc)
+                    length             <- read `liftM` getMessage proc
                     removedConstraints <- mapM getMessage (replicate length proc)
-                    xml <- getMessage proc
-                    return $ Just (removedConstraints, xml)
-            False -> return Nothing        
+                    xml                <- getMessage proc
+                    return $ Just (UnsatCore core removedConstraints xml)
+            False -> return Nothing
 
 
 -- Tell alloyIG to quit

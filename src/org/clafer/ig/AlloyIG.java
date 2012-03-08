@@ -79,9 +79,6 @@ public final class AlloyIG {
     private static class NextOperation implements Operation {
     }
 
-    private static class UnsatCoreOperation implements Operation {
-    }
-
     private static class CounterexampleOperation implements Operation {
     }
 
@@ -138,8 +135,6 @@ public final class AlloyIG {
             return new SetScopeOperation(sig, scopeSize);
         } else if (op.equals("resolve")) {
             return new ResolveOperation();
-        } else if (op.equals("unsatCore")) {
-            return new UnsatCoreOperation();
         } else if (op.equals("counterexample")) {
             return new CounterexampleOperation();
         }
@@ -276,28 +271,13 @@ public final class AlloyIG {
 
                 Command c = command;
                 command = new Command(c.pos, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.expects, scope, c.additionalExactScopes, c.formula, c.parent);
-            } else if (operation instanceof UnsatCoreOperation) {
-                // Without this check, the highLevelCore can return gibberish.
-                // Learned the hard way.
-                if (rep.minimizedAfter > 0) {
-                    Pair<Set<Pos>, Set<Pos>> unsatCore = ans.highLevelCore();
-                    writeMessage(unsatCore.a.size());
-                    for (Pos pos : unsatCore.a) {
-                        writeMessage(pos.toString());
-                    }
-                    writeMessage(unsatCore.b.size());
-                    for (Pos pos : unsatCore.b) {
-                        writeMessage(pos.toString());
-                    }
-                } else {
-                    writeMessage(0);
-                    writeMessage(0);
-                }
             } else if (operation instanceof CounterexampleOperation) {
                 AlloyIGReporter reporter = new AlloyIGReporter();
                 reporter.minimizedBefore = rep.minimizedBefore;
                 reporter.minimizedAfter = rep.minimizedAfter;
 
+
+                Set<Pos> unsatCore = ans.highLevelCore().a;
                 A4Solution a4 = ans;
                 Command counterExample = command;
                 List<Pos> removed = new ArrayList<Pos>();
@@ -312,7 +292,7 @@ public final class AlloyIG {
                     Pos constraint = a4.highLevelCore().a.iterator().next();
                     Command newCounterExample = removeGlobalConstraint(constraint, counterExample);
                     if (newCounterExample == null) {
-                        if(!removeLocalConstraint(constraint, sigs)) {
+                        if (!removeLocalConstraint(constraint, sigs)) {
                             throw new AlloyIGException("Cannot remove constraint " + constraint);
                         }
                     } else {
@@ -325,6 +305,10 @@ public final class AlloyIG {
                     writeMessage("False");
                 } else {
                     writeMessage("True");
+                    writeMessage(unsatCore.size());
+                    for (Pos pos : unsatCore) {
+                        writeMessage(pos.toString());
+                    }
                     writeMessage(removed.size());
                     for (Pos r : removed) {
                         writeMessage(r.toString());
