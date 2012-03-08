@@ -28,64 +28,24 @@ import edu.mit.csail.sdg.alloy4.ErrorWarning;
 import edu.mit.csail.sdg.alloy4.Pair;
 import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
-import edu.mit.csail.sdg.alloy4compiler.ast.Browsable;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;
 import edu.mit.csail.sdg.alloy4compiler.ast.CommandScope;
-import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
-import edu.mit.csail.sdg.alloy4compiler.ast.ExprList;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
 import edu.mit.csail.sdg.alloy4compiler.parser.AlloyCompiler;
 import edu.mit.csail.sdg.alloy4compiler.parser.CompModule;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Options;
 import edu.mit.csail.sdg.alloy4compiler.translator.A4Solution;
 import edu.mit.csail.sdg.alloy4compiler.translator.TranslateAlloyToKodkod;
-import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import static org.clafer.ig.Util.*;
 
 public final class AlloyIG {
-
-    private static BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
-    private static PrintStream output = System.out;
-
-    private static String readMessage() throws IOException {
-        String line = input.readLine();
-        if (line == null) {
-            throw new EOFException();
-        }
-        int length = Integer.parseInt(line);
-
-        char[] buf = new char[length];
-        int off = 0;
-
-        while (off < length) {
-            int l = input.read(buf, off, length - off);
-            if (l == -1) {
-                throw new EOFException();
-            }
-
-            off += l;
-        }
-
-        return new String(buf);
-    }
-
-    private static void writeMessage(int message) throws IOException {
-        writeMessage(Integer.toString(message));
-    }
-
-    private static void writeMessage(String message) throws IOException {
-        output.println(message.length());
-        output.print(message);
-    }
 
     // The only to detect unsatisfiability to is wait for the minimized callback to be called.
     // If it is called, then unsatisfiable. Otherwise not. Very strange way of doing things
@@ -109,46 +69,6 @@ public final class AlloyIG {
             super.minimized(command, before, after);
         }
     };
-
-    private static Pair<Pos, Command> removeConstraint(Set<Pos> core, Set<Pos> subcore, Command command) {
-        for (Pos pos : core) {
-            Command newCommand = removeConstraint(pos, command);
-            if (newCommand != null) {
-                return new Pair<Pos, Command>(pos, newCommand);
-            }
-        }
-        for (Pos pos : subcore) {
-            Command newCommand = removeConstraint(pos, command);
-            if (newCommand != null) {
-                return new Pair<Pos, Command>(pos, newCommand);
-            }
-        }
-        return null;
-    }
-
-    private static Command removeConstraint(Pos pos, Command c) {
-        ExprList formula = (ExprList) c.formula;
-        List<Expr> newSubnodes = removeSubnode(pos, formula.args);
-        if (newSubnodes == null) {
-            return null;
-        }
-        ExprList newFormula = ExprList.make(formula.pos, formula.closingBracket, formula.op, newSubnodes);
-
-        return new Command(c.pos, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.expects, c.scope, c.additionalExactScopes, newFormula, c.parent);
-    }
-
-    private static List<Expr> removeSubnode(Pos pos, List<Expr> subnodes) {
-        List<Expr> result = new ArrayList<Expr>(subnodes);
-        Iterator<Expr> iter = result.iterator();
-        while (iter.hasNext()) {
-            Browsable next = iter.next();
-            if (pos.equals(next.span())) {
-                iter.remove();
-                return result;
-            }
-        }
-        return null;
-    }
 
     private static interface Operation {
     }
@@ -229,15 +149,6 @@ public final class AlloyIG {
     private static CommandScope setCommandScopeSize(int scopeSize, CommandScope cs) throws ErrorSyntax {
         return new CommandScope(
                 cs.pos, cs.sig, cs.isExact, scopeSize, scopeSize, cs.increment);
-    }
-
-    private static Sig findSig(String name, Iterable<Sig> sigs) {
-        for (Sig sig : sigs) {
-            if (name.equals(sig.label)) {
-                return sig;
-            }
-        }
-        throw new AlloyIGException("Unknown sig " + name);
     }
 
     private static List<CommandScope> setScopeSize(Sig sig, int scopeSize, List<CommandScope> scope) throws ErrorSyntax {
@@ -390,6 +301,7 @@ public final class AlloyIG {
                 A4Solution a4 = ans;
                 Command counterExample = command;
                 List<Pos> removed = new ArrayList<Pos>();
+                State save = saveState(sigs);
 
                 // Without this check, the highLevelCore can return gibberish.
                 // Learned the hard way.
@@ -397,14 +309,17 @@ public final class AlloyIG {
                     reporter.minimizedBefore = 0;
                     reporter.minimizedAfter = 0;
 
-                    Pair<Pos, Command> removedPair = removeConstraint(a4.highLevelCore().a, a4.highLevelCore().b, counterExample);
-                    if (removedPair == null) {
-                        removed.clear();
-                        break;
+                    Pos constraint = a4.highLevelCore().a.iterator().next();
+                    Command newCounterExample = removeGlobalConstraint(constraint, counterExample);
+                    if (newCounterExample == null) {
+                        if(!removeLocalConstraint(constraint, sigs)) {
+                            throw new AlloyIGException("Cannot remove constraint " + constraint);
+                        }
+                    } else {
+                        counterExample = newCounterExample;
                     }
-                    removed.add(removedPair.a);
-                    counterExample = removedPair.b;
-                    a4 = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), counterExample, options);
+                    removed.add(constraint);
+                    a4 = TranslateAlloyToKodkod.execute_command(reporter, world.getAllReachableSigs(), counterExample, options);
                 }
                 if (removed.isEmpty()) {
                     writeMessage("False");
@@ -416,6 +331,8 @@ public final class AlloyIG {
                     }
                     writeMessage(toXml(a4));
                 }
+
+                restoreState(save, sigs);
             }
         }
     }
