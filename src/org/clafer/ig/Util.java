@@ -204,11 +204,8 @@ public class Util {
             ExprUnary.Op op = expr.op;
             Expr sub = expr.sub;
 
-            // Read ExprUnary.getSubnodes to see why NOOP is special
-            if (op != ExprUnary.Op.NOOP) {
-                if (pos.equals(sub.span())) {
-                    return null;
-                }
+            if (pos.equals(sub.span())) {
+                return null;
             }
             Expr newSub = removeSubnode(pos, sub);
             if (newSub == null) {
