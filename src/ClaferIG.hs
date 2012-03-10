@@ -50,7 +50,7 @@ initClaferIG :: FilePath -> IO ClaferIG
 initClaferIG claferFile = 
     do
         execPath <- executableDirectory
-        claferProc <- pipeProcess (execPath ++ "clafer") ["-f", "-o", "-s", claferFile]
+        claferProc <- pipeProcess (execPath ++ "clafer") ["-o", "-s", claferFile]
         claferOutput <- getContentsVerbatim claferProc
         claferExit <- waitFor claferProc
         when (claferExit /= ExitSuccess) (fail "clafer unexpectedly terminated")
