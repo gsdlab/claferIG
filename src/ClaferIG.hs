@@ -55,6 +55,8 @@ initClaferIG claferFile =
         claferExit <- waitFor claferProc
         when (claferExit /= ExitSuccess) (fail "clafer unexpectedly terminated")
         claferModel <- readFile claferFile
+        -- readFile is lazy. Force it to evaluate by mapping over everything doing nothing
+        mapM_ return claferModel 
         
         alloyIG <- AlloyIG.initAlloyIG claferOutput
         
