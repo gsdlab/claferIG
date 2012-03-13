@@ -32,9 +32,8 @@ data AlloyIG = AlloyIG{proc::Process, alloyModel::String, sigMap::Map String Sig
 data Sig = Sig{s_name::String, s_multiplicity::Multiplicity, s_subset::Maybe String}
 data Multiplicity = One | Lone | Some | Any deriving (Eq, Read, Show)
 
-data UnsatCore = UnsatCore{core::[String], removed::[String], counterexample::String} deriving Show
-
-
+data UnsatCore = UnsatCore{core::[Constraint], removed::[String], counterexample::String} deriving Show
+data Constraint = Constraint {line::Integer, column::Integer} deriving Show
 
 withinRange :: Int -> Multiplicity -> Bool
 withinRange scope One = scope == 1
@@ -150,12 +149,18 @@ sendCounterexampleCommand AlloyIG{proc=proc} =
             True ->
                 do
                     coreLength         <- read `liftM` getMessage proc
-                    core               <- mapM getMessage (replicate coreLength proc)
+                    core               <- replicateM coreLength readConstraint
                     length             <- read `liftM` getMessage proc
                     removedConstraints <- mapM getMessage (replicate length proc)
                     xml                <- getMessage proc
                     return $ Just (UnsatCore core removedConstraints xml)
             False -> return Nothing
+    where
+    readConstraint =
+        do
+            line <- getMessage proc
+            column <- getMessage proc
+            return $ Constraint (read line) (read column)
 
 
 -- Tell alloyIG to quit

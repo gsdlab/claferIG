@@ -307,7 +307,8 @@ public final class AlloyIG {
                     writeMessage("True");
                     writeMessage(unsatCore.size());
                     for (Pos pos : unsatCore) {
-                        writeMessage(pos.toString());
+                        writeMessage(pos.y); // Line
+                        writeMessage(pos.x); // Column
                     }
                     writeMessage(removed.size());
                     for (Pos r : removed) {

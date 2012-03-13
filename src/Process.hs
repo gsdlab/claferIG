@@ -50,7 +50,12 @@ waitFor proc = waitForProcess (procHandle proc)
 
 
 -- Reads the entire output verbatim
-getContentsVerbatim proc = hGetContents $ stdOut proc
+getContentsVerbatim proc =
+    do
+        contents <- hGetContents $ stdOut proc
+        -- hGetContents is lazy. Force it to evaluate by mapping over everything doing nothing
+        mapM_ return contents
+        return contents
 
     
 -- Read the message

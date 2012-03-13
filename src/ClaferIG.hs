@@ -20,25 +20,26 @@
  SOFTWARE.
 -}
 
-module ClaferIG (ClaferIG(claferModel, claferFile), Scope, Constraint(..), Instance(..), claferIGVersion, initClaferIG, alloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, nextWithAlloyInstance, quit) where
+module ClaferIG (ClaferIG(claferModel, claferFile), Scope, Instance(..), claferIGVersion, initClaferIG, alloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, nextWithAlloyInstance, quit) where
 
 import qualified AlloyIGInterface as AlloyIG
 import ClaferModel
+import Constraints
 import Control.Monad
 import Data.Map as Map hiding (map)
 import Process
 import Solution
 import Sugarer
+import System.FilePath
 import System.Exit
 import Version
 
 
-data ClaferIG = ClaferIG{claferModel::String, claferFile::FilePath, claferToSigNameMap::Map String String, alloyIG::AlloyIG.AlloyIG}
+data ClaferIG = ClaferIG{constraints::[Constraint], claferModel::String, claferFile::FilePath, claferToSigNameMap::Map String String, alloyIG::AlloyIG.AlloyIG}
 data Scope = Scope {name::String, sigName::String, claferIG::ClaferIG}
-data Constraint = Constraint String deriving Show
 data Instance =
     Instance {modelInstance::ClaferModel, alloyModelInstance::String} |
-    Counterexample {unsatConstraints::[Constraint], removedConstraints::[Constraint], modelInstance::ClaferModel, alloyModelInstance::String} |
+    Counterexample {unsatConstraints::[Constraint], removedConstraints::[String], modelInstance::ClaferModel, alloyModelInstance::String} |
     NoInstance
 
 
@@ -49,20 +50,38 @@ claferIGVersion =
 initClaferIG :: FilePath -> IO ClaferIG
 initClaferIG claferFile = 
     do
-        execPath <- executableDirectory
-        claferProc <- pipeProcess (execPath ++ "clafer") ["-o", "-s", claferFile]
-        claferOutput <- getContentsVerbatim claferProc
-        claferExit <- waitFor claferProc
-        when (claferExit /= ExitSuccess) (fail "clafer unexpectedly terminated")
-        claferModel <- readFile claferFile
-        -- readFile is lazy. Force it to evaluate by mapping over everything doing nothing
-        mapM_ return claferModel 
+        alloyModel  <- callClaferTranslator ["-o", "-s", claferFile]
+        ir          <- callClaferTranslator ["-o", "-s", "-m", "xml", "-a", claferFile]
+        mapping     <- strictReadFile $ replaceExtension claferFile "map"
+        claferModel <- strictReadFile claferFile
         
-        alloyIG <- AlloyIG.initAlloyIG claferOutput
+        let constraints = parseConstraints ir mapping
+        
+        alloyIG <- AlloyIG.initAlloyIG alloyModel
         
         let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- (AlloyIG.sigs alloyIG)]
         
-        return $ ClaferIG claferModel claferFile claferToSigNameMap alloyIG
+        return $ ClaferIG constraints claferModel claferFile claferToSigNameMap alloyIG
+        
+
+callClaferTranslator :: [String] -> IO String    
+callClaferTranslator args =
+    do
+        execPath <- executableDirectory
+        claferProc <- pipeProcess (execPath ++ "clafer") args
+        claferOutput <- getContentsVerbatim claferProc
+        claferExit <- waitFor claferProc
+        when (claferExit /= ExitSuccess) (fail "clafer unexpectedly terminated")
+        return claferOutput
+                
+
+strictReadFile :: FilePath -> IO String        
+strictReadFile filePath = 
+    do
+        contents <- readFile filePath
+        -- readFile is lazy. Force it to evaluate by mapping over everything doing nothing
+        mapM_ return contents
+        return contents
 
 
 alloyModel = AlloyIG.alloyModel . alloyIG
@@ -122,7 +141,7 @@ setScope scope Scope{sigName = sigName, claferIG = claferIG} =
 
 
 next :: ClaferIG -> IO Instance
-next ClaferIG{alloyIG = alloyIG} = 
+next ClaferIG{alloyIG = alloyIG, constraints = constraints} = 
     do
         xmlSolution <- AlloyIG.sendNextCommand alloyIG
         case xmlSolution of
@@ -135,10 +154,17 @@ next ClaferIG{alloyIG = alloyIG} =
             xmlSolution <- AlloyIG.sendCounterexampleCommand alloyIG
             case xmlSolution of
                 Just (AlloyIG.UnsatCore core removed xml) ->
-                    return $ Counterexample (map Constraint core) (map Constraint removed) (xmlToModel xml) xml
+                    return $ Counterexample
+                        [lookupConstraint (position alloyConstraint) constraints | alloyConstraint <- core]
+                        removed
+                        (xmlToModel xml)
+                        xml
                 Nothing -> return NoInstance
                 
     xmlToModel xml = sugarClaferModel $ buildClaferModel $ parseSolution xml
+    
+    
+position (AlloyIG.Constraint line column) = Position line column
 
 
 nextWithAlloyInstance :: ClaferIG -> IO (Maybe (String, ClaferModel))

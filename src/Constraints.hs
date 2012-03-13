@@ -23,9 +23,9 @@
 module Constraints where
 
 import Control.Monad
-import Debug.Trace
-import Data.List
+import Data.List hiding (span)
 import Data.Maybe
+import Data.Ord
 import Text.XML.HaXml hiding (find)
 import Text.XML.HaXml.Namespaces
 import Text.XML.HaXml.Posn
@@ -33,11 +33,11 @@ import Text.XML.HaXml.Posn
 
 
 data Constraint =
-    ParentConstraint {span::Span} |
-    ExactCardinalityConstraint {span::Span, claferInfo::ClaferInfo} |
-    LowerCardinalityConstraint {span::Span, claferInfo::ClaferInfo} |
-    UpperCardinalityConstraint {span::Span, claferInfo::ClaferInfo} |
-    UserConstraint {span::Span, constraintInfo::ConstraintInfo}
+    ParentConstraint {range::Range} |
+    ExactCardinalityConstraint {range::Range, claferInfo::ClaferInfo} |
+    LowerCardinalityConstraint {range::Range, claferInfo::ClaferInfo} |
+    UpperCardinalityConstraint {range::Range, claferInfo::ClaferInfo} |
+    UserConstraint {range::Range, constraintInfo::ConstraintInfo}
     deriving Show
 
 
@@ -48,17 +48,29 @@ instance Show Cardinality where
     show (Cardinality lower (Just upper)) = show lower ++ ".." ++ show upper
 
 
-data ClaferInfo = ClaferInfo {uniqueId::String, cardinality::Cardinality} deriving Show
+data ClaferInfo = ClaferInfo {uniqueId::String, cardinality::Cardinality}
+
+instance Show ClaferInfo where
+    show (ClaferInfo uniqueId cardinality) = uniqueId ++ " " ++ show cardinality
 
 
 data ConstraintInfo = ConstraintInfo {pId::String, syntax::String} deriving Show
 
 
-data Position = Position {line::Integer, column::Integer} deriving Show
+data Position = Position {line::Integer, column::Integer} deriving (Show, Eq, Ord)
 
 
-type Span = (Position, Position)
+type Range = (Position, Position)
 
+
+
+between position (low, high) = position >= low && position <= high
+
+
+lookupConstraint position constraints =
+    case [x | x <- constraints, position `between` range x] of
+        [] -> error $ show position ++ " not within known constraints " ++ show constraints
+        cs -> minimumBy (comparing range) cs
 
 
 qType = QN (Namespace "xsi" "http://www.w3.org/2001/XMLSchema-instance") "type"
@@ -84,27 +96,27 @@ parseConstraints ir mapping =
             (error $ name ++ " not in " ++ show (map pId constraintInfos))
             (find ((== name) . pId) constraintInfos)
 
-    exactCardinalityConstraint (source, span) =
+    exactCardinalityConstraint (source, range) =
         do
             claferId <- stripPrefix "Cardinality exact " source
-            return $ ExactCardinalityConstraint span (findClafer claferId)
+            return $ ExactCardinalityConstraint range (findClafer claferId)
 
-    lowerCardinalityConstraint (source, span) =
+    lowerCardinalityConstraint (source, range) =
         do
             claferId <- stripPrefix "Cardinality lower " source
-            return $ LowerCardinalityConstraint span (findClafer claferId)
+            return $ LowerCardinalityConstraint range (findClafer claferId)
             
-    upperCardinalityConstraint (source, span) =
+    upperCardinalityConstraint (source, range) =
         do
             claferId <- stripPrefix "Cardinality upper " source
-            return $ UpperCardinalityConstraint span (findClafer claferId)
+            return $ UpperCardinalityConstraint range (findClafer claferId)
     
-    parentConstraint ("Parent-relationship", span) = Just $ ParentConstraint span
+    parentConstraint ("Parent-relationship", range) = Just $ ParentConstraint range
     parentConstraint _ = Nothing
     
-    userConstraint (constraintId, span) = Just $ UserConstraint span (findConstraint constraintId)
+    userConstraint (constraintId, range) = Just $ UserConstraint range (findConstraint constraintId)
     
-    buildConstraint :: (String, Span) -> Constraint
+    buildConstraint :: (String, Range) -> Constraint
     buildConstraint x =
         fromMaybe (error $ "Unknown constraint " ++ show x) $
             msum [exactCardinalityConstraint x, lowerCardinalityConstraint x, upperCardinalityConstraint x, parentConstraint x, userConstraint x]
@@ -252,7 +264,7 @@ getAttrs :: Content i -> [Attribute]
 getAttrs (CElem (Elem _ attributes _) _) = attributes
 
 
-parseMapping :: String -> [(String, Span)]
+parseMapping :: String -> [(String, Range)]
 parseMapping text =
     map transform mapping'
     where

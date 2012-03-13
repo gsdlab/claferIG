@@ -25,6 +25,7 @@ module CommandLine (claferIGVersion, runCommandLine) where
 import ClaferIG
 import ClaferModel
 import CommandLineParser
+import Constraints
 import Control.Monad
 import Control.Monad.Trans
 import Data.Char
@@ -76,7 +77,7 @@ runCommandLine claferIG =
                     outputStrLn "The following set of constraints cannot be satisfied in the current scope."
                     printConstraints core
                     outputStrLn "Removing the following constraints produced a counterexample."
-                    printConstraints removed
+                    outputStrLn $ show removed
                     outputStrLn $ show claferModel
                     nextLoop context
                 NoInstance -> do
@@ -87,7 +88,7 @@ runCommandLine claferIG =
             printConstraints' _ [] = return ()
             printConstraints' i (c:cs) =
                 do
-                    outputStrLn $ "  " ++ show i ++ ") " ++ show c
+                    outputStrLn $ "  " ++ show i ++ ") " ++ show (claferInfo c)
                     printConstraints' (i + 1) cs
                     
     loop Help context =
