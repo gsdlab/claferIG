@@ -28,12 +28,25 @@ import Data.Map as Map hiding (null)
 import Process
 
 
+
 data AlloyIG = AlloyIG{proc::Process, alloyModel::String, sigMap::Map String Sig, scopes::IORef (Map String Int), globalScope::IORef Int}
+
+
 data Sig = Sig{s_name::String, s_multiplicity::Multiplicity, s_subset::Maybe String}
+
+
 data Multiplicity = One | Lone | Some | Any deriving (Eq, Read, Show)
 
-data UnsatCore = UnsatCore{core::[Constraint], removed::[String], counterexample::String} deriving Show
-data Constraint = Constraint {line::Integer, column::Integer} deriving Show
+
+data UnsatCore = UnsatCore{core::[Constraint]} deriving Show
+
+
+data Constraint = Constraint {from::Position, to::Position} deriving (Show, Eq)
+
+
+data Position = Position {line::Integer, column::Integer} deriving (Show, Eq, Ord)
+
+
 
 withinRange :: Int -> Multiplicity -> Bool
 withinRange scope One = scope == 1
@@ -139,29 +152,47 @@ sendResolveCommand :: AlloyIG -> IO ()
 sendResolveCommand AlloyIG{proc = proc} = putMessage proc "resolve"
 
 
--- Get the counterexample of the unsatisfiable solution from alloyIG
-sendCounterexampleCommand :: AlloyIG -> IO (Maybe UnsatCore)
-sendCounterexampleCommand AlloyIG{proc=proc} =
+-- Tell alloyIG to save the current state
+sendSaveStateCommand :: AlloyIG -> IO ()
+sendSaveStateCommand AlloyIG{proc = proc} = putMessage proc "saveState"
+
+
+-- Tell alloyIG to restore the state
+sendRestoreStateCommand :: AlloyIG -> IO ()
+sendRestoreStateCommand AlloyIG{proc = proc} = putMessage proc "restoreState"
+
+
+-- Tell alloyIG to remove the constraint
+sendRemoveConstraintCommand :: Constraint -> AlloyIG -> IO ()
+sendRemoveConstraintCommand (Constraint from to) AlloyIG{proc = proc} =
     do
-        putMessage proc "counterexample"
-        status <- read `liftM` getMessage proc
-        case status of
-            True ->
-                do
-                    coreLength         <- read `liftM` getMessage proc
-                    core               <- replicateM coreLength readConstraint
-                    length             <- read `liftM` getMessage proc
-                    removedConstraints <- mapM getMessage (replicate length proc)
-                    xml                <- getMessage proc
-                    return $ Just (UnsatCore core removedConstraints xml)
-            False -> return Nothing
+        putMessage proc "removeConstraint"
+        sendPosition from >> sendPosition to
     where
+    sendPosition (Position line column) =
+        putMessage proc (show line) >> putMessage proc (show column)
+        
+
+-- Tell alloyIG to return the unsat core of the previous operation        
+sendUnsatCoreCommand :: AlloyIG -> IO UnsatCore
+sendUnsatCoreCommand AlloyIG{proc = proc} =
+    do
+        putMessage proc "unsatCore"
+        coreLength         <- read `liftM` getMessage proc
+        core               <- replicateM coreLength readConstraint
+        return $ UnsatCore core
+    where
+    readPosition =
+        do
+            line   <- getMessage proc
+            column <- getMessage proc
+            return $ Position (read line) (read column)
     readConstraint =
         do
-            line <- getMessage proc
-            column <- getMessage proc
-            return $ Constraint (read line) (read column)
-
+            from <- readPosition
+            to   <- readPosition
+            return $ Constraint from to
+        
 
 -- Tell alloyIG to quit
 sendQuitCommand :: AlloyIG -> IO ()

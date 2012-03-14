@@ -61,27 +61,34 @@ public class Util {
         return t;
     }
 
-    public static class State {
+    public static class State<T> {
 
         private final SafeList<Expr>[] save;
+        private final T extra;
 
-        private State(SafeList[] save) {
+        private State(SafeList[] save, T extra) {
             this.save = save;
+            this.extra = extra;
         }
     }
 
-    public static State saveState(SafeList<Sig> sigs) {
+    public static <T> State<T> saveState(SafeList<Sig> sigs, T extra) {
         SafeList[] save = new SafeList[sigs.size()];
         for (int i = 0; i < save.length; i++) {
             save[i] = sigs.get(i).getFacts();
         }
-        return new State(save);
+        return new State(save, extra);
     }
 
-    public static void restoreState(State state, SafeList<Sig> sigs) {
+    public static <T> T restoreState(State<T> state, SafeList<Sig> sigs) {
         for (int i = 0; i < state.save.length; i++) {
             set(sigs.get(i), facts, state.save[i]);
         }
+        return state.extra;
+    }
+
+    public static int readIntMessage() throws IOException {
+        return Integer.parseInt(readMessage());
     }
 
     public static String readMessage() throws IOException {

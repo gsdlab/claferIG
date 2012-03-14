@@ -76,20 +76,60 @@ runCommandLine claferIG =
                     outputStrLn "No more instances found. Try increasing scope to get more instances."
                     outputStrLn "The following set of constraints cannot be satisfied in the current scope."
                     printConstraints core
-                    outputStrLn "Removing the following constraints produced a counterexample."
-                    outputStrLn $ show removed
+                    outputStrLn "Altering the following constraints produced a counterexample."
+                    printTransformations removed
                     outputStrLn $ show claferModel
                     nextLoop context
                 NoInstance -> do
                     outputStrLn "No more instances found. Try increasing scope to get more instances."
                     nextLoop context
             where
+            printConstraint UserConstraint{constraintInfo = info} = show info
+            printConstraint constraint = show $ claferInfo constraint
+            
             printConstraints = printConstraints' 1
             printConstraints' _ [] = return ()
             printConstraints' i (c:cs) =
                 do
-                    outputStrLn $ "  " ++ show i ++ ") " ++ show (claferInfo c)
+                    outputStrLn $ "  " ++ show i ++ ") " ++ printConstraint c
                     printConstraints' (i + 1) cs
+            
+            printTransformation :: Constraint -> [Constraint] -> (String, [Constraint])        
+            printTransformation UserConstraint{constraintInfo = info} rest = (syntax info, rest)
+            printTransformation LowerCardinalityConstraint{claferInfo = info} rest =
+                case deleteUpper (uniqueId info) rest of
+                    -- Deleted the lower and upper constraint
+                    Just rest' -> (show info ++ " changed to " ++ show (setUpper (setLower info 0) Nothing), rest')
+                    -- Only deleted the lower constraint
+                    Nothing    -> (show info ++ " changed to " ++ show (setLower info 0), rest)
+
+
+            printTransformations cs = printTransformations' 1 cs
+            printTransformations' _ [] = return ()
+            printTransformations' i (c:cs) =
+                do
+                    let (print, rest) = printTransformation c cs
+                    outputStrLn $ "  " ++ show i ++ ") " ++ print
+                    printTransformations' (i + 1) rest
+                    
+            setLower info@ClaferInfo{cardinality = c} lower = info{cardinality = c{lower = lower}}
+
+            setUpper info@ClaferInfo{cardinality = c} upper = info{cardinality = c{upper = upper}}
+
+            deleteLower :: String -> [Constraint] -> Maybe [Constraint]                    
+            deleteLower id ys =
+                findAndDelete id (filter isLowerCardinalityConstraint ys)
+            
+            deleteUpper :: String -> [Constraint] -> Maybe [Constraint]
+            deleteUpper id ys =
+                findAndDelete id (filter isUpperCardinalityConstraint ys)
+            
+            findAndDelete :: String -> [Constraint] -> Maybe [Constraint]
+            findAndDelete _ [] = Nothing
+            findAndDelete id (c:cs)
+                | id == uniqueId (claferInfo c) = Just cs
+                | otherwise                     = (c :) `fmap` findAndDelete id cs
+                
                     
     loop Help context =
         do

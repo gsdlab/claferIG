@@ -25,7 +25,6 @@ import edu.mit.csail.sdg.alloy4.A4Reporter;
 import edu.mit.csail.sdg.alloy4.Err;
 import edu.mit.csail.sdg.alloy4.ErrorSyntax;
 import edu.mit.csail.sdg.alloy4.ErrorWarning;
-import edu.mit.csail.sdg.alloy4.Pair;
 import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;
@@ -79,7 +78,32 @@ public final class AlloyIG {
     private static class NextOperation implements Operation {
     }
 
-    private static class CounterexampleOperation implements Operation {
+    private static class SaveStateOperation implements Operation {
+        // To generate counterexamples, we mutate the model. Save
+        // the state first and restore the state once completed so
+        // the model returns to its original form.
+    }
+
+    private static class RestoreStateOperation implements Operation {
+    }
+
+    private static class RemoveConstraintOperation implements Operation {
+
+        private final int y, x, y2, x2;
+
+        public RemoveConstraintOperation(int y, int x, int y2, int x2) {
+            this.y = y;
+            this.x = x;
+            this.y2 = y2;
+            this.x2 = x2;
+        }
+
+        public Pos getPos() {
+            return new Pos("", x, y, x2, y2);
+        }
+    }
+
+    private static class UnsatCoreOperation implements Operation {
     }
 
     private static class QuitOperation implements Operation {
@@ -127,16 +151,24 @@ public final class AlloyIG {
         } else if (op.equals("next")) {
             return new NextOperation();
         } else if (op.equals("setGlobalScope")) {
-            int scopeSize = Integer.parseInt(readMessage());
+            int scopeSize = readIntMessage();
             return new SetGlobalScopeOperation(scopeSize);
         } else if (op.equals("setScope")) {
             String sig = readMessage();
-            int scopeSize = Integer.parseInt(readMessage());
+            int scopeSize = readIntMessage();
             return new SetScopeOperation(sig, scopeSize);
         } else if (op.equals("resolve")) {
             return new ResolveOperation();
-        } else if (op.equals("counterexample")) {
-            return new CounterexampleOperation();
+        } else if (op.equals("saveState")) {
+            return new SaveStateOperation();
+        } else if (op.equals("restoreState")) {
+            return new RestoreStateOperation();
+        } else if (op.equals("removeConstraint")) {
+            // The second column is one less than it should be.
+            // Not sure if Alloy bug or intended.
+            return new RemoveConstraintOperation(readIntMessage(), readIntMessage(), readIntMessage(), readIntMessage() - 1);
+        } else if (op.equals("unsatCore")) {
+            return new UnsatCoreOperation();
         }
         throw new AlloyIGException("Unknown op " + op);
     }
@@ -232,7 +264,9 @@ public final class AlloyIG {
         options.coreMinimization = 0;
         options.solver = A4Options.SatSolver.MiniSatProverJNI;
 
-        while (!(operation instanceof QuitOperation)) {
+        State<StateExtra> state = null;
+
+        while (true) {
             operation = nextOperation();
 
             if (operation instanceof ResolveOperation) {
@@ -243,9 +277,7 @@ public final class AlloyIG {
             } else if (operation instanceof NextOperation) {
                 if (ans.satisfiable()) {
                     writeMessage("True");
-                    StringWriter xml = new StringWriter();
-                    ans.writeXML(new PrintWriter(xml), null, null);
-                    writeMessage(xml.toString());
+                    writeMessage(toXml(ans));
 
                     A4Solution nextAns = ans.next();
                     if (nextAns == ans) {
@@ -271,54 +303,83 @@ public final class AlloyIG {
 
                 Command c = command;
                 command = new Command(c.pos, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.expects, scope, c.additionalExactScopes, c.formula, c.parent);
-            } else if (operation instanceof CounterexampleOperation) {
-                AlloyIGReporter reporter = new AlloyIGReporter();
-                reporter.minimizedBefore = rep.minimizedBefore;
-                reporter.minimizedAfter = rep.minimizedAfter;
+            } else if (operation instanceof SaveStateOperation) {
+                state = saveState(sigs, new StateExtra(rep.minimizedBefore, rep.minimizedAfter, ans, command));
+            } else if (operation instanceof RestoreStateOperation) {
+                StateExtra extra = restoreState(state, sigs);
+                rep.minimizedBefore = extra.getMinimizedBefore();
+                rep.minimizedAfter = extra.getMinimizedAfter();
+                ans = extra.getAnswer();
+                command = extra.getCommand();
+            } else if (operation instanceof RemoveConstraintOperation) {
+                RemoveConstraintOperation removeConstraint = (RemoveConstraintOperation) operation;
+                Pos constraint = removeConstraint.getPos();
 
-
-                Set<Pos> unsatCore = ans.highLevelCore().a;
-                A4Solution a4 = ans;
-                Command counterExample = command;
-                List<Pos> removed = new ArrayList<Pos>();
-                State save = saveState(sigs);
-
-                // Without this check, the highLevelCore can return gibberish.
-                // Learned the hard way.
-                while (reporter.minimizedAfter > 0) {
-                    reporter.minimizedBefore = 0;
-                    reporter.minimizedAfter = 0;
-
-                    Pos constraint = a4.highLevelCore().a.iterator().next();
-                    Command newCounterExample = removeGlobalConstraint(constraint, counterExample);
-                    if (newCounterExample == null) {
-                        if (!removeLocalConstraint(constraint, sigs)) {
-                            throw new AlloyIGException("Cannot remove constraint " + constraint);
-                        }
-                    } else {
-                        counterExample = newCounterExample;
+                Command newCommand = removeGlobalConstraint(constraint, command);
+                if (newCommand == null) {
+                    if (!removeLocalConstraint(constraint, sigs)) {
+                        throw new AlloyIGException(
+                                String.format("Cannot remove constraint (line=%d, column=%d)-(line=%d, column=%d)",
+                                constraint.y, constraint.x, constraint.y2, constraint.x2
+                                ));
                     }
-                    removed.add(constraint);
-                    a4 = TranslateAlloyToKodkod.execute_command(reporter, world.getAllReachableSigs(), counterExample, options);
-                }
-                if (removed.isEmpty()) {
-                    writeMessage("False");
                 } else {
-                    writeMessage("True");
-                    writeMessage(unsatCore.size());
-                    for (Pos pos : unsatCore) {
-                        writeMessage(pos.y); // Line
-                        writeMessage(pos.x); // Column
-                    }
-                    writeMessage(removed.size());
-                    for (Pos r : removed) {
-                        writeMessage(r.toString());
-                    }
-                    writeMessage(toXml(a4));
+                    command = newCommand;
                 }
+            } else if (operation instanceof UnsatCoreOperation) {
+                // Without this check, the highLevelCore can return garbage.
+                // Learned the hard way.
+                if (rep.minimizedAfter > 0) {
+                    Set<Pos> unsatCore = ans.highLevelCore().a;
 
-                restoreState(save, sigs);
+                    writeMessage(unsatCore.size());
+                    for (Pos unsate : unsatCore) {
+                        writeMessage(unsate.y); // Line
+                        writeMessage(unsate.x); // Column
+                        writeMessage(unsate.y2); // Line
+                        // The second column is one less than it should be.
+                        // Not sure if Alloy bug or intended.
+                        writeMessage(unsate.x2 + 1); // Column
+                    }
+                } else {
+                    writeMessage(0);
+                }
+            } else if (operation instanceof QuitOperation) {
+                break;
+            } else {
+                throw new IllegalStateException("Unknown operation " + operation);
             }
+        }
+    }
+
+    private static class StateExtra {
+
+        private final int minimizedBefore;
+        private final int minimizedAfter;
+        private final A4Solution answer;
+        private final Command command;
+
+        public StateExtra(int minimizedBefore, int minimizedAfter, A4Solution answer, Command command) {
+            this.minimizedBefore = minimizedBefore;
+            this.minimizedAfter = minimizedAfter;
+            this.answer = notNull(answer);
+            this.command = notNull(command);
+        }
+
+        public int getMinimizedBefore() {
+            return minimizedBefore;
+        }
+
+        public int getMinimizedAfter() {
+            return minimizedAfter;
+        }
+
+        public A4Solution getAnswer() {
+            return answer;
+        }
+
+        public Command getCommand() {
+            return command;
         }
     }
 }

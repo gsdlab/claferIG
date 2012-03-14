@@ -20,8 +20,9 @@
  SOFTWARE.
 -}
 
-module Constraints where
+module Constraints (Constraint(..), Cardinality(..), ClaferInfo(..), ConstraintInfo(..), isLowerCardinalityConstraint, isUpperCardinalityConstraint, lookupConstraint, parseConstraints)  where
 
+import qualified AlloyIGInterface as AlloyIG
 import Control.Monad
 import Data.List hiding (span)
 import Data.Maybe
@@ -33,11 +34,15 @@ import Text.XML.HaXml.Posn
 
 
 data Constraint =
-    ParentConstraint {range::Range} |
-    ExactCardinalityConstraint {range::Range, claferInfo::ClaferInfo} |
-    LowerCardinalityConstraint {range::Range, claferInfo::ClaferInfo} |
-    UpperCardinalityConstraint {range::Range, claferInfo::ClaferInfo} |
-    UserConstraint {range::Range, constraintInfo::ConstraintInfo}
+    SigConstraint {range::AlloyIG.Constraint} |
+    SubSigConstraint {range::AlloyIG.Constraint} |
+    ParentConstraint {range::AlloyIG.Constraint} |
+    InConstraint {range::AlloyIG.Constraint} |
+    ExtendsConstraint {range::AlloyIG.Constraint} |
+    ExactCardinalityConstraint {range::AlloyIG.Constraint, claferInfo::ClaferInfo} |
+    LowerCardinalityConstraint {range::AlloyIG.Constraint, claferInfo::ClaferInfo} |
+    UpperCardinalityConstraint {range::AlloyIG.Constraint, claferInfo::ClaferInfo} |
+    UserConstraint {range::AlloyIG.Constraint, constraintInfo::ConstraintInfo}
     deriving Show
 
 
@@ -54,23 +59,26 @@ instance Show ClaferInfo where
     show (ClaferInfo uniqueId cardinality) = uniqueId ++ " " ++ show cardinality
 
 
-data ConstraintInfo = ConstraintInfo {pId::String, syntax::String} deriving Show
+data ConstraintInfo = ConstraintInfo {pId::String, syntax::String}
 
-
-data Position = Position {line::Integer, column::Integer} deriving (Show, Eq, Ord)
-
-
-type Range = (Position, Position)
+instance Show ConstraintInfo where
+    show ConstraintInfo{syntax = syntax} = syntax
 
 
 
-between position (low, high) = position >= low && position <= high
+isLowerCardinalityConstraint LowerCardinalityConstraint{} = True
+isLowerCardinalityConstraint _ = False
 
 
-lookupConstraint position constraints =
-    case [x | x <- constraints, position `between` range x] of
-        [] -> error $ show position ++ " not within known constraints " ++ show constraints
-        cs -> minimumBy (comparing range) cs
+isUpperCardinalityConstraint UpperCardinalityConstraint{} = True
+isUpperCardinalityConstraint _ = False
+
+
+lookupConstraint :: AlloyIG.Constraint -> [Constraint] -> Constraint
+lookupConstraint constraint constraints =
+    case [x | x <- constraints, constraint == range x] of
+        [] -> error $ show constraint ++ " not equal to known constraints " ++ show constraints
+        cs -> minimumBy (comparing $ AlloyIG.to . range) cs
 
 
 qType = QN (Namespace "xsi" "http://www.w3.org/2001/XMLSchema-instance") "type"
@@ -96,30 +104,46 @@ parseConstraints ir mapping =
             (error $ name ++ " not in " ++ show (map pId constraintInfos))
             (find ((== name) . pId) constraintInfos)
 
+    sigConstraint (source, range) =
+        if source == "Sig" then Just $ SigConstraint range
+        else Nothing
+        
+    subSigConstraint (source, range) =
+        if source == "SubSig" then Just $ SubSigConstraint range
+        else Nothing
+
+    inConstraint (source, range) =
+        if source == "In" then Just $ InConstraint range
+        else Nothing
+        
+    extendsConstraint (source, range) =
+        if source == "Extends" then Just $ ExtendsConstraint range
+        else Nothing
+
     exactCardinalityConstraint (source, range) =
         do
             claferId <- stripPrefix "Cardinality exact " source
-            return $ ExactCardinalityConstraint range (findClafer claferId)
+            return $ ExactCardinalityConstraint range (findClafer $ sigToClaferName claferId)
 
     lowerCardinalityConstraint (source, range) =
         do
             claferId <- stripPrefix "Cardinality lower " source
-            return $ LowerCardinalityConstraint range (findClafer claferId)
+            return $ LowerCardinalityConstraint range (findClafer $ sigToClaferName claferId)
             
     upperCardinalityConstraint (source, range) =
         do
             claferId <- stripPrefix "Cardinality upper " source
-            return $ UpperCardinalityConstraint range (findClafer claferId)
-    
+            return $ UpperCardinalityConstraint range (findClafer $ sigToClaferName claferId)
+            
     parentConstraint ("Parent-relationship", range) = Just $ ParentConstraint range
     parentConstraint _ = Nothing
     
-    userConstraint (constraintId, range) = Just $ UserConstraint range (findConstraint constraintId)
+    userConstraint (constraintId, range) = UserConstraint range (findConstraint constraintId)
     
-    buildConstraint :: (String, Range) -> Constraint
+    buildConstraint :: (String, AlloyIG.Constraint) -> Constraint
     buildConstraint x =
-        fromMaybe (error $ "Unknown constraint " ++ show x) $
-            msum [exactCardinalityConstraint x, lowerCardinalityConstraint x, upperCardinalityConstraint x, parentConstraint x, userConstraint x]
+        fromMaybe (userConstraint x) $
+            msum [sigConstraint x, subSigConstraint x, inConstraint x, extendsConstraint x, exactCardinalityConstraint x, lowerCardinalityConstraint x, upperCardinalityConstraint x, parentConstraint x]
 
 
 -- Get all the constraint information from the IR
@@ -152,7 +176,7 @@ declElems content =
     
 parseIClafer :: Content i -> ClaferInfo 
 parseIClafer content =
-    ClaferInfo uid $ Cardinality min max
+    ClaferInfo (sigToClaferName uid) $ Cardinality min max
     where
     uid = verbatim $ (keep /> tag "UniqueId" /> txt) content
     min = read $ verbatim $ (keep /> (tag "Card" /> tag "Min" /> tag "IntLiteral" /> txt)) content
@@ -234,21 +258,53 @@ parsePExp content =
                 (syntax, (ConstraintInfo pId syntax):subConstraints)
         
         "cl:IIntExp"               ->
-            (verbatim $ (keep /> tag "IntLiteral" /> txt) exp, [])
+            (verbatim $ exp `unique` (tag "IntLiteral" /> txt), [])
             
         "cl:IDoubleExp"            ->
-            (verbatim $ (keep /> tag "DoubleLiteral" /> txt) exp, [])
+            (verbatim $ exp `unique` (tag "DoubleLiteral" /> txt), [])
             
         "cl:IStringExp"            ->
-            (verbatim $ (keep /> tag "StringLiteral" /> txt) exp, [])
+            (verbatim $ exp `unique` (tag "StringLiteral" /> txt), [])
             
         "cl:IClaferId"             ->
-            (verbatim $ (keep /> tag "Id" /> txt) exp, [])
+            (sigToClaferName $ verbatim $ exp `unique` (tag "Id" /> txt), [])
         
-        "cl:IDeclarationParentExp" -> error "TODO: IDeclarationParentExp is not yet supported"
+        "cl:IDeclarationParentExp" ->
+            let
+                quantifier =
+                    case findAttr qType $ exp `unique` tag "Quantifier" of
+                        "cl:INo"   -> "no"
+                        "cl:ILone" -> "lone"
+                        "cl:IOne"  -> "one"
+                        "cl:ISome" -> "some"
+                        "cl:IAll"  -> "all"
+                        x          -> error "Unknown quantifier " ++ x
+                
+                decl = exp `perhaps` tag "Declaration"
+                
+                declSyntax =
+                    do
+                        dexp <- decl
+                        let disj = if "true" == (verbatim $ dexp `unique` (tag "IsDisjunct" /> txt)) then "disj" else ""
+                        let locIds = map verbatim $ dexp `many` (tag "Declaration" /> tag "LocalDeclaration")
+                        let (body, subConstraints) = parsePExp $ dexp `unique` tag "Body"
+                        return $ (disj ++ " " ++ intercalate " " locIds ++ " : " ++ body, subConstraints)                
+                        
+                
+                (bodyParent, subConstraints) = parsePExp $ exp `unique` tag "BodyParentExp"
+            in
+                case declSyntax of
+                    Just (declSyntax', declSubConstraints) ->
+                        (syntax, (ConstraintInfo pId syntax) : (declSubConstraints ++ subConstraints))
+                        where
+                        syntax = quantifier ++ " " ++ declSyntax' ++ " | " ++ bodyParent
+                    Nothing ->
+                        (syntax, (ConstraintInfo pId syntax) : subConstraints)
+                        where
+                        syntax = quantifier ++ " " ++ bodyParent
     where
     pId = verbatim $ (keep /> tag "ParentId" /> txt) content
-    exp = ((keep /> tag "Exp") content) !! 0
+    exp = content `unique` tag "Exp"
     expType = findAttr qType exp
     
     
@@ -264,7 +320,26 @@ getAttrs :: Content i -> [Attribute]
 getAttrs (CElem (Elem _ attributes _) _) = attributes
 
 
-parseMapping :: String -> [(String, Range)]
+perhaps :: Content i -> CFilter i -> Maybe (Content i)
+perhaps exp y =
+    case many exp y of
+        [] -> Nothing
+        [x] -> Just x
+        xs  -> error $ "Expected one or less but got " ++ show (length xs) ++ " elements"        
+
+
+unique :: Content i -> CFilter i -> Content i
+unique exp y =
+    case many exp y of
+        [x] -> x
+        xs  -> error $ "Expected unique but got " ++ show (length xs) ++ " elements"
+
+
+many :: Content i -> CFilter i -> [Content i]
+many exp y = (keep /> y) exp
+
+
+parseMapping :: String -> [(String, AlloyIG.Constraint)]
 parseMapping text =
     map transform mapping'
     where
@@ -273,4 +348,17 @@ parseMapping text =
     
     mapping' = filter (not . null . fst) mapping
     
-    transform (source, ((line1, column1), (line2, column2))) = (source, (Position line1 column1, Position line2 column2))
+    transform (source, ((line1, column1), (line2, column2))) =
+        (source,
+            AlloyIG.Constraint
+                (AlloyIG.Position line1 column1)
+                (AlloyIG.Position line2 column2))
+                
+                
+-- This is a duplicate method from ClaferIG.hs
+-- TODO: only define the method once
+sigToClaferName :: String -> String
+sigToClaferName n =
+    case snd $ break ('_' ==) n of
+        [] ->  n
+        x -> tail x

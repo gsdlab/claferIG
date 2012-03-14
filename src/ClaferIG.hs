@@ -20,13 +20,15 @@
  SOFTWARE.
 -}
 
-module ClaferIG (ClaferIG(claferModel, claferFile), Scope, Instance(..), claferIGVersion, initClaferIG, alloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, nextWithAlloyInstance, quit) where
+module ClaferIG (ClaferIG(claferModel, claferFile), Scope, Instance(..), claferIGVersion, initClaferIG, alloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, quit) where
 
 import qualified AlloyIGInterface as AlloyIG
 import ClaferModel
 import Constraints
 import Control.Monad
-import Data.Map as Map hiding (map)
+import Data.List
+import Data.Map as Map hiding (map, null)
+import Data.Maybe
 import Process
 import Solution
 import Sugarer
@@ -39,7 +41,7 @@ data ClaferIG = ClaferIG{constraints::[Constraint], claferModel::String, claferF
 data Scope = Scope {name::String, sigName::String, claferIG::ClaferIG}
 data Instance =
     Instance {modelInstance::ClaferModel, alloyModelInstance::String} |
-    Counterexample {unsatConstraints::[Constraint], removedConstraints::[String], modelInstance::ClaferModel, alloyModelInstance::String} |
+    Counterexample {unsatConstraints::[Constraint], removedConstraints::[Constraint], modelInstance::ClaferModel, alloyModelInstance::String} |
     NoInstance
 
 
@@ -146,40 +148,62 @@ next ClaferIG{alloyIG = alloyIG, constraints = constraints} =
         xmlSolution <- AlloyIG.sendNextCommand alloyIG
         case xmlSolution of
             Just xml -> return $ Instance (xmlToModel xml) xml
-            Nothing  -> counterexample
+            Nothing  -> do
+                AlloyIG.sendSaveStateCommand alloyIG
+                -- Generating counterexample modifies the state. If we ever want to
+                -- rerun the original model, we need to restore the state.
+                AlloyIG.UnsatCore core <- AlloyIG.sendUnsatCoreCommand alloyIG
+                c <- counterexample core
+                AlloyIG.sendRestoreStateCommand alloyIG 
+                return c
     where
-    counterexample :: IO Instance
-    counterexample =
-        do
-            xmlSolution <- AlloyIG.sendCounterexampleCommand alloyIG
-            case xmlSolution of
-                Just (AlloyIG.UnsatCore core removed xml) ->
-                    return $ Counterexample
-                        [lookupConstraint (position alloyConstraint) constraints | alloyConstraint <- core]
-                        removed
-                        (xmlToModel xml)
-                        xml
-                Nothing -> return NoInstance
+    counterexample :: [AlloyIG.Constraint] -> IO Instance
+    counterexample originalCore =
+        counterexample' originalCore []
+        where
+        counterexample' core removed =
+            case null core of
+                True  ->
+                    return NoInstance
+                False ->
+                    do
+                        let remove = findRemovable core
+                        AlloyIG.sendRemoveConstraintCommand remove alloyIG
+                        AlloyIG.sendResolveCommand alloyIG
+                        xmlSolution <- AlloyIG.sendNextCommand alloyIG
+                        case xmlSolution of
+                            Just xml -> return $
+                                Counterexample
+                                    -- Give back the original core, (but don't return non removable since that
+                                    -- would confuse the user.
+                                    [claferCore | alloyCore <- originalCore, let claferCore = lookup alloyCore, removable claferCore]
+                                    (reverse $ lookup remove : removed)
+                                    (xmlToModel xml)
+                                    xml
+                            Nothing ->
+                                do
+                                    AlloyIG.UnsatCore core' <- AlloyIG.sendUnsatCoreCommand alloyIG
+                                    counterexample' core' $ lookup remove : removed
+
+    findRemovable core =
+        fromMaybe
+            -- I don't think this case is ever possible...
+            (error $ "Cannot find a removable constraint in the core " ++ show core)
+            (find (removable . lookup) core)
+            
+    lookup x = lookupConstraint x constraints
+
+    -- Only certain types of constraints can be removed for counterexamples.
+    removable SigConstraint{} = False
+    removable SubSigConstraint{} = False
+    removable ParentConstraint{} = False
+    removable InConstraint{} = False
+    removable ExtendsConstraint{} = False
+    removable _ = True
                 
     xmlToModel xml = sugarClaferModel $ buildClaferModel $ parseSolution xml
     
     
-position (AlloyIG.Constraint line column) = Position line column
-
-
-nextWithAlloyInstance :: ClaferIG -> IO (Maybe (String, ClaferModel))
-nextWithAlloyInstance ClaferIG{alloyIG = alloyIG} =
-    do
-        xmlSolution <- AlloyIG.sendNextCommand alloyIG
-        return $
-            do
-                xml <- xmlSolution
-                let solution = parseSolution xml
-                let claferModel = buildClaferModel solution
-                let sugarModel = sugarClaferModel claferModel
-                return (xml, sugarModel)
-
-
 quit :: ClaferIG -> IO ()
 quit ClaferIG{alloyIG = alloyIG} = AlloyIG.sendQuitCommand alloyIG
     
