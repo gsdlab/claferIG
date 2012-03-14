@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module ClaferIG (ClaferIG(claferModel, claferFile), Scope, Instance(..), claferIGVersion, initClaferIG, alloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, quit) where
+module ClaferIG (ClaferIG(claferModel, claferFile), Scope, Instance(..), Counterexample(..), claferIGVersion, initClaferIG, alloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, quit) where
 
 import qualified AlloyIGInterface as AlloyIG
 import ClaferModel
@@ -38,11 +38,19 @@ import Version
 
 
 data ClaferIG = ClaferIG{constraints::[Constraint], claferModel::String, claferFile::FilePath, claferToSigNameMap::Map String String, alloyIG::AlloyIG.AlloyIG}
+
+
 data Scope = Scope {name::String, sigName::String, claferIG::ClaferIG}
+
+
 data Instance =
     Instance {modelInstance::ClaferModel, alloyModelInstance::String} |
-    Counterexample {unsatConstraints::[Constraint], removedConstraints::[Constraint], modelInstance::ClaferModel, alloyModelInstance::String} |
+    UnsatCore {unsatConstraints::[Constraint], counterexample::Maybe Counterexample} |
     NoInstance
+    
+
+data Counterexample = Counterexample {removedConstraints::[Constraint], counterexampleInstance::ClaferModel, counterexampleAlloyInstance::String}
+
 
 
 claferIGVersion =
@@ -159,37 +167,34 @@ next ClaferIG{alloyIG = alloyIG, constraints = constraints} =
     where
     counterexample :: [AlloyIG.Constraint] -> IO Instance
     counterexample originalCore =
-        counterexample' originalCore []
+        if null claferCore then return NoInstance else counterexample' originalCore []
+        
         where
+        
+        -- Give back the original core, (but don't return non removable since that would confuse the user.
+        claferCore = [claferConstraint | alloyConstraint <- originalCore, let claferConstraint = lookup alloyConstraint, removable claferConstraint]
+        
         counterexample' core removed =
             case null core of
                 True  ->
                     return NoInstance
                 False ->
-                    do
-                        let remove = findRemovable core
-                        AlloyIG.sendRemoveConstraintCommand remove alloyIG
-                        AlloyIG.sendResolveCommand alloyIG
-                        xmlSolution <- AlloyIG.sendNextCommand alloyIG
-                        case xmlSolution of
-                            Just xml -> return $
-                                Counterexample
-                                    -- Give back the original core, (but don't return non removable since that
-                                    -- would confuse the user.
-                                    [claferCore | alloyCore <- originalCore, let claferCore = lookup alloyCore, removable claferCore]
-                                    (reverse $ lookup remove : removed)
-                                    (xmlToModel xml)
-                                    xml
-                            Nothing ->
-                                do
-                                    AlloyIG.UnsatCore core' <- AlloyIG.sendUnsatCoreCommand alloyIG
-                                    counterexample' core' $ lookup remove : removed
+                    case findRemovable core of
+                        Just remove -> do
+                            AlloyIG.sendRemoveConstraintCommand remove alloyIG
+                            AlloyIG.sendResolveCommand alloyIG
+                            xmlSolution <- AlloyIG.sendNextCommand alloyIG
+                            case xmlSolution of
+                                Just xml -> return $
+                                    UnsatCore claferCore (Just $ Counterexample (reverse $ lookup remove : removed) (xmlToModel xml) xml)
+                                Nothing ->
+                                    do
+                                        AlloyIG.UnsatCore core' <- AlloyIG.sendUnsatCoreCommand alloyIG
+                                        counterexample' core' $ lookup remove : removed
+                        Nothing -> -- It is possible that none of the constraints are removable
+                            return $ UnsatCore claferCore Nothing
 
-    findRemovable core =
-        fromMaybe
-            -- I don't think this case is ever possible...
-            (error $ "Cannot find a removable constraint in the core " ++ show core)
-            (find (removable . lookup) core)
+    findRemovable core = find (removable . lookup) core
             
     lookup x = lookupConstraint x constraints
 
