@@ -63,6 +63,9 @@ data ConstraintInfo = ConstraintInfo {pId::String, syntax::String}
 
 instance Show ConstraintInfo where
     show ConstraintInfo{syntax = syntax} = syntax
+    
+    
+type Precidence = Int
 
 
 
@@ -193,7 +196,7 @@ parseIConstraint content =
     concatMap (snd . parsePExp) ((keep /> tag "ParentExp") content)
 
 
-parsePExp :: Content i -> (String, [ConstraintInfo])
+parsePExp :: Content i -> ((String, Precidence), [ConstraintInfo])
 parsePExp content =
     case expType of
         "cl:IFunctionExp"          ->
@@ -203,71 +206,75 @@ parsePExp content =
                 arguments' = map parsePExp arguments
                 
                 subConstraints = concatMap snd arguments'
+
                 args = map fst arguments'
                 
-                format :: String -> [String] -> String
+                format :: String -> [(String, Precidence)] -> (String, Precidence)
                 -- Handle minus as a special case
-                format "-" [arg1] = formatUn "-" [arg1]
-                format "-" args   = formatBin "-" args
-                format op args    = (nary op) op args
+                format "-" [arg1] = formatUn 6 "-" [arg1]
+                format "-" args   = formatBin 6 "-" args
+                format op args    = nary op args
 
+                nary :: String -> [(String, Precidence)] -> (String, Precidence)
+                nary op = nary' op op
                 -- Minus is a special case since it can be either negate or subtraction
-                nary "-"      = undefined
-                nary "!"      = formatUn
-                nary "#"      = formatUn
-                nary "max"    = formatUn
-                nary "min"    = formatUn
-                nary "<=>"    = formatBin
-                nary "=>"     = formatBin
-                nary "||"     = formatBin
-                nary "xor"    = formatBin                                
-                nary "&&"     = formatBin
-                nary "<"      = formatBin
-                nary ">"      = formatBin
-                nary "="      = formatBin
-                nary "<="     = formatBin
-                nary ">="     = formatBin
-                nary "!="     = formatBin
-                nary "in"     = formatBin
-                nary "not in" = formatBin
-                nary "+"      = formatBin
-                nary "*"      = formatBin
-                nary "/"      = formatBin
-                nary "++"     = formatBin
-                nary "--"     = formatBin
-                nary "&"      = formatBin
-                nary "<:"     = formatBin
-                nary ">:"     = formatBin
-                nary "."      = formatBin
-                nary "=>else" = formatIfElse
-                nary op       = error $ "Unknown operator " ++ op
+                nary' "-"      = undefined
+                nary' "!"      = formatUn 9
+                nary' "#"      = formatUn 9
+                nary' "max"    = formatUn 8
+                nary' "min"    = formatUn 8
+                nary' "<=>"    = formatBin 1
+                nary' "=>"     = formatBin 1
+                nary' "||"     = formatBin 1
+                nary' "xor"    = formatBin 1                              
+                nary' "&&"     = formatBin 1
+                nary' "<"      = formatBin 2
+                nary' ">"      = formatBin 2
+                nary' "="      = formatBin 2
+                nary' "<="     = formatBin 2
+                nary' ">="     = formatBin 2
+                nary' "!="     = formatBin 2
+                nary' "in"     = formatBin 3
+                nary' "not in" = formatBin 3
+                nary' "+"      = formatBin 6
+                nary' "*"      = formatBin 7
+                nary' "/"      = formatBin 7
+                nary' "++"     = formatBin 4
+                nary' "--"     = formatBin 4
+                nary' "&"      = formatBin 4
+                nary' "<:"     = formatBin 4
+                nary' ">:"     = formatBin 4
+                nary' "."      = formatBin 1
+                nary' "=>else" = formatIfElse
+                nary' op       = error $ "Unknown operator " ++ op
                 
-                formatUn op [arg1] = op ++ parens arg1
-                formatUn op args = error (op ++ show args ++ " is an invalid unary operation")
+                formatUn precidence op [arg1] = (op ++ parens precidence arg1, precidence)
+                formatUn precidence op args = error (op ++ show args ++ " is an invalid unary operation")
                 
-                formatBin op [arg1, arg2] = parens arg1 ++ op ++ parens arg2
-                formatBin op args = error (op ++ show args ++ " is an invalid binary operation")
+                formatBin precidence op [arg1, arg2] = (parens precidence arg1 ++ op ++ parens precidence arg2, precidence)
+                formatBin precidence op args = error (op ++ show args ++ " is an invalid binary operation")
                 
-                formatIfElse "=>else" [arg1, arg2, arg3] = parens arg1 ++ "=>" ++ parens arg2 ++ "else" ++ parens arg3
+                formatIfElse "=>else" [arg1, arg2, arg3] = (parens  0 arg1 ++ "=>" ++ parens 0 arg2 ++ "else" ++ parens 0 arg3, 0)
                 formatIfElse op args = error (op ++ show args ++ " is an invalid ternary operation")
                 
-                parens s = '(':s ++ ")"
+                parens :: Precidence -> (String, Precidence) -> String
+                parens precidence (s, precidence') = if precidence < precidence' then s else '(':s ++ ")"
                 
-                syntax = format operation args
+                (syntax, precidence) = format operation args
             in
-                (syntax, (ConstraintInfo pId syntax):subConstraints)
+                ((syntax, precidence), (ConstraintInfo pId syntax):subConstraints)
         
         "cl:IIntExp"               ->
-            (verbatim $ exp `unique` (tag "IntLiteral" /> txt), [])
+            ((verbatim $ exp `unique` (tag "IntLiteral" /> txt), 10), [])
             
         "cl:IDoubleExp"            ->
-            (verbatim $ exp `unique` (tag "DoubleLiteral" /> txt), [])
+            ((verbatim $ exp `unique` (tag "DoubleLiteral" /> txt), 10), [])
             
         "cl:IStringExp"            ->
-            (verbatim $ exp `unique` (tag "StringLiteral" /> txt), [])
+            ((verbatim $ exp `unique` (tag "StringLiteral" /> txt), 10), [])
             
         "cl:IClaferId"             ->
-            (sigToClaferName $ verbatim $ exp `unique` (tag "Id" /> txt), [])
+            ((sigToClaferName $ verbatim $ exp `unique` (tag "Id" /> txt), 10), [])
         
         "cl:IDeclarationParentExp" ->
             let
@@ -287,19 +294,19 @@ parsePExp content =
                         dexp <- decl
                         let disj = if "true" == (verbatim $ dexp `unique` (tag "IsDisjunct" /> txt)) then "disj" else ""
                         let locIds = map verbatim $ dexp `many` (tag "Declaration" /> tag "LocalDeclaration")
-                        let (body, subConstraints) = parsePExp $ dexp `unique` tag "Body"
+                        let ((body, _), subConstraints) = parsePExp $ dexp `unique` tag "Body"
                         return $ (disj ++ " " ++ intercalate " " locIds ++ " : " ++ body, subConstraints)                
                         
                 
-                (bodyParent, subConstraints) = parsePExp $ exp `unique` tag "BodyParentExp"
+                ((bodyParent, _), subConstraints) = parsePExp $ exp `unique` tag "BodyParentExp"
             in
                 case declSyntax of
                     Just (declSyntax', declSubConstraints) ->
-                        (syntax, (ConstraintInfo pId syntax) : (declSubConstraints ++ subConstraints))
+                        ((syntax, 0), (ConstraintInfo pId syntax) : (declSubConstraints ++ subConstraints))
                         where
                         syntax = quantifier ++ " " ++ declSyntax' ++ " | " ++ bodyParent
                     Nothing ->
-                        (syntax, (ConstraintInfo pId syntax) : subConstraints)
+                        ((syntax, 0), (ConstraintInfo pId syntax) : subConstraints)
                         where
                         syntax = quantifier ++ " " ++ bodyParent
     where
