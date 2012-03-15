@@ -24,6 +24,8 @@ module Constraints (Constraint(..), Cardinality(..), ClaferInfo(..), ConstraintI
 
 import qualified AlloyIGInterface as AlloyIG
 import Control.Monad
+import Control.Monad.State
+import Control.Monad.Trans.Maybe
 import Data.List hiding (span)
 import Data.Maybe
 import Data.Ord
@@ -192,23 +194,22 @@ parseIClafer content =
 
 
 parseIConstraint :: Content i -> [ConstraintInfo]
-parseIConstraint content =
-    concatMap (snd . parsePExp) ((keep /> tag "ParentExp") content)
+parseIConstraint content = parsePExp (content `unique` tag "ParentExp")
 
 
-parsePExp :: Content i -> ((String, Precidence), [ConstraintInfo])
-parsePExp content =
+parsePExp :: Content i -> [ConstraintInfo]
+parsePExp content = execState (parsePExp' content) []
+parsePExp' :: Content i -> State [ConstraintInfo] -> (String, Precidence)
+parsePExp' content =
     case expType of
-        "cl:IFunctionExp"          ->
+        "cl:IFunctionExp"          -> do
             let
-                operation = verbatim $ (keep /> tag "Operation" /> txt) exp
-                arguments = (keep /> tag "Argument") exp
-                arguments' = map parsePExp arguments
-                
-                subConstraints = concatMap snd arguments'
-
-                args = map fst arguments'
-                
+                operation = verbatim $ exp `unique` (tag "Operation" /> txt)
+                arguments = exp `many` tag "Argument"
+            
+            arguments' <- (mapM parsePExp' arguments)
+            
+            let
                 format :: String -> [(String, Precidence)] -> (String, Precidence)
                 -- Handle minus as a special case
                 format "-" [arg1] = formatUn 6 "-" [arg1]
@@ -260,21 +261,23 @@ parsePExp content =
                 parens :: Precidence -> (String, Precidence) -> String
                 parens precidence (s, precidence') = if precidence < precidence' then s else '(':s ++ ")"
                 
-                (syntax, precidence) = format operation args
-            in
-                ((syntax, precidence), (ConstraintInfo pId syntax):subConstraints)
+                (syntax, precidence) = format operation arguments'
+            
+            -- Cons a new ConstraintInfo into the state
+            modify $ (ConstraintInfo pId syntax :)
+            return (syntax, precidence)
         
         "cl:IIntExp"               ->
-            ((verbatim $ exp `unique` (tag "IntLiteral" /> txt), 10), [])
+            return (verbatim $ exp `unique` (tag "IntLiteral" /> txt), 10)
             
         "cl:IDoubleExp"            ->
-            ((verbatim $ exp `unique` (tag "DoubleLiteral" /> txt), 10), [])
+            return (verbatim $ exp `unique` (tag "DoubleLiteral" /> txt), 10)
             
         "cl:IStringExp"            ->
-            ((verbatim $ exp `unique` (tag "StringLiteral" /> txt), 10), [])
+            return (verbatim $ exp `unique` (tag "StringLiteral" /> txt), 10)
             
         "cl:IClaferId"             ->
-            ((sigToClaferName $ verbatim $ exp `unique` (tag "Id" /> txt), 10), [])
+            return (sigToClaferName $ verbatim $ exp `unique` (tag "Id" /> txt), 10)
         
         "cl:IDeclarationParentExp" ->
             let
@@ -289,30 +292,30 @@ parsePExp content =
                 
                 decl = exp `perhaps` tag "Declaration"
                 
-                declSyntax =
-                    do
-                        dexp <- decl
-                        let disj = if "true" == (verbatim $ dexp `unique` (tag "IsDisjunct" /> txt)) then "disj" else ""
-                        let locIds = map verbatim $ dexp `many` (tag "Declaration" /> tag "LocalDeclaration")
-                        let ((body, _), subConstraints) = parsePExp $ dexp `unique` tag "Body"
-                        return $ (disj ++ " " ++ intercalate " " locIds ++ " : " ++ body, subConstraints)                
-                        
-                
-                ((bodyParent, _), subConstraints) = parsePExp $ exp `unique` tag "BodyParentExp"
+                parseDeclSyntax =
+                    case decl of
+                        Just dexp ->
+                            do
+                                let
+                                    disj = if "true" == (verbatim $ dexp `unique` (tag "IsDisjunct" /> txt)) then "disj" else ""
+                                    locIds = map verbatim $ dexp `many` (tag "Declaration" /> tag "LocalDeclaration")
+                                (body, _) <- lift $ parsePExp' $ dexp `unique` tag "Body"
+                                return $ disj ++ " " ++ intercalate " " locIds ++ " : " ++ body                
+                        Nothing -> fail "No decl"
             in
-                case declSyntax of
-                    Just (declSyntax', declSubConstraints) ->
-                        ((syntax, 0), (ConstraintInfo pId syntax) : (declSubConstraints ++ subConstraints))
-                        where
-                        syntax = quantifier ++ " " ++ declSyntax' ++ " | " ++ bodyParent
-                    Nothing ->
-                        ((syntax, 0), (ConstraintInfo pId syntax) : subConstraints)
-                        where
-                        syntax = quantifier ++ " " ++ bodyParent
+                do
+                    (bodyParent, _) <- parsePExp' $ exp `unique` tag "BodyParentExp"
+                    declSyntax <- runMaybeT parseDeclSyntax
+                    let syntax = case declSyntax of
+                            Just declSyntax' -> quantifier ++ " " ++ declSyntax' ++ " | " ++ bodyParent
+                            Nothing          -> quantifier ++ " " ++ bodyParent
+                    -- Cons a new ConstraintInfo into the state
+                    modify $ (ConstraintInfo pId syntax :)
+                    return (syntax, 0)
     where
     pId = verbatim $ (keep /> tag "ParentId" /> txt) content
     exp = content `unique` tag "Exp"
-    expType = findAttr qType exp
+    expType = findAttr qType exp    
     
     
 findOptAttr :: QName -> Content i -> Maybe String
