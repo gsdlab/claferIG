@@ -51,6 +51,7 @@ data Constraint =
 data Cardinality = Cardinality {lower::Integer, upper::Maybe Integer}
 
 instance Show Cardinality where
+    show (Cardinality 0 Nothing) = "*"
     show (Cardinality 1 Nothing) = "+"
     show (Cardinality lower Nothing) = show lower ++ "..*"
     show (Cardinality 0 (Just 1)) = "?"
