@@ -41,6 +41,7 @@ data Constraint =
     ParentConstraint {range::AlloyIG.Constraint} |
     InConstraint {range::AlloyIG.Constraint} |
     ExtendsConstraint {range::AlloyIG.Constraint} |
+    GroupCardinalityConstraint {range::AlloyIG.Constraint} |
     ExactCardinalityConstraint {range::AlloyIG.Constraint, claferInfo::ClaferInfo} |
     LowerCardinalityConstraint {range::AlloyIG.Constraint, claferInfo::ClaferInfo} |
     UpperCardinalityConstraint {range::AlloyIG.Constraint, claferInfo::ClaferInfo} |
@@ -129,6 +130,7 @@ parseConstraints ir mapping =
     extendsConstraint (source, range) =
         if source == "Extends" then Just $ ExtendsConstraint range
         else Nothing
+
 
     exactCardinalityConstraint (source, range) =
         do
