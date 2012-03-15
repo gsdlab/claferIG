@@ -4,6 +4,7 @@ import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
 import edu.mit.csail.sdg.alloy4compiler.ast.Command;
 import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
+import edu.mit.csail.sdg.alloy4compiler.ast.ExprLet;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprList;
 import edu.mit.csail.sdg.alloy4compiler.ast.ExprUnary;
 import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
@@ -153,15 +154,7 @@ public class Util {
             List<Expr> newFacts = new ArrayList<Expr>(asList(sig.getFacts()));
             for (ListIterator<Expr> iter = newFacts.listIterator(); iter.hasNext();) {
                 Expr fact = iter.next();
-                // Base case
-                if (pos.equals(fact.span())) {
-                    iter.remove();
 
-                    set(sig, facts, new SafeList<Expr>(newFacts));
-                    return true;
-                }
-
-                // Recursive case
                 Expr newFact = removeSubnode(pos, fact);
                 if (newFact == null) {
                     iter.remove();
@@ -181,20 +174,16 @@ public class Util {
     }
 
     private static Expr removeSubnode(Pos pos, Expr node) {
+        if (pos.equals(node.span())) {
+            return null;
+        }
         if (node instanceof ExprList) {
             ExprList exprList = (ExprList) node;
 
             List<Expr> newSubNodes = new ArrayList<Expr>(exprList.args);
             for (ListIterator<Expr> iter = newSubNodes.listIterator(); iter.hasNext();) {
                 Expr next = iter.next();
-                // Base case
-                if (pos.equals(next.span())) {
-                    iter.remove();
 
-                    return ExprList.make(exprList.pos, exprList.closingBracket, exprList.op, newSubNodes);
-                }
-
-                // Recursive case
                 Expr newSubNode = removeSubnode(pos, next);
                 if (newSubNode == null) {
                     iter.remove();
@@ -211,15 +200,22 @@ public class Util {
             ExprUnary.Op op = expr.op;
             Expr sub = expr.sub;
 
-            if (pos.equals(sub.span())) {
-                return null;
-            }
             Expr newSub = removeSubnode(pos, sub);
             if (newSub == null) {
                 return null;
             }
             if (newSub != sub) {
                 return op.make(expr.pos, newSub);
+            }
+        } else if (node instanceof ExprLet) {
+            ExprLet let = (ExprLet) node;
+
+            Expr newSub = removeSubnode(pos, let.sub);
+            if (newSub == null) {
+                return null;
+            }
+            if (newSub != let.sub) {
+                ExprLet.make(let.pos, let.var, let.expr, newSub);
             }
         }
         return node;
