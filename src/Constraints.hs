@@ -51,8 +51,12 @@ data Constraint =
 data Cardinality = Cardinality {lower::Integer, upper::Maybe Integer}
 
 instance Show Cardinality where
+    show (Cardinality 1 Nothing) = "+"
     show (Cardinality lower Nothing) = show lower ++ "..*"
-    show (Cardinality lower (Just upper)) = show lower ++ ".." ++ show upper
+    show (Cardinality 0 (Just 1)) = "?"
+    show (Cardinality lower (Just upper))
+        | lower == upper = show lower
+        | otherwise      = show lower ++ ".." ++ show upper
 
 
 data ClaferInfo = ClaferInfo {uniqueId::String, cardinality::Cardinality}
@@ -199,7 +203,7 @@ parseIConstraint content = parsePExp (content `unique` tag "ParentExp")
 
 parsePExp :: Content i -> [ConstraintInfo]
 parsePExp content = execState (parsePExp' content) []
-parsePExp' :: Content i -> State [ConstraintInfo] -> (String, Precidence)
+parsePExp' :: Content i -> State [ConstraintInfo] (String, Precidence)
 parsePExp' content =
     case expType of
         "cl:IFunctionExp"          -> do
