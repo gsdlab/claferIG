@@ -11,8 +11,13 @@ Dependencies
 
 * [Clafer translator](https://github.com/gsdlab/clafer) (to produce Alloy models (.als) and Clafer IR (.xml) from Clafer models)
 * [Alloy 4.2](http://alloy.mit.edu/alloy/) (backend reasoner)
-* MiniSAT (SAT solver used by Alloy that can produce Unsat Core, bundled with Alloy)
-* Some Haskell libraries (installed automatically)
+* MiniSAT Proover (a SAT solver used by Alloy that can produce UnSAT Core, bundled with Alloy)
+* Some Haskell libraries (installed automatically by Cabal)
+
+### Prerequisites
+1. install the Haskell Platform (it contains GHC and Cabal)
+2. install the [Clafer translator](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
+3. make sure the `<target directory>` is on your command PATH
 
 ### Building
 
@@ -20,11 +25,12 @@ Dependencies
 2. copy `alloy4.jar` into the newly created `claferIG` directory
 3. execute `make`
 
+#### Note: 
+> On Windows, install Cygwin with the `make` package.
+
 ### Installation
 
-1. install the [Clafer translator](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
-2. back in `claferIG`, execute `make deploy to=<target directory>`
-3. make sure the `<target directory>` is on your command PATH
+1. execute `make deploy to=<target directory>`
 
 Usage
 -----
@@ -46,14 +52,16 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 In the interactive mode, the users can invoke the following commands by pressing the first letter of the command name or the whole command as marked by boldface:
 
 * [tab] - print the available commands or auto-complete command name, a clafer name, or clafer instance name in a given context
-* **n**ext or **[enter]** - to produce the next instance if available or to output a message that no more instances exist within the given scope
+* **n**ext or **[enter]** - to produce the next instance if available, a counterexample, or to output a message that no more instances exist within the given scope
 * **i**ncrease - to increase the maximum number of instances of a given clafer or all clafers (scope)
+* **r**eload - to load a new version of the input model while preserving the current scope settings
 * **s**ave - to save all instances displayed so far or a counterexample to files named `<model file name>.cfr.<instance number>.data`, one instance per file
 * **q**uit - to quit the interactive session
 * **h**elp - to display this menu options summary
 * **scope** - to print out the values of the global scope and individual Clafer scopes
-* **claferModel** - to print out the original Clafer model verbatim
-* **alloyModel** - to print out the output of Clafer translator verbatim
+* **resetScopes** - to load the original minimal scopes computed by the Clafer translator
+* **claferModel** - to print out the original Clafer model with line numbers and UnSAT core markers
+* **alloyModel** - to print out the output of Clafer translator with line numbers and UnSAT core markers
 * **alloyInstance** - to print out the Alloy xml document of the most recent solution
 * **f**ind - to print a Clafer with given name found in the most recent solution
 
@@ -81,6 +89,9 @@ The instance data notation is very similar to a regular Clafer notation for conc
 
 Additionally, the data notation contains concrete values of the clafers and suffix numbers to distinguish among multipe instances of the same clafer.
 
+### Note:
+> The instance data models could be read by the Clafer translator if the translator had simple type inference support.
+
 #### Example 
 
 For a model
@@ -90,13 +101,16 @@ abstract A
     a ?
     b +
     c : integer ?
-    d -> E
+    d -> E 2
+    g -> E 2
+        h : integer
 
 abstract E
     f : integer +
 
 a1 : A
 e1 : E
+e2 : E
 ```
 
 A possible instance data looks as follows:
@@ -106,10 +120,14 @@ a1
     b1
     b2
     c = 10
-    d = e1
+    d = e1, e2    // concise reference notation - no children
+    g1 = e1       // expanded reference notation - with children
+        h = 5     
+    g2 = e2
+        h = 2
 
 e1
-    f = 2, 3, 4
+    f = 2, 3, 4   // concise multivalue notation
 ```
 
 ### Counter example
@@ -131,13 +149,24 @@ a1 : A
     [ b ]       // C3
 ```
 
-Constraints C1, C2, and C3 form an UNSAT Core. Removal of any of them will make the model satisfiable. The constraint C1 is part of the model and cannot be removed (part of domain knowledge). Therefore, either C2 or C3 must be removed to remove the inconsistency. On possible counter example that illustrates the inconsistency is as follows:
+Constraints C1, C2, and C3 form an UnSAT Core. Removal of any of them will make the model satisfiable. The constraint C1 is part of the model and cannot be removed (part of domain knowledge). Therefore, either C2 or C3 must be removed to remove the inconsistency. The command `claferModel` prints the model as follows:
 
 ```clafer
+1. |abstract A
+2. |    a ?
+3. |    b ?
+4. >        [ a ]   <--- UnSAT Core
+5. |
+6. |a1 : A
+7. >    [ no a ]    <--- UnSAT Core
+8. >    [ b ]       <--- UnSAT Core
+```
 
+On possible counter example that illustrates the inconsistency is as follows:
+
+```clafer
 a1
     a
-    [ no a ]   // violated
     b
 ```
 
@@ -148,9 +177,9 @@ How it works
 
 The Clafer instance generator:
 
-* translates the input Clafer model (.cfr) to an Alloy model (.als) and Clafer IR model (.xml). The IR model contains the mapping between Clafer names and Alloy names
-* computes the smallest scopes for each Alloy signature to ensure that a valid instance can be found if it exists
-* invokes Alloy Analyzer to produce an instance or find a counterexample
+* translates the input Clafer model (.cfr) to an Alloy model (.als) and Clafer IR model (.xml). The IR model contains the mapping between Clafer names and Alloy names. The IR also contains the smallest scopes for each Alloy signature to ensure that a valid instance can be found if it exists
+* invokes Alloy Analyzer to produce an instance or find an UnSAT core
+** given an UnSAT core, removes constraints from the core until an instance is found - that instance represents the counterexample which violates the removed constraints
 * translates the instance or the counterexample data produced by Alloy Analyzer to Clafer instance data format using the name map from IR in a reverse direction,
 * for a counterexample, translates the counter example in Alloy to Claefr instance data and constraint violations in Alloy into constraint violations in Clafer model
 
