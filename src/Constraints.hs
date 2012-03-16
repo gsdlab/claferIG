@@ -259,7 +259,7 @@ parsePExp' content =
                 formatUn precidence op [arg1] = (op ++ parens precidence arg1, precidence)
                 formatUn precidence op args = error (op ++ show args ++ " is an invalid unary operation")
                 
-                formatBin precidence op [arg1, arg2] = (parens precidence arg1 ++ op ++ parens precidence arg2, precidence)
+                formatBin precidence op [arg1, arg2] = (parens precidence arg1 ++ " " ++ op ++ " " ++ parens precidence arg2, precidence)
                 formatBin precidence op args = error (op ++ show args ++ " is an invalid binary operation")
                 
                 formatIfElse "=>else" [arg1, arg2, arg3] = (parens  0 arg1 ++ "=>" ++ parens 0 arg2 ++ "else" ++ parens 0 arg3, 0)
