@@ -107,12 +107,12 @@ parseConstraints ir mapping =
     
     findClafer name =
         fromMaybe
-            (error $ name ++ " not in " ++ show (map uniqueId claferInfos))
+            (error $ name ++ " clafer not in " ++ show (map uniqueId claferInfos))
             (find ((== name) . uniqueId) claferInfos)
             
     findConstraint name =
         fromMaybe
-            (error $ name ++ " not in " ++ show (map pId constraintInfos))
+            (error $ name ++ " constraint not in " ++ show (map pId constraintInfos))
             (find ((== name) . pId) constraintInfos)
 
     sigConstraint (source, range) =
