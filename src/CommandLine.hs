@@ -98,13 +98,22 @@ runCommandLine claferIG =
                     printConstraints' (i + 1) cs
             
             printTransformation :: Constraint -> [Constraint] -> (String, [Constraint])        
-            printTransformation UserConstraint{constraintInfo = info} rest = (syntax info, rest)
+            printTransformation UserConstraint{constraintInfo = info} rest = ("removed " ++ syntax info, rest)
+            printTransformation ExactCardinalityConstraint{claferInfo = info} rest =
+                (show info ++ " changed to " ++ show (setUpper (setLower info 0) Nothing), rest)
             printTransformation LowerCardinalityConstraint{claferInfo = info} rest =
                 case deleteUpper (uniqueId info) rest of
                     -- Deleted the lower and upper constraint
                     Just rest' -> (show info ++ " changed to " ++ show (setUpper (setLower info 0) Nothing), rest')
                     -- Only deleted the lower constraint
                     Nothing    -> (show info ++ " changed to " ++ show (setLower info 0), rest)
+            printTransformation UpperCardinalityConstraint{claferInfo = info} rest =
+                case deleteLower (uniqueId info) rest of
+                    -- Deleted the lower and upper constraint
+                    Just rest' -> (show info ++ " changed to " ++ show (setUpper (setLower info 0) Nothing), rest')
+                    -- Only deleted the upper constraint
+                    Nothing    -> (show info ++ " changed to " ++ show (setUpper info Nothing), rest)
+
 
 
             printTransformations cs = printTransformations' 1 cs

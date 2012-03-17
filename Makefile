@@ -82,6 +82,7 @@ runTests:
 	./claferIG --all=4 -s dist/run test/suite/inconsistent.cfr
 	./claferIG --all=4 -s dist/run test/suite/PersonFingers.cfr
 	./claferIG --all=4 -s dist/run test/suite/waitingLine.cfr
+	./claferIG --all=4 -s dist/run test/suite/subclaferCardinality.cfr
 	
 clean:
 	rm -rf dist
