@@ -93,6 +93,7 @@ clean:
 deploy: 
 	mkdir -p $(to)
 	cp -R lib $(to)
+	cp alloy4.jar $(to)
 	cp alloyIG.jar $(to)
 	cp claferIG* $(to)
 	cp README.md $(to)
