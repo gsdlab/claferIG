@@ -20,12 +20,13 @@
  SOFTWARE.
 -}
 
-module ClaferIG (ClaferIG(claferModel, claferFile), Scope, Instance(..), Counterexample(..), claferIGVersion, initClaferIG, alloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, quit) where
+module ClaferIG (ClaferIG(claferFile), Scope, Instance(..), Counterexample(..), claferIGVersion, getClaferModel, initClaferIG, getAlloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, quit, reload) where
 
 import qualified AlloyIGInterface as AlloyIG
 import ClaferModel
 import Constraints
 import Control.Monad
+import Data.IORef
 import Data.List
 import Data.Map as Map hiding (map, null)
 import Data.Maybe
@@ -37,7 +38,7 @@ import System.Exit
 import Version
 
 
-data ClaferIG = ClaferIG{constraints::[Constraint], claferModel::String, claferFile::FilePath, claferToSigNameMap::Map String String, alloyIG::AlloyIG.AlloyIG}
+data ClaferIG = ClaferIG{claferFile::FilePath, constraints::IORef [Constraint], claferModel::IORef String, claferToSigNameMap::IORef (Map String String), alloyIG::IORef AlloyIG.AlloyIG}
 
 
 data Scope = Scope {name::String, sigName::String, claferIG::ClaferIG}
@@ -56,9 +57,26 @@ data Counterexample = Counterexample {removedConstraints::[Constraint], countere
 claferIGVersion =
     "ClaferIG " ++ version
     
-    
+
+getClaferModel :: ClaferIG -> IO String
+getClaferModel ClaferIG{claferModel = claferModel} = readIORef claferModel
+
+
 initClaferIG :: FilePath -> IO ClaferIG
 initClaferIG claferFile = 
+    do
+        (constraints, claferModel, claferToSigNameMap, alloyIG) <- load claferFile
+        
+        constraintsRef <- newIORef constraints
+        claferModelRef <- newIORef claferModel
+        claferToSigNameMapRef <- newIORef claferToSigNameMap
+        alloyIGRef <- newIORef alloyIG
+        
+        return $ ClaferIG claferFile constraintsRef claferModelRef claferToSigNameMapRef alloyIGRef
+        
+
+load :: String -> IO ([Constraint], String, Map String String, AlloyIG.AlloyIG)
+load claferFile =
     do
         alloyModel  <- callClaferTranslator ["-o", "-s", claferFile]
         ir          <- callClaferTranslator ["-o", "-s", "-m", "xml", "-a", claferFile]
@@ -68,11 +86,13 @@ initClaferIG claferFile =
         let constraints = parseConstraints ir mapping
         
         alloyIG <- AlloyIG.initAlloyIG alloyModel
+        AlloyIG.sendLoadCommand alloyModel alloyIG
         
-        let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- (AlloyIG.sigs alloyIG)]
+        sigs <- AlloyIG.getSigs alloyIG
+        let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
         
-        return $ ClaferIG constraints claferModel claferFile claferToSigNameMap alloyIG
-        
+        return (constraints, claferModel, claferToSigNameMap, alloyIG)
+
 
 callClaferTranslator :: [String] -> IO String    
 callClaferTranslator args =
@@ -85,7 +105,7 @@ callClaferTranslator args =
         return claferOutput
                 
 
-strictReadFile :: FilePath -> IO String        
+strictReadFile :: FilePath -> IO String 
 strictReadFile filePath = 
     do
         contents <- readFile filePath
@@ -94,37 +114,58 @@ strictReadFile filePath =
         return contents
 
 
-alloyModel = AlloyIG.alloyModel . alloyIG
+getAlloyModel :: ClaferIG -> IO String
+getAlloyModel ClaferIG{alloyIG = alloyIG} =
+    do
+        alloyIG' <- readIORef alloyIG
+        AlloyIG.getAlloyModel alloyIG'
 
 
 solve :: ClaferIG -> IO ()
-solve claferIG = AlloyIG.sendResolveCommand (alloyIG claferIG)
+solve ClaferIG{alloyIG = alloyIG} =
+    do
+        alloyIG' <- readIORef alloyIG
+        AlloyIG.sendResolveCommand alloyIG'
 
  
-getClafers :: ClaferIG -> [String]
-getClafers ClaferIG{alloyIG = alloyIG} = map sigToClaferName (AlloyIG.sigs alloyIG)
+getClafers :: ClaferIG -> IO [String]
+getClafers ClaferIG{alloyIG = alloyIG} =
+    do
+        alloyIG' <- readIORef alloyIG
+        sigs <- AlloyIG.getSigs alloyIG'
+        return $ map sigToClaferName sigs
 
 
 getGlobalScope :: ClaferIG -> IO Int
-getGlobalScope ClaferIG{alloyIG = alloyIG} = AlloyIG.getGlobalScope alloyIG
+getGlobalScope ClaferIG{alloyIG = alloyIG} =
+    do
+        alloyIG' <- readIORef alloyIG
+        AlloyIG.getGlobalScope alloyIG'
 
 
 setGlobalScope :: Int -> ClaferIG -> IO ()
-setGlobalScope scope ClaferIG{alloyIG = alloyIG} = AlloyIG.sendSetGlobalScopeCommand scope alloyIG
+setGlobalScope scope ClaferIG{alloyIG = alloyIG} =
+    do
+        alloyIG' <- readIORef alloyIG
+        AlloyIG.sendSetGlobalScopeCommand scope alloyIG'
 
 
 getScopes :: ClaferIG -> IO [Scope]
-getScopes claferIG = 
+getScopes claferIG@ClaferIG{alloyIG = alloyIG} = 
     do
-        scopes <- AlloyIG.getScopes (alloyIG claferIG)
+        alloyIG' <- readIORef alloyIG
+        scopes <- AlloyIG.getScopes alloyIG'
         return $ [Scope (sigToClaferName sig) sig claferIG | (sig, scope) <- scopes]
         
         
-getScope :: String -> ClaferIG -> Maybe Scope
-getScope name claferIG =
-    case Map.lookup name $ claferToSigNameMap claferIG of
-        Just sigName -> Just $ Scope name sigName claferIG
-        Nothing -> Nothing
+getScope :: String -> ClaferIG -> IO (Maybe Scope)
+getScope name claferIG@ClaferIG{claferToSigNameMap = claferToSigNameMap} =
+    do
+        claferToSigNameMap' <- readIORef claferToSigNameMap
+        return $
+            do
+                sigName <- name `Map.lookup` claferToSigNameMap'
+                return $Scope name sigName claferIG
         
 
 nameOfScope :: Scope -> String
@@ -132,7 +173,10 @@ nameOfScope = name
 
 
 valueOfScope :: Scope -> IO Int
-valueOfScope Scope{sigName = sigName, claferIG = claferIG} = AlloyIG.getScope sigName (alloyIG claferIG)
+valueOfScope Scope{sigName = sigName, claferIG = ClaferIG{alloyIG = alloyIG}} =
+    do
+        alloyIG' <- readIORef alloyIG
+        AlloyIG.getScope sigName alloyIG'
 
 
 increaseScope :: Int -> Scope -> IO (Maybe String)
@@ -144,14 +188,21 @@ increaseScope increment scope =
     
 
 setScope :: Int -> Scope -> IO (Maybe String)
-setScope scope Scope{sigName = sigName, claferIG = claferIG} =
+setScope scope Scope{sigName = sigName, claferIG = ClaferIG{alloyIG = alloyIG}} =
     do
-        subset <- AlloyIG.sendSetScopeCommand sigName scope (alloyIG claferIG)
+        alloyIG' <- readIORef alloyIG
+        subset <- AlloyIG.sendSetScopeCommand sigName scope alloyIG'
         return $ sigToClaferName `liftM` subset
 
 
 next :: ClaferIG -> IO Instance
-next ClaferIG{alloyIG = alloyIG, constraints = constraints} = 
+next ClaferIG{alloyIG = alloyIG, constraints = constraints} =
+    do
+        alloyIG' <- readIORef alloyIG
+        constraints' <- readIORef constraints
+        nextImpl alloyIG' constraints'
+
+nextImpl alloyIG constraints = 
     do
         xmlSolution <- AlloyIG.sendNextCommand alloyIG
         case xmlSolution of
@@ -209,8 +260,30 @@ next ClaferIG{alloyIG = alloyIG, constraints = constraints} =
     xmlToModel xml = sugarClaferModel $ buildClaferModel $ parseSolution xml
     
     
+reload :: ClaferIG -> IO ()
+reload claferIG@(ClaferIG claferFile constraints claferModel claferToSigNameMap alloyIG) =
+    do
+        globalScope <- getGlobalScope claferIG
+        
+        quit claferIG
+        
+        (constraints', claferModel', claferToSigNameMap', alloyIG') <- load claferFile
+        
+        writeIORef constraints constraints'
+        writeIORef claferModel claferModel'
+        writeIORef claferToSigNameMap claferToSigNameMap'
+        writeIORef alloyIG alloyIG'
+        
+        setGlobalScope globalScope claferIG
+        
+        return ()
+        
+    
 quit :: ClaferIG -> IO ()
-quit ClaferIG{alloyIG = alloyIG} = AlloyIG.sendQuitCommand alloyIG
+quit ClaferIG{alloyIG = alloyIG} =
+    do
+        alloyIG' <- readIORef alloyIG
+        AlloyIG.sendQuitCommand alloyIG'
     
     
 sigToClaferName :: String -> String

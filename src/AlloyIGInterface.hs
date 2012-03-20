@@ -29,7 +29,7 @@ import Process
 
 
 
-data AlloyIG = AlloyIG{proc::Process, alloyModel::String, sigMap::Map String Sig, scopes::IORef (Map String Int), globalScope::IORef Int}
+data AlloyIG = AlloyIG{proc::Process, alloyModel::IORef String, sigMap::IORef (Map String Sig), scopes::IORef (Map String Int), globalScope::IORef Int}
 
 
 data Sig = Sig{s_name::String, s_multiplicity::Multiplicity, s_subset::Maybe String}
@@ -60,15 +60,42 @@ initAlloyIG alloyModel =
     do
         execPath <- executableDirectory
         alloyIGProc <- pipeProcess "java" ["-Djava.library.path=" ++ execPath ++ "lib" , "-jar", execPath ++ "alloyIG.jar"]
-        putMessage alloyIGProc alloyModel
-        numberOfSigs <- read `liftM` getMessage alloyIGProc
-        sigs <- mapM readSig (replicate numberOfSigs alloyIGProc)
-        globalScope <- read `liftM` getMessage alloyIGProc
-
-        scopesRef <- newIORef Map.empty        
-        globalScopeRef <- newIORef globalScope
         
-        return $ AlloyIG alloyIGProc alloyModel (fromList [(s_name sig, sig) | sig <- sigs]) scopesRef globalScopeRef
+        alloyModelRef <- newIORef ""
+        sigMapRef <- newIORef Map.empty
+        scopesRef <- newIORef Map.empty
+        globalScopeRef <- newIORef 0
+
+        let alloyIG = AlloyIG alloyIGProc alloyModelRef sigMapRef scopesRef globalScopeRef
+
+        return alloyIG
+            
+
+getAlloyModel :: AlloyIG -> IO String
+getAlloyModel AlloyIG{alloyModel = alloyModel} = readIORef alloyModel
+
+
+getSigs :: AlloyIG -> IO [String]
+getSigs alloyIG = keys `fmap` readIORef (sigMap alloyIG)
+
+
+-- Call load before any other commands.
+sendLoadCommand :: String -> AlloyIG -> IO ()
+sendLoadCommand model (AlloyIG proc alloyModel sigMap scopes globalScope) =
+    do
+        putMessage proc "load"
+        putMessage proc model
+        numberOfSigs <- read `liftM` getMessage proc
+        sigs <- replicateM numberOfSigs $ readSig proc
+
+        let sigMap' = fromList [(s_name sig, sig) | sig <- sigs]
+        let scopes' = Map.empty
+        globalScope' <- read `liftM` getMessage proc
+        
+        writeIORef alloyModel model
+        writeIORef sigMap sigMap'
+        writeIORef scopes scopes'
+        writeIORef globalScope globalScope'
     where
     readSig :: Process -> IO Sig
     readSig proc =
@@ -77,10 +104,6 @@ initAlloyIG alloyModel =
             multiplicity <- read `liftM` getMessage proc
             subset <- getMessage proc
             return $ Sig sig multiplicity (if null subset then Nothing else Just subset)
-            
-
-sigs :: AlloyIG -> [String]
-sigs alloyIG = keys (sigMap alloyIG)
 
 
 -- Get the next solution from alloyIG
@@ -114,6 +137,9 @@ getScopes alloyIG =
 sendSetScopeCommand :: String -> Int -> AlloyIG -> IO (Maybe String)
 sendSetScopeCommand sig scope AlloyIG{proc=proc, scopes=scopes, sigMap=sigMap} =
     do
+        sigMap' <- readIORef sigMap
+        let Sig{s_multiplicity = multiplicity, s_subset = subset} = sigMap' ! sig
+        
         -- Alloy has a fit when trying to set a scope outside its multiplicity
         -- Don't send command if outside its multiplicity but continue the illusion that
         -- the scope was set
@@ -130,8 +156,6 @@ sendSetScopeCommand sig scope AlloyIG{proc=proc, scopes=scopes, sigMap=sigMap} =
                     return $ Nothing
             Just sub ->
                 return $ Just sub
-    where
-    Sig{s_multiplicity = multiplicity, s_subset = subset} = sigMap ! sig
         
 
 getGlobalScope :: AlloyIG -> IO Int

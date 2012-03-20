@@ -72,6 +72,19 @@ public final class AlloyIG {
     private static interface Operation {
     }
 
+    private static class LoadOperation implements Operation {
+
+        private final String model;
+
+        public LoadOperation(String model) {
+            this.model = model;
+        }
+
+        public String getModel() {
+            return model;
+        }
+    }
+
     private static class ResolveOperation implements Operation {
     }
 
@@ -148,6 +161,9 @@ public final class AlloyIG {
         String op = readMessage();
         if (op == null || op.equals("quit")) {
             return new QuitOperation();
+        } else if (op.equals("load")) {
+            String model = readMessage();
+            return new LoadOperation(model);
         } else if (op.equals("next")) {
             return new NextOperation();
         } else if (op.equals("setGlobalScope")) {
@@ -238,23 +254,10 @@ public final class AlloyIG {
 
     public static void run(String[] args) throws IOException, Err {
         AlloyIGReporter rep = new AlloyIGReporter();
-        String modelVerbatim = readMessage();
 
-        // Parse+typecheck the model
-        CompModule world = AlloyCompiler.parse(rep, modelVerbatim);
-        SafeList<Sig> sigs = world.getAllSigs();
-
-        Command command = world.getAllCommands().get(0);
-
-        // Send back all the sigs
-        writeMessage(Integer.toString(sigs.size()));
-        for (Sig sig : sigs) {
-            writeMessage(sig.label);
-            writeMessage(multiplicity(sig));
-            writeMessage(sig instanceof Sig.PrimSig ? "" : removeCurly(sig.type().toString()));
-        }
-        // Send back the global scope
-        writeMessage(Integer.toString(command.overall));
+        CompModule world = null;
+        SafeList<Sig> sigs = null;
+        Command command = null;
 
         A4Solution ans = null;
         Operation operation = null;
@@ -269,7 +272,23 @@ public final class AlloyIG {
         while (true) {
             operation = nextOperation();
 
-            if (operation instanceof ResolveOperation) {
+            if (operation instanceof LoadOperation) {
+                LoadOperation load = (LoadOperation) operation;
+
+                world = AlloyCompiler.parse(rep, load.getModel());
+                sigs = world.getAllSigs();
+                command = world.getAllCommands().get(0);
+
+                // Send back all the sigs
+                writeMessage(Integer.toString(sigs.size()));
+                for (Sig sig : sigs) {
+                    writeMessage(sig.label);
+                    writeMessage(multiplicity(sig));
+                    writeMessage(sig instanceof Sig.PrimSig ? "" : removeCurly(sig.type().toString()));
+                }
+                // Send back the global scope
+                writeMessage(Integer.toString(command.overall));
+            } else if (operation instanceof ResolveOperation) {
                 rep.minimizedBefore = 0;
                 rep.minimizedAfter = 0;
                 // Reexecute the command
@@ -320,8 +339,7 @@ public final class AlloyIG {
                     if (!removeLocalConstraint(constraint, sigs)) {
                         throw new AlloyIGException(
                                 String.format("Cannot remove constraint (line=%d, column=%d)-(line=%d, column=%d)",
-                                constraint.y, constraint.x, constraint.y2, constraint.x2
-                                ));
+                                constraint.y, constraint.x, constraint.y2, constraint.x2));
                     }
                 } else {
                     command = newCommand;

@@ -49,10 +49,12 @@ runCommandLine claferIG =
     do
         solve claferIG
         
-        clafers <- newIORef $ getClafers claferIG
-        claferInstances <- newIORef []
+        clafers <- getClafers claferIG
 
-        let autoCompleteContext = AutoCompleteContext clafers claferInstances
+        clafersRef <- newIORef clafers
+        claferInstancesRef <- newIORef []
+
+        let autoCompleteContext = AutoCompleteContext clafersRef claferInstancesRef
         runInputT Settings {
             complete = completeFunc autoCompleteContext,
             historyFile = Nothing,
@@ -176,7 +178,13 @@ runCommandLine claferIG =
         do
             lift $ save unsaved (length saved)
             nextLoop context{saved=unsaved ++ saved, unsaved=[]}
-                    
+
+    loop Reload context =
+        do
+            lift $ reload claferIG
+            lift $ solve claferIG
+            nextLoop context
+
     loop (IncreaseGlobalScope i) context =
         do
             globalScope <- lift $ getGlobalScope claferIG
@@ -192,18 +200,19 @@ runCommandLine claferIG =
             
     loop (IncreaseScope name i) context =
         do
-            case getScope name claferIG of
-                Just scope ->
+            scope <- lift $ getScope name claferIG
+            case scope of
+                Just scope' ->
                     do
-                        error <- lift $ increaseScope i scope
+                        error <- lift $ increaseScope i scope'
                         case error of
                             Just subset ->
                                 outputStrLn $ "Cannot increase scope of the reference Clafer \"" ++ name ++ "\". Try increasing the scope of its refered Clafer \"" ++ subset ++ "\"."
                             Nothing ->
                                 do
-                                    scope' <- lift $ valueOfScope scope
+                                    scopeValue <- lift $ valueOfScope scope'
                                     lift $ solve claferIG
-                                    outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scope')
+                                    outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scopeValue)
                 Nothing -> outputStrLn ("Unknown clafer " ++ name)
             nextLoop context
             
@@ -233,9 +242,18 @@ runCommandLine claferIG =
                 []  -> outputStrLn $ "No instance"
             nextLoop context
 
-    loop ShowClaferModel context = outputStrLn (claferModel claferIG) >> nextLoop context
+    loop ShowClaferModel context =
+        do
+            claferModel <- lift $ getClaferModel claferIG
+            outputStrLn claferModel
+            nextLoop context
             
-    loop ShowAlloyModel context = outputStrLn (alloyModel claferIG) >> nextLoop context
+            
+    loop ShowAlloyModel context =
+        do
+            alloyModel <- lift $ getAlloyModel claferIG
+            outputStrLn alloyModel
+            nextLoop context
 
     loop ShowAlloyInstance context =
         do
