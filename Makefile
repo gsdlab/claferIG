@@ -96,5 +96,6 @@ deploy:
 	cp -R lib $(to)
 	cp alloy4.jar $(to)
 	cp alloyIG.jar $(to)
-	cp claferIG* $(to)
-	cp README.md $(to)
+	cp claferIG $(to)
+	cp claferIG.exe $(to)
+	cp README.md $(to)/claferIG-README.md
