@@ -9,21 +9,22 @@ Overview
 Dependencies
 ------------
 
-* [Clafer translator](https://github.com/gsdlab/clafer) (to produce Alloy models (.als) and Clafer IR (.xml) from Clafer models)
-* [Alloy 4.2](http://alloy.mit.edu/alloy/) (backend reasoner)
+* [Clafer translator](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`) and Clafer IR (`.xml`) from Clafer models)
+* [Alloy 4.1](http://alloy.mit.edu/alloy/download.html)(`alloy4.jar`) (backend reasoner)
 * MiniSAT Proover (a SAT solver used by Alloy that can produce UnSAT Core, bundled with Alloy)
 * Some Haskell libraries (installed automatically by Cabal)
 
 ### Prerequisites
-1. install the Haskell Platform (it contains GHC and Cabal)
-2. install the [Clafer translator](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
-3. make sure the `<target directory>` is on your command PATH
+1. install [Git](http://git-scm.com/)
+2. install the Haskell Platform (it contains GHC and Cabal)
+3. install the [Clafer translator](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
+4. make sure the `<target directory>` is on your command PATH
+5. in another directory, `<source directory>`, execute `git clone git://github.com/gsdlab/claferIG.git`
 
 ### Building
 
-1. execute `git clone git://github.com/gsdlab/claferIG.git`
-2. copy `alloy4.jar` into the newly created `claferIG` directory
-3. execute `make`
+1. copy `alloy4.jar` into the newly created `<source directory>/claferIG` directory
+2. execute `make`
 
 #### Note: 
 > On Windows, install Cygwin with the `make` package.
@@ -31,6 +32,9 @@ Dependencies
 ### Installation
 
 1. execute `make deploy to=<target directory>`
+
+#### Note: 
+> On Windows, use `/` with the `make` command instead of `\`.
 
 Usage
 -----
@@ -184,5 +188,5 @@ The Clafer instance generator:
 * for a counterexample, translates the counter example in Alloy to Claefr instance data and constraint violations in Alloy into constraint violations in Clafer model
 
 Need help?
-----------
+==========
 Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `claferig` (so that we know what they are related to) and with `jimmy-liang` (so that Jimmy gets a notification).
