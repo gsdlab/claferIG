@@ -1,7 +1,9 @@
-abstract Person
-	head
-	hand 2
-		finger 5
+// need to set the scopes as follows
+
+abstract Person			// scope=2
+	head			// scope=2
+	hand 2			// scope=4
+		finger 5	// scope=20
 
 Alice : Person
 
