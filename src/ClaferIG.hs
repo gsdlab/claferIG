@@ -33,6 +33,7 @@ import Data.Maybe
 import Process
 import Solution
 import Sugarer
+import System.Directory
 import System.FilePath
 import System.Exit
 import Version
@@ -80,8 +81,13 @@ load claferFile =
     do
         alloyModel  <- callClaferTranslator ["-o", "-s", claferFile]
         ir          <- callClaferTranslator ["-o", "-s", "-m", "xml", "-a", claferFile]
-        mapping     <- strictReadFile $ replaceExtension claferFile "map"
+        
+        let mappingFile = replaceExtension claferFile "map"
+        
+        mapping     <- strictReadFile mappingFile
         claferModel <- strictReadFile claferFile
+        
+        removeFile mappingFile
         
         let constraints = parseConstraints ir mapping
         
