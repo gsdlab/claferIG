@@ -228,7 +228,18 @@ sendUnsatCoreCommand AlloyIG{proc = proc} =
             from <- readPosition
             to   <- readPosition
             return $ Constraint from to
-        
+            
+            
+-- Tell alloyIG to change the unsat core minimization level.
+-- 0 -> Fastest
+-- 1 -> Medium
+-- 2 -> Best
+sendSetUnsatCoreMinimizationCommand :: Integer -> AlloyIG -> IO ()
+sendSetUnsatCoreMinimizationCommand level AlloyIG{proc = proc} =
+    do
+        putMessage proc "unsatCoreMinimization"
+        putMessage proc (show level)
+
 
 -- Tell alloyIG to quit
 sendQuitCommand :: AlloyIG -> IO ()

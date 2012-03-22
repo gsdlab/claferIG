@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module CommandLineParser (Command(..), parseCommandLine, parseCommandLineAutoComplete, commandStrings, expectedMessage, unexpectedMessage, errorMessages) where
+module CommandLineParser (Command(..), UnsatCoreMinimization(..), parseCommandLine, parseCommandLineAutoComplete, commandStrings, expectedMessage, unexpectedMessage, errorMessages) where
 
 import Control.Monad
 import Data.List
@@ -28,7 +28,11 @@ import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Error
 
 
-data Command = Next | IncreaseGlobalScope Integer | IncreaseScope String Integer | Save | Quit | Reload | Help | Find String | ShowScope | ShowClaferModel | ShowAlloyModel | ShowAlloyInstance deriving Show
+
+data Command = Next | IncreaseGlobalScope Integer | IncreaseScope String Integer | Save | Quit | Reload | Help | Find String | ShowScope | ShowClaferModel | ShowAlloyModel | ShowAlloyInstance | SetUnsatCoreMinimization UnsatCoreMinimization deriving Show
+
+
+data UnsatCoreMinimization = Fastest | Medium | Best deriving Show
 
 
 
@@ -108,20 +112,22 @@ commandMap =
     ("claferModel", claferModelCommand):
     ("alloyModel", alloyModelCommand):
     ("alloyInstance", alloyInstanceCommand):
+    ("setUnsatCoreMinimization", setUnsatCoreMinimization):
     []
 
 
-helpCommand          = return Help
-increaseCommand      = increaseGlobalScope
-nextCommand          = return Next
-quitCommand          = return Quit
-saveCommand          = return Save
-reloadCommand        = return Reload
-findCommand          = Find `liftM` (gap >> claferInstance)
-scopeCommand         = return ShowScope
-claferModelCommand   = return ShowClaferModel
-alloyModelCommand    = return ShowAlloyModel
-alloyInstanceCommand = return ShowAlloyInstance
+helpCommand              = return Help
+increaseCommand          = increaseGlobalScope
+nextCommand              = return Next
+quitCommand              = return Quit
+saveCommand              = return Save
+reloadCommand            = return Reload
+findCommand              = Find `liftM` (gap >> claferInstance)
+scopeCommand             = return ShowScope
+claferModelCommand       = return ShowClaferModel
+alloyModelCommand        = return ShowAlloyModel
+alloyInstanceCommand     = return ShowAlloyInstance
+setUnsatCoreMinimization = SetUnsatCoreMinimization `liftM` (gap >> unsatCoreMinimization)
 
 
 gap = skipMany1 space
@@ -138,8 +144,8 @@ increaseGlobalScope =
 explicitIncreaseGlobalScope :: Parser Command
 explicitIncreaseGlobalScope =
     do
-        i <- many1 digit
-        return $ IncreaseGlobalScope (read i)
+        i <- number
+        return $ IncreaseGlobalScope i
     <|>
     increaseScope
 
@@ -157,8 +163,12 @@ increaseScope =
 explicitIncreaseScope :: String -> Parser Command
 explicitIncreaseScope name =
     do
-        i <- many1 digit
-        return $ IncreaseScope name (read i)
+        i <- number
+        return $ IncreaseScope name i
+
+
+number :: Parser Integer
+number = read `liftM` many1 digit
 
 
 clafer :: Parser String        
@@ -167,3 +177,14 @@ clafer = many1 (letter <?> "clafer")
 
 claferInstance :: Parser String
 claferInstance = many1 (alphaNum <?> "claferInstance")
+
+
+unsatCoreMinimization :: Parser UnsatCoreMinimization
+unsatCoreMinimization =
+    do
+        level <- many1 (letter <?> "Unsat core minimization level")
+        case level of
+            "fastest" -> return Fastest
+            "medium"  -> return Medium
+            "best"    -> return Best
+            x         -> fail $ x ++ " is not a valid unsat core minimization level"

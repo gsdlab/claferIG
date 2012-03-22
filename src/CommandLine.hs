@@ -36,7 +36,7 @@ import Data.Maybe
 import System.Console.Haskeline
 
 
-data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_Space | Auto_Digit | No_Auto deriving Show
+data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_UnsatCoreMinimization | Auto_Space | Auto_Digit | No_Auto deriving Show
 
 data AutoCompleteContext = AutoCompleteContext {clafers::IORef [String], claferInstances::IORef [String]}
 
@@ -261,6 +261,17 @@ runCommandLine claferIG =
                 Just alloyInstance -> outputStrLn alloyInstance
                 Nothing -> outputStrLn $ "No instance"
             nextLoop context
+            
+    loop (SetUnsatCoreMinimization level) context =
+        do
+            let level' = 
+                    case level of
+                        Fastest -> 2
+                        Medium  -> 1
+                        Best    -> 0
+            lift $ setUnsatCoreMinimization level' claferIG >> solve claferIG
+            
+            nextLoop context
 
     nextLoop context =
         do
@@ -324,6 +335,7 @@ autoComplete context word Auto_ClaferInstance =
     do
         ci <- readIORef $ claferInstances context
         return $ completePrefix word ci
+autoComplete context word Auto_UnsatCoreMinimization = return $ completePrefix word ["fastest", "medium", "best"]
 autoComplete context word Auto_Digit = return [] -- Don't auto complete numbers.
 autoComplete context word Auto_Space = return [simpleCompletion $ word]
 autoComplete context word No_Auto = return []
@@ -335,6 +347,7 @@ autoCompleteDetect error
     | any (== "command") expectedMessages = Auto_Command
     | any (== "clafer") expectedMessages = Auto_Clafer
     | any (== "claferInstance") expectedMessages = Auto_ClaferInstance
+    | any (== "Unsat core minimization level") expectedMessages = Auto_UnsatCoreMinimization
     | any (== "digit") expectedMessages = Auto_Digit
     | any (== "space") expectedMessages = Auto_Space
     | otherwise = No_Auto

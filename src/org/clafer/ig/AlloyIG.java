@@ -157,6 +157,22 @@ public final class AlloyIG {
         }
     }
 
+    private static class SetUnsatCoreMinimizationOperation implements Operation {
+
+        private final int minimizationLevel;
+
+        public SetUnsatCoreMinimizationOperation(int minimizationLevel) {
+            if (minimizationLevel < 0 || minimizationLevel > 2) {
+                throw new IllegalArgumentException(minimizationLevel + " is in invalid optimization level.");
+            }
+            this.minimizationLevel = minimizationLevel;
+        }
+
+        public int getMinimizationLevel() {
+            return minimizationLevel;
+        }
+    }
+
     private static Operation nextOperation() throws IOException {
         String op = readMessage();
         if (op == null || op.equals("quit")) {
@@ -185,6 +201,9 @@ public final class AlloyIG {
             return new RemoveConstraintOperation(readIntMessage(), readIntMessage(), readIntMessage(), readIntMessage() - 1);
         } else if (op.equals("unsatCore")) {
             return new UnsatCoreOperation();
+        } else if (op.equals("unsatCoreMinimization")) {
+            int optimizationLEvel = readIntMessage();
+            return new SetUnsatCoreMinimizationOperation(optimizationLEvel);
         }
         throw new AlloyIGException("Unknown op " + op);
     }
@@ -262,9 +281,9 @@ public final class AlloyIG {
         A4Solution ans = null;
         Operation operation = null;
 
-        // Choose some default options for how you want to execute the commands
         A4Options options = new A4Options();
-        options.coreMinimization = 0;
+        // Use fastest
+        options.coreMinimization = 2;
         options.solver = A4Options.SatSolver.MiniSatProverJNI;
 
         State<StateExtra> state = null;
@@ -286,7 +305,7 @@ public final class AlloyIG {
                     writeMessage(multiplicity(sig));
                     writeMessage(sig instanceof Sig.PrimSig ? "" : removeCurly(sig.type().toString()));
                     CommandScope scope = command.getScope(sig);
-                    if(scope == null) {
+                    if (scope == null) {
                         writeMessage("False");
                     } else {
                         writeMessage("True");
@@ -369,6 +388,9 @@ public final class AlloyIG {
                 } else {
                     writeMessage(0);
                 }
+            } else if(operation instanceof SetUnsatCoreMinimizationOperation) {
+                SetUnsatCoreMinimizationOperation setUnsatCoreMinimization = (SetUnsatCoreMinimizationOperation) operation;
+                options.coreMinimization = setUnsatCoreMinimization.getMinimizationLevel();
             } else if (operation instanceof QuitOperation) {
                 break;
             } else {
