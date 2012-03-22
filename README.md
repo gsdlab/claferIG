@@ -25,8 +25,7 @@ Building
 
 1. install the [Clafer translator](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
 2. in some `<source directory>`, execute `git clone git://github.com/gsdlab/claferIG.git`
-3. copy `alloy4.jar` into `<source directory>/claferIG`
-4. in `<source directory>/claferIG`, execute
+3. in `<source directory>/claferIG`, execute
   * `cabal update`
   * `make`
 
