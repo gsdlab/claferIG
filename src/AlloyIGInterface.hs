@@ -29,10 +29,10 @@ import Process
 
 
 
-data AlloyIG = AlloyIG{proc::Process, alloyModel::IORef String, sigMap::IORef (Map String Sig), scopes::IORef (Map String Int), globalScope::IORef Int}
+data AlloyIG = AlloyIG{proc::Process, alloyModel::IORef String, sigMap::IORef (Map String Sig), scopes::IORef (Map String Integer), globalScope::IORef Integer}
 
 
-data Sig = Sig{s_name::String, s_multiplicity::Multiplicity, s_subset::Maybe String}
+data Sig = Sig{s_name::String, s_multiplicity::Multiplicity, s_subset::Maybe String, s_startingScope::Maybe Integer}
 
 
 data Multiplicity = One | Lone | Some | Any deriving (Eq, Read, Show)
@@ -48,7 +48,7 @@ data Position = Position {line::Integer, column::Integer} deriving (Show, Eq, Or
 
 
 
-withinRange :: Int -> Multiplicity -> Bool
+withinRange :: Integer -> Multiplicity -> Bool
 withinRange scope One = scope == 1
 withinRange scope Lone = scope == 0 || scope == 1
 withinRange scope Some = scope >= 1
@@ -81,7 +81,7 @@ getSigs alloyIG = keys `fmap` readIORef (sigMap alloyIG)
 
 -- Call load before any other commands.
 sendLoadCommand :: String -> AlloyIG -> IO ()
-sendLoadCommand model (AlloyIG proc alloyModel sigMap scopes globalScope) =
+sendLoadCommand model alloyIG@(AlloyIG proc alloyModel sigMap scopes globalScope) =
     do
         putMessage proc "load"
         putMessage proc model
@@ -96,6 +96,9 @@ sendLoadCommand model (AlloyIG proc alloyModel sigMap scopes globalScope) =
         writeIORef sigMap sigMap'
         writeIORef scopes scopes'
         writeIORef globalScope globalScope'
+        
+        mapM_ resetScope sigs
+        
     where
     readSig :: Process -> IO Sig
     readSig proc =
@@ -103,7 +106,16 @@ sendLoadCommand model (AlloyIG proc alloyModel sigMap scopes globalScope) =
             sig <- getMessage proc 
             multiplicity <- read `liftM` getMessage proc
             subset <- getMessage proc
-            return $ Sig sig multiplicity (if null subset then Nothing else Just subset)
+            hasStartingScope <- read `liftM` getMessage proc
+            startingScope <-
+                if hasStartingScope then (Just . read) `liftM` getMessage proc else return Nothing
+            return $ Sig sig multiplicity (if null subset then Nothing else Just subset) startingScope
+            
+    resetScope :: Sig -> IO ()
+    resetScope Sig{s_name = name, s_startingScope = startingScope} =
+        case startingScope of
+            Just scope -> sendSetScopeCommand name scope alloyIG >> return ()
+            Nothing    -> return ()
 
 
 -- Get the next solution from alloyIG
@@ -117,7 +129,7 @@ sendNextCommand AlloyIG{proc=proc} =
             False -> return Nothing
 
 
-getScope :: String -> AlloyIG -> IO Int
+getScope :: String -> AlloyIG -> IO Integer
 getScope sig alloyIG =
     do
         rscopes <- readIORef (scopes alloyIG)
@@ -126,7 +138,7 @@ getScope sig alloyIG =
             Nothing  -> readIORef (globalScope alloyIG)
         
 
-getScopes :: AlloyIG -> IO [(String, Int)]
+getScopes :: AlloyIG -> IO [(String, Integer)]
 getScopes alloyIG =
     do
         rscopes <- readIORef (scopes alloyIG)
@@ -134,7 +146,7 @@ getScopes alloyIG =
             
 
 -- Tell alloyIG to change the scope of a sig
-sendSetScopeCommand :: String -> Int -> AlloyIG -> IO (Maybe String)
+sendSetScopeCommand :: String -> Integer -> AlloyIG -> IO (Maybe String)
 sendSetScopeCommand sig scope AlloyIG{proc=proc, scopes=scopes, sigMap=sigMap} =
     do
         sigMap' <- readIORef sigMap
@@ -158,12 +170,12 @@ sendSetScopeCommand sig scope AlloyIG{proc=proc, scopes=scopes, sigMap=sigMap} =
                 return $ Just sub
         
 
-getGlobalScope :: AlloyIG -> IO Int
+getGlobalScope :: AlloyIG -> IO Integer
 getGlobalScope alloyIG = readIORef $ globalScope alloyIG
 
 
 -- Tell alloyIG to change the global scope
-sendSetGlobalScopeCommand :: Int -> AlloyIG -> IO ()
+sendSetGlobalScopeCommand :: Integer -> AlloyIG -> IO ()
 sendSetGlobalScopeCommand scope AlloyIG{proc=proc, globalScope=globalScope} =
     do
         putMessage proc "setGlobalScope"

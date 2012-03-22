@@ -176,7 +176,7 @@ runCommandLine claferIG =
             
     loop Save context@Context{saved=saved, unsaved=unsaved} =
         do
-            lift $ save unsaved (length saved)
+            lift $ save unsaved (toInteger $ length saved)
             nextLoop context{saved=unsaved ++ saved, unsaved=[]}
 
     loop Reload context =
@@ -272,7 +272,7 @@ runCommandLine claferIG =
                         Left error    -> outputStrLn (show error) >> nextLoop context
                         Right command -> loop command context
     
-    save :: [ClaferModel] -> Int -> IO ()
+    save :: [ClaferModel] -> Integer -> IO ()
     save [] _ = return ()
     save (c:cs) counter =
         do

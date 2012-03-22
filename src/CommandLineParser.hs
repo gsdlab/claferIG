@@ -28,7 +28,7 @@ import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Error
 
 
-data Command = Next | IncreaseGlobalScope Int | IncreaseScope String Int | Save | Quit | Reload | Help | Find String | ShowScope | ShowClaferModel | ShowAlloyModel | ShowAlloyInstance deriving Show
+data Command = Next | IncreaseGlobalScope Integer | IncreaseScope String Integer | Save | Quit | Reload | Help | Find String | ShowScope | ShowClaferModel | ShowAlloyModel | ShowAlloyInstance deriving Show
 
 
 

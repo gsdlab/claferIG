@@ -35,7 +35,7 @@ import System.FilePath
 
 
 data IGArgs = IGArgs {
-    all :: Maybe Int,
+    all :: Maybe Integer,
     saveDir :: Maybe FilePath,  
     claferModelFile :: FilePath
 } deriving (Show, Data, Typeable)

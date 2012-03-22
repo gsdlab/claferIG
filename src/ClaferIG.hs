@@ -136,14 +136,14 @@ getClafers ClaferIG{alloyIG = alloyIG} =
         return $ map sigToClaferName sigs
 
 
-getGlobalScope :: ClaferIG -> IO Int
+getGlobalScope :: ClaferIG -> IO Integer
 getGlobalScope ClaferIG{alloyIG = alloyIG} =
     do
         alloyIG' <- readIORef alloyIG
         AlloyIG.getGlobalScope alloyIG'
 
 
-setGlobalScope :: Int -> ClaferIG -> IO ()
+setGlobalScope :: Integer -> ClaferIG -> IO ()
 setGlobalScope scope ClaferIG{alloyIG = alloyIG} =
     do
         alloyIG' <- readIORef alloyIG
@@ -172,14 +172,14 @@ nameOfScope :: Scope -> String
 nameOfScope = name
 
 
-valueOfScope :: Scope -> IO Int
+valueOfScope :: Scope -> IO Integer
 valueOfScope Scope{sigName = sigName, claferIG = ClaferIG{alloyIG = alloyIG}} =
     do
         alloyIG' <- readIORef alloyIG
         AlloyIG.getScope sigName alloyIG'
 
 
-increaseScope :: Int -> Scope -> IO (Maybe String)
+increaseScope :: Integer -> Scope -> IO (Maybe String)
 increaseScope increment scope =
     do
         value <- valueOfScope scope
@@ -187,7 +187,7 @@ increaseScope increment scope =
         setScope value' scope
     
 
-setScope :: Int -> Scope -> IO (Maybe String)
+setScope :: Integer -> Scope -> IO (Maybe String)
 setScope scope Scope{sigName = sigName, claferIG = ClaferIG{alloyIG = alloyIG}} =
     do
         alloyIG' <- readIORef alloyIG

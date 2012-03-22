@@ -285,6 +285,13 @@ public final class AlloyIG {
                     writeMessage(sig.label);
                     writeMessage(multiplicity(sig));
                     writeMessage(sig instanceof Sig.PrimSig ? "" : removeCurly(sig.type().toString()));
+                    CommandScope scope = command.getScope(sig);
+                    if(scope == null) {
+                        writeMessage("False");
+                    } else {
+                        writeMessage("True");
+                        writeMessage(scope.startingScope);
+                    }
                 }
                 // Send back the global scope
                 writeMessage(Integer.toString(command.overall));
