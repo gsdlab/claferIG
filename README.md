@@ -1,37 +1,40 @@
 Clafer Instance Generator
 =========================
 
-Overview
---------
-
 **Clafer instance generator** (claferIG) is an API and an interactive tool that generates instances and counter examples of concrete clafers in a Clafer module. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces a counter example that illustrates the constraint violation. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator first returns the minimal instance and subsequently produces instances of increasing size, on-demand. The instance generator can also be used directly as an API (the command line and interactive session interfaces only use the API).
 
 Dependencies
 ------------
 
 * [Clafer translator](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`) and Clafer IR (`.xml`) from Clafer models)
-* [Alloy 4.1](http://alloy.mit.edu/alloy/download.html)(`alloy4.jar`) (backend reasoner)
-* MiniSAT Proover (a SAT solver used by Alloy that can produce UnSAT Core, bundled with Alloy)
-* Some Haskell libraries (installed automatically by Cabal)
 
-### Prerequisites
-1. install [Git](http://git-scm.com/)
-2. install the Haskell Platform (it contains GHC and Cabal)
-3. install the [Clafer translator](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
-4. make sure the `<target directory>` is on your command PATH
-5. in another directory, `<source directory>`, execute `git clone git://github.com/gsdlab/claferIG.git`
+**Note**: Installing the Clafer translator will satisfy all the following dependencies:
 
-### Building
+* [The Haskell Platform](http://hackage.haskell.org/platform/).
+* [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) >= 5, 32bit
+* [Alloy4.1](http://alloy.mit.edu/alloy/download.html)
+ * MiniSAT Proover (a SAT solver used by Alloy that can produce UnSAT Core, bundled with Alloy)
+* [Git](http://git-scm.com/)
 
-1. copy `alloy4.jar` into the newly created `<source directory>/claferIG` directory
-2. execute `make`
+On Windows only
 
-#### Note: 
-> On Windows, install Cygwin with the `make` package.
+* [Cygwin](http://www.cygwin.com/) with packages `make`, `wget`
 
-### Installation
+Building
+------------------
 
-1. execute `make deploy to=<target directory>`
+1. install the [Clafer translator](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
+2. in some `<source directory>`, execute `git clone git://github.com/gsdlab/claferIG.git`
+3. copy `alloy4.jar` into `<source directory>/claferIG`
+4. in `<source directory>/claferIG`, execute
+  * `cabal update`
+  * `make`
+
+Installation
+------------
+
+1. execute `make install to=<target directory>`
+2. add the `<target directory>` is on your command PATH
 
 #### Note: 
 > On Windows, use `/` with the `make` command instead of `\`.
@@ -64,6 +67,7 @@ In the interactive mode, the users can invoke the following commands by pressing
 * **h**elp - to display this menu options summary
 * **scope** - to print out the values of the global scope and individual Clafer scopes
 * **resetScopes** - to load the original minimal scopes computed by the Clafer translator
+* **setUnsatCoreMinimization** - to choose UnSAT core minimization strategy [fastest | medium | best]. Default: fastest
 * **claferModel** - to print out the original Clafer model with line numbers and UnSAT core markers
 * **alloyModel** - to print out the output of Clafer translator with line numbers and UnSAT core markers
 * **alloyInstance** - to print out the Alloy xml document of the most recent solution
@@ -71,13 +75,20 @@ In the interactive mode, the users can invoke the following commands by pressing
 
 The command '**i**ncrease' allows you to change the maximum number of instances for a given clafer or for all clafers as follows:
 
-* `'i' [enter]` - to increase for all clafers by `1` 
-* `'i' <name> [enter]` - to increase for the clafer `<name>` by `1` 
-* `'i' <name> <number>` - to increase for the clafer `<name>` by `<number>`
+* `i [enter]` - to increase for all clafers by `1` 
+* `i <name> [enter]` - to increase for the clafer `<name>` by `1` 
+* `i <name> <number>` - to increase for the clafer `<name>` by `<number>`
 
 The command '**f**ind' allows you find a clafer with the given name and print it:
 
-* `'f' <name>` 
+* `f <name>` 
+
+The command **setUnsatCoreMinimization** let's you choose UnSAT core minimization strategy 
+
+* `setUnsatCoreMinimization fastest` - fastest but the worst
+* `setUnsatCoreMinimization medium` 
+* `setUnsatCoreMinimization best` - best but slowest even for modest size cores
+
 
 Output format
 -------------

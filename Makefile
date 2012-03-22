@@ -43,11 +43,18 @@ ifeq ($(UNAME), darwin)
     endif
 endif
 
+# Calling `make` should only build
+all: alloyIG.jar lib build
 
-all: alloyIG.jar lib install
-
+# Calling `make install to=<target directory>` should only install
 install:
-	cabal install --bindir=.
+	mkdir -p $(to)
+	cp -R lib $(to)
+	cp alloy4.jar $(to)
+	cp alloyIG.jar $(to)
+	cabal install --bindir=$(to)
+	cp README.md $(to)/claferIG-README.md
+
 
 # this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs 
 newVersion:
@@ -65,7 +72,7 @@ lib:
 	
 # Build takes less time. For ease of development.
 build: alloyIG.jar
-	ghc -XDeriveDataTypeable -isrc src/Main.hs -outputdir dist/build --make -o claferIG
+	cabal build
 
 alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	@if test ! -f "alloy4.jar"; then \
@@ -90,12 +97,3 @@ clean:
 	rm -f claferIG
 	rm -rf lib
 	rm -f dateVer*
-
-deploy: 
-	mkdir -p $(to)
-	cp -R lib $(to)
-	cp alloy4.jar $(to)
-	cp alloyIG.jar $(to)
-	cp claferIG $(to)
-	cp claferIG.exe $(to)
-	cp README.md $(to)/claferIG-README.md
