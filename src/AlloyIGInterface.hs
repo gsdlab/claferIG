@@ -239,6 +239,15 @@ sendSetUnsatCoreMinimizationCommand level AlloyIG{proc = proc} =
     do
         putMessage proc "unsatCoreMinimization"
         putMessage proc (show level)
+        
+
+-- Tell alloyIG to change the bitwidth        
+sendSetBitwidthCommand :: Integer -> AlloyIG -> IO ()
+sendSetBitwidthCommand bitwidth AlloyIG{proc = proc} =
+    do
+        when (bitwidth < 0) $ fail (show bitwidth ++ " is not a valid bitwidth.")
+        putMessage proc "setBitwidth"
+        putMessage proc (show bitwidth)
 
 
 -- Tell alloyIG to quit

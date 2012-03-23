@@ -173,6 +173,21 @@ public final class AlloyIG {
         }
     }
 
+    private static class SetBitwidthOperation implements Operation {
+        private final int bitwidth;
+
+        public SetBitwidthOperation(int bitwidth) {
+            if(bitwidth < 1) {
+                throw new IllegalArgumentException(bitwidth + " is an invalid bitwidth.");
+            }
+            this.bitwidth = bitwidth;
+        }
+
+        public int getBitwidth() {
+            return bitwidth;
+        }
+    }
+
     private static Operation nextOperation() throws IOException {
         String op = readMessage();
         if (op == null || op.equals("quit")) {
@@ -204,6 +219,9 @@ public final class AlloyIG {
         } else if (op.equals("unsatCoreMinimization")) {
             int optimizationLEvel = readIntMessage();
             return new SetUnsatCoreMinimizationOperation(optimizationLEvel);
+        } else if (op.equals("setBitwidth")) {
+            int bitwidth = readIntMessage();
+            return new SetBitwidthOperation(bitwidth);
         }
         throw new AlloyIGException("Unknown op " + op);
     }
@@ -312,6 +330,7 @@ public final class AlloyIG {
                         writeMessage(scope.startingScope);
                     }
                 }
+                
                 // Send back the global scope
                 writeMessage(Integer.toString(command.overall));
             } else if (operation instanceof ResolveOperation) {
@@ -391,6 +410,10 @@ public final class AlloyIG {
             } else if(operation instanceof SetUnsatCoreMinimizationOperation) {
                 SetUnsatCoreMinimizationOperation setUnsatCoreMinimization = (SetUnsatCoreMinimizationOperation) operation;
                 options.coreMinimization = setUnsatCoreMinimization.getMinimizationLevel();
+            } else if (operation instanceof SetBitwidthOperation) {
+                SetBitwidthOperation setBitwidth = (SetBitwidthOperation) operation;
+                Command c = command;
+                command = new Command(c.pos, c.label, c.check, c.overall, setBitwidth.getBitwidth(), c.maxseq, c.expects, c.scope, c.additionalExactScopes, c.formula, c.parent);
             } else if (operation instanceof QuitOperation) {
                 break;
             } else {

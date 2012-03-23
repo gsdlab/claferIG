@@ -37,7 +37,8 @@ import System.FilePath
 data IGArgs = IGArgs {
     all :: Maybe Integer,
     saveDir :: Maybe FilePath,  
-    claferModelFile :: FilePath
+    claferModelFile :: FilePath,
+    bitwidth :: Maybe Integer
 } deriving (Show, Data, Typeable)
 
 
@@ -45,6 +46,7 @@ data IGArgs = IGArgs {
 claferIG = IGArgs {
     all             = def &= help "Saves all instances up to the provided scope or a counterexample.",
     saveDir         = def &= help "Specify the directory for storing saved files." &= typ "FILE",
+    bitwidth        = def &= help "Set the bitwidth for integers." &= typ "INTEGER",
     claferModelFile = def &= argPos 0 &= typ "FILE"
 } &= summary claferIGVersion
 
@@ -53,6 +55,10 @@ main =
     do
         args <- cmdArgs claferIG
         claferIG <- initClaferIG $ claferModelFile args
+        
+        case bitwidth args of
+            Just bitwidth' -> setBitwidth bitwidth' claferIG
+            Nothing        -> return ()
         
         case all args of
             Just scope ->

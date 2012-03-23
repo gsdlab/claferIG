@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module ClaferIG (ClaferIG(claferFile), Scope, Instance(..), Counterexample(..), claferIGVersion, getClaferModel, initClaferIG, getAlloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, setUnsatCoreMinimization, quit, reload) where
+module ClaferIG (ClaferIG(claferFile), Scope, Instance(..), Counterexample(..), claferIGVersion, getClaferModel, initClaferIG, getAlloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, setUnsatCoreMinimization, setBitwidth, quit, reload) where
 
 import qualified AlloyIGInterface as AlloyIG
 import ClaferModel
@@ -290,6 +290,13 @@ setUnsatCoreMinimization level ClaferIG{alloyIG = alloyIG} =
     do
         alloyIG' <- readIORef alloyIG
         AlloyIG.sendSetUnsatCoreMinimizationCommand level alloyIG'
+        
+        
+setBitwidth :: Integer -> ClaferIG -> IO ()
+setBitwidth bitwidth ClaferIG{alloyIG = alloyIG} =
+    do
+        alloyIG' <- readIORef alloyIG
+        AlloyIG.sendSetBitwidthCommand bitwidth alloyIG'
 
         
     
