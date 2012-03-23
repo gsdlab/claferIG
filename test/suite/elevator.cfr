@@ -1,0 +1,60 @@
+/*
+1. Elevator door is by default closed
+2. Door can't be opened unless an elevator button is pressed (if it is empty) or it reached the 
+level it wants (if it has a person inside)
+3. Door can't be closed again unless the maximum weight that the elevator can carry is not 
+exceeded
+4. Elevator can't move unless a button from inside is pressed.
+5. The elevator has to check current floor to decide whether to go up or down (Can't go up when 
+you are already on top floor, and can't go down if you are already on bottom floor)
+6. The elevator can only move up or down if a destination floor is given or a calling floor are 
+different from the current floor
+*/
+
+abstract Elevator
+    // static configuration parameters
+    maxAllowedLoad : int
+    topFloorNo : int
+    lowestFloorNo : int
+
+    // dynamic part
+    xor door
+        opened
+            [ no movement.up ]
+            [ no movement.down ]
+            [ destinationFloorNoButtonPressed || reachedRequiredLevel && currentLoad > 0 ]
+        closed // (1)
+            [ currentLoad < maxAllowedLoad ]
+    currentLoad : int
+        [ this > 0 ]
+    mux movement
+        up
+            [ currentFloor < topFloorNo ]
+            [ destinationFloorNoButtonPressed > currentFloor ]
+        down
+            [ currentFloor > lowestFloorNo ]
+            [ destinationFloorNoButtonPressed < currentFloor ]
+    destinationFloorNoButtonPressed : int ?		// has a value if the floor button was pressed from the inside
+    currentFloor : int
+    reachedRequiredLevel ?
+        [ currentFloor = destinationFloorNoButtonPressed ]
+
+E : Elevator
+    // static configuration parameters
+    [ maxAllowedLoad = 7
+       topFloorNo = 7
+      lowestFloorNo = -5 ]
+    //  dynamic part
+    [  currentLoad = 5
+       destinationFloorNoButtonPressed = 2
+       currentFloor = 4 ]
+//  [ no reachedRequiredLevel ] is inferred
+//  [ no opened ] is inferred
+//  [ closed ] is inferred
+//  both  up  and  down  are valid choices, say we assert
+//    [ up ]
+
+/*
+Given this single example, I can already see a flaw: "why is the elevator moving up"? 
+Since, the person has not requested a destination floor, this could only happen if somebody higher
+than the current floor has called the elevator. But this aspect is missing from the description */
