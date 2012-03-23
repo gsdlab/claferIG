@@ -34,6 +34,7 @@ ifeq ($(ONAME), cygwin)
         LIB := x86-windows/minisatprover*
     endif
 endif
+
 ifeq ($(UNAME), darwin)
 	ifeq ($(MNAME), i686)
         LIB := x86-mac/libminisatprover*
@@ -41,6 +42,9 @@ ifeq ($(UNAME), darwin)
 	ifeq ($(MNAME), x86_64)
         LIB := x86-mac/libminisatprover*
     endif
+    WGET_COMMAND := curl -O
+else
+    WGET_COMMAND := wget
 endif
 
 # Calling `make` should only build
@@ -78,7 +82,7 @@ build: alloyIG.jar
 alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	@if test ! -f "alloy4.jar"; then \
 		echo "[WARNING] Missing alloy4.jar. Downloading..."; \
-		wget http://alloy.mit.edu/alloy/downloads/alloy4.jar; \
+		$(WGET_COMMAND) http://alloy.mit.edu/alloy/downloads/alloy4.jar; \
 	fi
 	mkdir -p dist/javabuild
 	javac -cp "alloy4.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
