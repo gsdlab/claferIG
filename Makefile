@@ -1,3 +1,5 @@
+TOOL_DIR = tools
+
 UNAME := $(shell uname | tr "A-Z" "a-z")
 
 ifeq ($(UNAME), darwin)
@@ -53,8 +55,10 @@ all: alloyIG.jar lib build
 # Calling `make install to=<target directory>` should only install
 install:
 	mkdir -p $(to)
-	cp -R lib $(to)
-	cp alloy4.jar $(to)
+	mkdir -p $(to)/lib
+	mkdir -p $(to)/tools
+	cp lib/minisatprover* $(to)/lib
+	cp tools/alloy4.jar $(to)/tools
 	cp alloyIG.jar $(to)
 	cabal install --bindir=$(to)
 	cp README.md $(to)/claferIG-README.md
@@ -65,29 +69,27 @@ newVersion:
 	ghc -isrc src/dateVer.hs dist/build/autogen/Paths_claferIG.hs -outputdir dist/build --make -o dateVer
 	./dateVer > src/Version.hs
 
-lib:
-	@if test -z $(LIB); then \
-		echo "[WARNING] Did not find a minisat prover binary suitable for your system. You may need to build the binary yourself."; \
-	else \
-		unzip alloy4.jar $(LIB) -d lib; \
-		chmod +x lib/$(LIB); \
-		cp lib/$(LIB) lib; \
-	fi
-	
+
 # Build takes less time. For ease of development.
 build: alloyIG.jar
 	cabal configure
 	cabal build
 
 alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
-	@if test ! -f "alloy4.jar"; then \
-		echo "[WARNING] Missing alloy4.jar. Downloading..."; \
-		$(WGET_COMMAND) http://alloy.mit.edu/alloy/downloads/alloy4.jar; \
-	fi
+	$(MAKE) -C $(TOOL_DIR)
 	mkdir -p dist/javabuild
-	javac -cp "alloy4.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
+	javac -cp "tools/alloy4.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	jar cfm alloyIG.jar src/manifest -C dist/javabuild org/clafer/ig/ -C dist/javabuild edu
 
+lib:
+	@if test -z $(LIB); then \
+		echo "[WARNING] Did not find a minisat prover binary suitable for your system. You may need to build the binary yourself."; \
+	else \
+		unzip tools/alloy4.jar $(LIB) -d lib; \
+		chmod +x lib/$(LIB); \
+		cp lib/$(LIB) lib; \
+	fi
+	
 runTests:
     # Only test a subset of the suite. The other cases do not work yet.
 	./claferIG --all=4 -s dist/run test/suite/backquoted.cfr
