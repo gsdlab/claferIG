@@ -162,15 +162,20 @@ runCommandLine claferIG =
                 "'q'uit          - to quit the interactive session\n" ++
                 "'h'elp          - to display this menu options summary\n" ++
                 "'scope'         - to print out the values of the global scope and individual Clafer scopes\n" ++
+                "'setUnsatCoreMinimization' - to choose UnSAT core minimization strategy [fastest | medium | best]. Default: fastest\n" ++ 
                 "'claferModel'   - to print out the original Clafer model verbatim\n" ++
                 "'alloyModel'    - to print out the output of Clafer translator verbatim\n" ++
                 "'alloyInstance' - to print out the Alloy xml document of the most recent solution\n" ++
                 "'f'ind          - to print a Clafer with given name found in the most recent solution\n\n" ++
                 "Parameterized command usage:\n" ++
-                "'i' [enter]         - to increase for all clafers by 1\n" ++
-                "'i' <name> [enter]  - to increase for the clafer <name> by 1\n" ++
-                "'i' <name> <number> - to increase for the clafer <name> by <number>\n" ++
-                "'f' <name>          - to display a clafer <name>\n")
+                "'i [enter]'         - to increase for all clafers by 1\n" ++
+                "'i <name> [enter]'  - to increase for the clafer <name> by 1\n" ++
+                "'i <name> <number>' - to increase for the clafer <name> by <number>\n" ++
+                "'f <name>'          - to display a clafer <name>\n" ++
+                "'setUnsatCoreMinimization fastest' - fastest but the worst\n" ++ 
+                "'setUnsatCoreMinimization medium'\n" ++ 
+                "'setUnsatCoreMinimization best' - best but slowest even for modest size cores" 
+                )
                 
             nextLoop context
             
