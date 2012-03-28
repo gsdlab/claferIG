@@ -80,7 +80,7 @@ load :: String -> IO ([Constraint], String, Map String String, AlloyIG.AlloyIG)
 load claferFile =
     do
         alloyModel  <- callClaferTranslator ["-o", "-s", "-k", claferFile]
-        ir          <- callClaferTranslator ["-o", "-s", "-m", "xml", "-a", claferFile]
+        ir          <- callClaferTranslator ["-o", "-s", "-k", "-m", "xml", "-a", claferFile]
         
         let mappingFile = replaceExtension claferFile "map"
         
