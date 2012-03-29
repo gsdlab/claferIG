@@ -1,0 +1,79 @@
+// Smallest scope required: 5
+
+// Abstraction
+
+abstract LTS
+	state -> State *
+	alphabet -> Alphabet *
+	transition -> Transition *
+	
+abstract Alphabet
+
+abstract State
+	default ?
+
+abstract Transition
+	lts -> LTS
+	source -> State
+	[ this.source in this.lts.state ]
+	label -> Alphabet
+	[ this.label in this.lts.alphabet ]
+	target -> State
+	[ this.target in this.lts.state ]
+
+// Example LTS
+
+MaritalLife : LTS
+	[ this.state = alive, dead, neverMarried, married, divorced ]
+	[ this.alphabet = beBorn, getMarried, getDivorced, die ]
+	[ this.transition = birth, death, firstMarriage, divorce, subsequentMarriage ]
+
+beBorn : Alphabet
+getMarried : Alphabet
+getDivorced : Alphabet
+die : Alphabet
+
+alive : State
+	[ ! default ]
+
+dead : State
+	[ default ]
+
+neverMarried : State
+	[ default ] 
+
+married : State
+	[ ! default ]
+
+divorced : State
+	[ ! default ]
+
+birth : Transition
+	[ this.lts = MaritalLife
+	  this.source = dead
+	  this.label = beBorn
+	  this.target = alive ]
+
+death : Transition
+	[ this.lts = MaritalLife
+	  this.source = alive
+	  this.label = die
+	  this.target = dead ]
+
+firstMarriage : Transition
+	[ this.lts = MaritalLife
+	  this.source = neverMarried
+	  this.label = getMarried
+	  this.target = married ]
+
+divorce : Transition
+	[ this.lts = MaritalLife
+	  this.source = married
+	  this.label = getDivorced
+	  this.target = divorced ]
+
+subsequentMarriage : Transition
+	[ this.lts = MaritalLife
+	  this.source = divorced
+	  this.label = getMarried
+	  this.target = married ]
