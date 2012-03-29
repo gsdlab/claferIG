@@ -28,6 +28,7 @@ import Data.Map as Map hiding (filter, map)
 import Data.Maybe
 import Data.Set as Set hiding (filter, map)
 import Solution
+import Debug.Trace
 
 
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
@@ -40,7 +41,7 @@ c_name = i_name . c_id
 data Id = Id {i_name::String, i_ordinal::Int} deriving (Eq, Ord, Show)
 
 data FamilyTree = FamilyTree {roots::Set Node, descendants::Map Id [Node]} deriving Show
-data Node = ClaferNode  {n_id::Id, n_type::Int} | AliasNode {n_id::Id, n_alias::Id, n_type::Int} deriving (Eq, Ord, Show)
+data Node = ClaferNode  {n_id::Id, n_type::Int} | ValueNode {n_value::Id, n_type::Int} deriving (Eq, Ord, Show)
 
 instance Show ClaferModel where
     show (ClaferModel clafers) = concatMap show clafers
@@ -104,54 +105,6 @@ renameSolution (Solution sigs fields) =
             [] -> Nothing
             x  -> Just $ tail x
             
-{-
- - Assumes renameSolution has already been invoked.
- -
- - Top level alias
- - <sig label="c3_Met" ID="11">
- -   <atom label="c4_Alice$0"/>
- -   <atom label="c5_Bob$0"/>
- -   <type ID="5"/>
- - </sig>
- -
- - Non-top level alias
- - <field label="c3_Met" ID="9" parentID="5">
- -   <tuple> <atom label="c4_Alice$0"/> <atom label="c5_Bob$0"/> </tuple>
- -   <tuple> <atom label="c5_Bob$0"/> <atom label="c4_Alice$0"/> </tuple>
- -   <types> <type ID="5"/> <type ID="5"/> </types>
- - </field>
- - <sig label="c3_Met" ID="11">
- -   <atom label="c4_Alice$0"/>
- -   <atom label="c5_Bob$0"/>
- -   <type ID="5"/>
- - </sig>
- -
- - This function will remove the sig's atoms in the second case.
- - <field label="c3_Met" ID="9" parentID="5">
- -   <tuple> <atom label="c4_Alice$0"/> <atom label="c5_Bob$0"/> </tuple>
- -   <tuple> <atom label="c5_Bob$0"/> <atom label="c4_Alice$0"/> </tuple>
- -   <types> <type ID="5"/> <type ID="5"/> </types>
- - </field>
- - <sig label="c3_Met" ID="11">
- -   <type ID="5"/>
- - </sig>
- -}
-filterAliases (Solution sigs fields) =
-    Solution (map filterSig sigs) fields
-    where
-    filterSig sig
-        | s_label sig `Set.member` fieldLabels = sig{s_atoms = []}
-        | otherwise = sig
-    fieldLabels = Set.fromList $ map f_label fields
-        
-
-getAliases :: [Sig] -> Set String
-getAliases sigs =
-    Set.fromList $ map s_label (filter isAliasSig sigs)
-    where
-    isAliasSig AliasSig{} = True
-    isAliasSig _ = False
-
 
 buildFamilyTree :: Solution -> FamilyTree
 buildFamilyTree (Solution sigs fields) =
@@ -159,12 +112,8 @@ buildFamilyTree (Solution sigs fields) =
     where
     asNodes :: Sig -> [Node]
     asNodes Sig{s_id = id, s_atoms = atoms} = map (flip ClaferNode id) $ map (labelAsId . a_label) atoms
-    asNodes AliasSig{s_label = label, as_parentId = parentId, s_atoms=atoms} = map (uncurry newAliasNode) (zip [0,1..] atoms)
-        where
-        newAliasNode ordinal atom = AliasNode (Id label ordinal) (labelAsId $ a_label atom) parentId
     rootNodes :: [Node]
     rootNodes = concatMap asNodes sigs
-    aliases = getAliases sigs
     
     buildFields fields = foldr buildField (FamilyTree (Set.fromList rootNodes) Map.empty) fields
     buildField field tree = foldr (uncurry buildTuple) tree (zip [0,1..] $ f_tuples field)
@@ -188,7 +137,7 @@ buildFamilyTree (Solution sigs fields) =
         buildTuple ordinal Tuple{t_from = from, t_to = to, t_toType = toType} tree =
             addChild (labelAsId $ a_label from) (buildNode (labelAsId $ a_label to) toType) tree
             where
-            buildNode = if label `Set.member` aliases then AliasNode (Id label ordinal) else ClaferNode
+            buildNode = if label == "ref" then ValueNode else ClaferNode
             
     labelAsId :: String -> Id
     labelAsId label =
@@ -208,9 +157,8 @@ buildClaferModel :: Solution -> ClaferModel
 buildClaferModel solution =
     ClaferModel $ lefts $ map buildClafer (getRoots ftree)
     where
-    solution' = filterAliases $ renameSolution solution
-    sigMap = buildSigMap solution'
-    ftree = buildFamilyTree solution'
+    sigMap = buildSigMap solution
+    ftree = buildFamilyTree solution
     
     intType = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
     
@@ -220,13 +168,14 @@ buildClaferModel solution =
     
     buildClafer :: Node -> Either Clafer Value
     buildClafer (ClaferNode id ntype) =
+        Left $ Clafer id (singleton valueChildren) claferChildren
+        where
+        (claferChildren, valueChildren) = partitionEithers $ map buildClafer children
+        children = getChildren id ftree
+    buildClafer (ValueNode value ntype) =
         if ntype == intType then
             Right $ IntValue (read name)
         else
-            Left $ Clafer id (singleton valueChildren) claferChildren
+            Right $ AliasValue value
         where
-        name = i_name id
-        (claferChildren, valueChildren) = partitionEithers $ map buildClafer children
-        children = getChildren id ftree
-    buildClafer (AliasNode id alias ntype) =
-        Left $ Clafer id (Just $ AliasValue alias) []
+            name = i_name value

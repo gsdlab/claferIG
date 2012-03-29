@@ -24,24 +24,27 @@ module Solution (Solution(..), Sig(..), Atom(..), Field(..), Tuple(..), parseSol
 
 import Control.Monad
 import Data.Either
+import Data.List
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Maybe
 import Text.XML.HaXml
+import Text.XML.HaXml.Namespaces
 import Text.XML.HaXml.Posn
+
 
 
 data Solution = Solution{s_sigs::[Sig], s_fields::[Field]} deriving Show
 
 -- The univ sig does not have a parent
-data Sig =
-    Sig {s_label::String, s_id::Int, s_parentId::Maybe Int, s_atoms::[Atom]} |
-    AliasSig {s_label::String, s_id::Int, as_parentId::Int, s_atoms::[Atom]}
-    deriving Show
+data Sig = Sig {s_label::String, s_id::Int, s_parentId::Maybe Int, s_atoms::[Atom]} deriving Show
 
 data Atom = Atom {a_label::String} deriving Show
 
 data Field = Field {f_label::String, f_id::Int, f_parentId::Int, f_tuples::[Tuple]} deriving Show
 
 data Tuple = Tuple {t_from::Atom, t_fromType::Int, t_to::Atom, t_toType::Int} deriving Show
+
 
 
 parseSolution :: String -> Solution
@@ -59,18 +62,9 @@ parseSolution xml =
 
 parseSig :: Content i -> Sig
 parseSig content =
-    case (keep /> tag "type") content of
-        [] ->
-            Sig label id parentId atoms
-            where
-            parentId = read `liftM` findOptAttr "parentID" content
-        [x] ->
-            AliasSig label id parentId atoms
-            where
-            parentId = read $ findAttr "ID" x
-        _ ->
-            error $ "Unexpected multiple type in sig " ++ label
+    Sig label id parentId atoms
     where
+    parentId = read `liftM` findOptAttr "parentID" content
     label = findAttr "label" content
     id = read $ findAttr "ID" content
     atoms = map parseAtom $ (keep /> tag "atom") content
