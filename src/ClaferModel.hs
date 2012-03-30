@@ -26,7 +26,6 @@ import Data.List
 import Data.Either
 import Data.Map as Map hiding (filter, map)
 import Data.Maybe
-import Data.Set as Set hiding (filter, map)
 import Solution
 import Debug.Trace
 
@@ -40,7 +39,7 @@ c_name = i_name . c_id
 -- The tuple of name and ordinal must be globally unique
 data Id = Id {i_name::String, i_ordinal::Int} deriving (Eq, Ord, Show)
 
-data FamilyTree = FamilyTree {roots::Set Node, descendants::Map Id [Node]} deriving Show
+data FamilyTree = FamilyTree {roots::Map Id Node, descendants::Map Id [Node]} deriving Show
 data Node = ClaferNode  {n_id::Id, n_type::Int} | ValueNode {n_value::Id, n_type::Int} deriving (Eq, Ord, Show)
 
 instance Show ClaferModel where
@@ -71,7 +70,10 @@ addChild :: Id -> Node -> FamilyTree -> FamilyTree
 addChild parent child (FamilyTree roots descendants) =
     FamilyTree roots' descendants'
     where
-    roots' = Set.delete child roots
+    roots' =
+        case child of
+            ClaferNode{n_id = id} -> Map.delete id roots
+            _ -> roots
     descendants' = (insertWith (++) parent [child] descendants)
 
 
@@ -80,7 +82,7 @@ getChildren parent (FamilyTree _ descendants) = findWithDefault [] parent descen
 
 
 getRoots :: FamilyTree -> [Node]
-getRoots = Set.toList . roots
+getRoots = elems . roots
 
 
 -- Renames the items in the solution so they are easier to work with
@@ -112,10 +114,10 @@ buildFamilyTree (Solution sigs fields) =
     where
     asNodes :: Sig -> [Node]
     asNodes Sig{s_id = id, s_atoms = atoms} = map (flip ClaferNode id) $ map (labelAsId . a_label) atoms
-    rootNodes :: [Node]
-    rootNodes = concatMap asNodes sigs
+    rootNodes :: [(Id, Node)]
+    rootNodes = [(n_id rootNode, rootNode) | rootNode <- concatMap asNodes sigs]
     
-    buildFields fields = foldr buildField (FamilyTree (Set.fromList rootNodes) Map.empty) fields
+    buildFields fields = foldr buildField (FamilyTree (fromList rootNodes) Map.empty) fields
     buildField field tree = foldr (uncurry buildTuple) tree (zip [0,1..] $ f_tuples field)
         where
         label = f_label field
