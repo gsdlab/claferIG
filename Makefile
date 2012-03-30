@@ -17,7 +17,7 @@ ifeq ($(UNAME), linux)
     endif
 	ifeq ($(MNAME), x86_64)
         # amd64 is a nickname for x86_64
-        LIB := amd64/libminisatprover*
+        LIB := amd64-linux/libminisatprover*
     endif
 endif
 ifeq ($(UNAME), windows)
@@ -57,7 +57,7 @@ install:
 	mkdir -p $(to)
 	mkdir -p $(to)/lib
 	mkdir -p $(to)/tools
-	cp lib/minisatprover* $(to)/lib
+	cp lib/*minisatprover* $(to)/lib
 	cp tools/alloy4.jar $(to)/tools
 	cp alloyIG.jar $(to)
 	cabal install --bindir=$(to)
