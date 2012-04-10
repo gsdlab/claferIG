@@ -73,6 +73,7 @@ newVersion:
 # Build takes less time. For ease of development.
 build: alloyIG.jar
 	cabal configure
+	cabal install --only-dependencies
 	cabal build
 
 alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
