@@ -4,6 +4,8 @@
 abstract A
     b ?
 
+`A 
+
 C
     b  ?
     a -> A
