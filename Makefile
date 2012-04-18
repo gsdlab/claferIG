@@ -57,11 +57,11 @@ install:
 	mkdir -p $(to)
 	mkdir -p $(to)/lib
 	mkdir -p $(to)/tools
-	cp lib/*minisatprover* $(to)/lib
-	cp tools/alloy4.jar $(to)/tools
-	cp alloyIG.jar $(to)
+	cp -f lib/*minisatprover* $(to)/lib
+	cp -f tools/alloy4.jar $(to)/tools
+	cp -f alloyIG.jar $(to)
+	cp -f README.md $(to)/claferIG-README.md
 	cabal install --bindir=$(to)
-	cp README.md $(to)/claferIG-README.md
 
 
 # this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs 
@@ -72,8 +72,8 @@ newVersion:
 
 # Build takes less time. For ease of development.
 build: alloyIG.jar
-	cabal configure
 	cabal install --only-dependencies
+	cabal configure
 	cabal build
 
 alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
