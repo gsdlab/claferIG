@@ -22,6 +22,7 @@
 
 module ClaferIG (ClaferIG(claferFile), Scope, Instance(..), Counterexample(..), claferIGVersion, getClaferModel, initClaferIG, getAlloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, setUnsatCoreMinimization, setBitwidth, quit, reload) where
 
+import Language.Clafer
 import qualified AlloyIGInterface as AlloyIG
 import ClaferModel
 import Constraints
@@ -79,15 +80,10 @@ initClaferIG claferFile =
 load :: String -> IO ([Constraint], String, Map String String, AlloyIG.AlloyIG)
 load claferFile =
     do
-        alloyModel  <- callClaferTranslator ["-o", "-s", "-k", claferFile]
-        ir          <- callClaferTranslator ["-o", "-s", "-k", "-m", "xml", "-a", claferFile]
-        
-        let mappingFile = replaceExtension claferFile "map"
-        
-        mapping     <- strictReadFile mappingFile
         claferModel <- strictReadFile claferFile
         
-        removeFile mappingFile
+        (alloyModel, mapping) <- callClaferTranslator2 claferModel
+        ir <- callClaferTranslator3 claferModel
         
         let constraints = parseConstraints ir mapping
         
@@ -100,16 +96,19 @@ load claferFile =
         return (constraints, claferModel, claferToSigNameMap, alloyIG)
 
 
-callClaferTranslator :: [String] -> IO String    
-callClaferTranslator args =
-    do
-        execPath <- executableDirectory
-        claferProc <- pipeProcess (execPath ++ "clafer") args
-        claferOutput <- getContentsVerbatim claferProc
-        claferExit <- waitFor claferProc
-        when (claferExit /= ExitSuccess) (fail "clafer unexpectedly terminated")
-        return claferOutput
+callClaferTranslator2 :: String -> IO (String, String)
+callClaferTranslator2 code =
+    return (outputCode result, fromJust $ mappingToAlloy result)
+    where
+    args = defaultClaferArgs {keep_unused = Just True, no_stats = Just True}
+    result = generateM args $ compileM args $ addModuleFragment args code
                 
+callClaferTranslator3 :: String -> IO String
+callClaferTranslator3 code =
+    return $ outputCode result
+    where
+    args = defaultClaferArgs{mode = Just Xml, no_stats = Just True}
+    result = generateM args $ compileM args $ addModuleFragment args code
 
 strictReadFile :: FilePath -> IO String 
 strictReadFile filePath = 
