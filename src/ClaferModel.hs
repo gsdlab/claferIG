@@ -24,7 +24,7 @@ module ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), c_name, buil
 
 import Data.List 
 import Data.Either
-import Data.Map as Map hiding (filter, map)
+import Data.Map as Map hiding (filter, map, foldr)
 import Data.Maybe
 import Solution
 import Debug.Trace
