@@ -25,7 +25,7 @@ module Sugarer (sugarClaferModel) where
 import ClaferModel
 import Control.Monad
 import Data.List as List hiding (map)
-import Data.Map as Map hiding (map)
+import Data.Map as Map hiding (map, foldr, foldl)
 
 
 -- Sample: maps the id to the its simple name and the number of times its simple name appeared in the census before it
