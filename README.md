@@ -6,11 +6,11 @@ Clafer Instance Generator
 Dependencies
 ------------
 
-* [Clafer translator](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`) and Clafer IR (`.xml`) from Clafer models)
+* [Clafer compiler](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`))
 
 **Note**: Installing the Clafer translator will satisfy all the following dependencies:
 
-* [The Haskell Platform](http://hackage.haskell.org/platform/).
+* [The Haskell Platform](http://hackage.haskell.org/platform/) v.2012.2.0.0
 * [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) >= 5, 32bit
 * [Alloy4.1](http://alloy.mit.edu/alloy/download.html)
  * MiniSAT Proover (a SAT solver used by Alloy that can produce UnSAT Core, bundled with Alloy)
@@ -20,17 +20,27 @@ On Windows only
 
 * [Cygwin](http://www.cygwin.com/) with packages `make`, `wget`
 
-Building
-------------------
+Building & Installation
+-----------------------
 
-1. install the [Clafer translator](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
+### Important: Branches must correspond
+
+Clafer and ClaferIG are following the  *simultaneous release model*. 
+The branch `master` contains releases, whereas the branch `develop` contains code under development. 
+When building the tools, the branches should match:
+Releases `clafer/master` and `claferIG/master` are guaranteed to work well together.
+Development versions `clafer/develop` and `claferIG/develop` should work well together but this might not always be the case.
+
+### Building
+
+1. install the [Clafer compiler](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
+  * Tip: it is advised to install both tools into the same `<target directory>`
 2. in some `<source directory>`, execute `git clone git://github.com/gsdlab/claferIG.git`
 3. in `<source directory>/claferIG`, execute
   * `cabal update`
   * `make`
 
-Installation
-------------
+### Installation
 
 1. execute `make install to=<target directory>`
 2. add the `<target directory>` is on your command PATH
