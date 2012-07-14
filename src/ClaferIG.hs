@@ -40,7 +40,7 @@ import System.Exit
 import Version
 
 
-data ClaferIG = ClaferIG{claferFile::FilePath, constraints::IORef [Constraint], claferModel::IORef String, claferToSigNameMap::IORef (Map String String), alloyIG::IORef AlloyIG.AlloyIG}
+data ClaferIG = ClaferIG{claferFile::FilePath, bitwidth::Integer, constraints::IORef [Constraint], claferModel::IORef String, claferToSigNameMap::IORef (Map String String), alloyIG::IORef AlloyIG.AlloyIG}
 
 
 data Scope = Scope {name::String, sigName::String, claferIG::ClaferIG}
@@ -64,8 +64,8 @@ getClaferModel :: ClaferIG -> IO String
 getClaferModel ClaferIG{claferModel = claferModel} = readIORef claferModel
 
 
-initClaferIG :: FilePath -> IO ClaferIG
-initClaferIG claferFile = 
+initClaferIG :: FilePath -> Integer -> IO ClaferIG
+initClaferIG claferFile bitwidth = 
     do
         (constraints, claferModel, claferToSigNameMap, alloyIG) <- load claferFile
         
@@ -74,11 +74,14 @@ initClaferIG claferFile =
         claferToSigNameMapRef <- newIORef claferToSigNameMap
         alloyIGRef <- newIORef alloyIG
         
-        return $ ClaferIG claferFile constraintsRef claferModelRef claferToSigNameMapRef alloyIGRef
+        let claferIG = ClaferIG claferFile bitwidth constraintsRef claferModelRef claferToSigNameMapRef alloyIGRef
+        setBitwidth bitwidth claferIG
+        
+        return claferIG
         
 
 load :: String -> IO ([Constraint], String, Map String String, AlloyIG.AlloyIG)
-load claferFile =
+load claferFile  =
     do
         claferModel <- strictReadFile claferFile
         
@@ -89,7 +92,7 @@ load claferFile =
         
         alloyIG <- AlloyIG.initAlloyIG alloyModel
         AlloyIG.sendLoadCommand alloyModel alloyIG
-        
+
         sigs <- AlloyIG.getSigs alloyIG
         let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
         
@@ -266,7 +269,7 @@ nextImpl alloyIG constraints =
     
     
 reload :: ClaferIG -> IO ()
-reload claferIG@(ClaferIG claferFile constraints claferModel claferToSigNameMap alloyIG) =
+reload claferIG@(ClaferIG claferFile bitwidth constraints claferModel claferToSigNameMap alloyIG) =
     do
         globalScope <- getGlobalScope claferIG
         
@@ -278,7 +281,8 @@ reload claferIG@(ClaferIG claferFile constraints claferModel claferToSigNameMap 
         writeIORef claferModel claferModel'
         writeIORef claferToSigNameMap claferToSigNameMap'
         writeIORef alloyIG alloyIG'
-        
+      
+        setBitwidth bitwidth claferIG  
         setGlobalScope globalScope claferIG
         
         return ()
