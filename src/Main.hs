@@ -29,6 +29,8 @@ import Control.Monad
 import Data.Maybe
 import Data.IORef
 import Prelude hiding (all)
+import Solution
+import Sugarer
 import System.Console.CmdArgs
 import System.Directory
 import System.FilePath
@@ -38,6 +40,7 @@ data IGArgs = IGArgs {
     all :: Maybe Integer,
     saveDir :: Maybe FilePath,  
     claferModelFile :: FilePath,
+    alloySolution :: Bool,
     bitwidth :: Integer
 } deriving (Show, Data, Typeable)
 
@@ -48,6 +51,7 @@ claferIG = IGArgs {
     saveDir         = def &= help "Specify the directory for storing saved files." &= typ "FILE",
     -- Default bitwidth is 4.
     bitwidth        = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER",
+    alloySolution   = False &= help "Convert Alloy solution to a Clafer solution.",
     claferModelFile = def &= argPos 0 &= typ "FILE"
 } &= summary claferIGVersion
 
@@ -55,6 +59,14 @@ claferIG = IGArgs {
 main =
     do
         args <- cmdArgs claferIG
+        if (alloySolution args)
+          then
+            runAlloySolution args
+          else
+            runClaferIG args
+        
+runClaferIG args =
+    do
         claferIG <- initClaferIG (claferModelFile args) (bitwidth args)
         
         case all args of
@@ -72,7 +84,11 @@ main =
             Nothing    -> runCommandLine claferIG
             
         quit claferIG
-
+        
+runAlloySolution args =
+    do
+        content <- readFile $ claferModelFile args -- It's an Alloy XML file in this case
+        putStrLn $ show $ sugarClaferModel $ buildClaferModel $ parseSolution content
 
 savePath :: FilePath -> IORef Int -> IO FilePath
 savePath file counterRef =
