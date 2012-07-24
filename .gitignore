@@ -1,4 +1,10 @@
 dist
 lib
 tools
+.dist-buildwrapper
+.project
+*.exe
+*.lkshs
+*.lkshw
 *.jar
+*.dll
