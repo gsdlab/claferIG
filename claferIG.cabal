@@ -13,7 +13,8 @@ Build-type:          Simple
 Cabal-version:       >=1.8
 
 Executable claferIG
-    Extensions:          DeriveDataTypeable
-    Main-is:             Main.hs
-    Build-depends:       base >= 4 && < 5, clafer == 0.3, cmdargs, containers, directory, executable-path, filepath, haskeline, HaXml, mtl, parsec, process, transformers
-    Hs-Source-Dirs:      src  
+    build-tools:     ghc >= 7.4.1
+    Extensions:      DeriveDataTypeable
+    Main-is:         Main.hs
+    Build-depends:   base >= 4 && < 5, clafer == 0.3, cmdargs, containers, directory, executable-path, filepath, haskeline, HaXml, mtl, parsec, process, transformers
+    Hs-Source-Dirs:  src  
