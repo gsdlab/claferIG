@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
+
 {-
  Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
 
@@ -20,14 +22,17 @@
  SOFTWARE.
 -}
 
-module ClaferIG (ClaferIG(claferFile), Scope, Instance(..), Counterexample(..), claferIGVersion, getClaferModel, initClaferIG, getAlloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, setUnsatCoreMinimization, setBitwidth, quit, reload) where
+module ClaferIG (ClaferIGT, Scope, Instance(..), Counterexample(..), runClaferIGT, claferIGVersion, getClaferModel, getAlloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, setUnsatCoreMinimization, getClaferFile, getBitwidth, setBitwidth, quit, reload) where
 
 import Language.Clafer
+import Language.Clafer.Generator.Xml
 import qualified AlloyIGInterface as AlloyIG
 import ClaferModel
 import Constraints
+import Control.Applicative
 import Control.Monad
-import Data.IORef
+import Control.Monad.Error
+import Control.Monad.Trans.State.Strict
 import Data.List
 import Data.Map as Map hiding (map, null)
 import Data.Maybe
@@ -38,12 +43,36 @@ import System.Directory
 import System.FilePath
 import System.Exit
 import Version
+import System.Console.Haskeline.MonadException
 
 
-data ClaferIG = ClaferIG{claferFile::FilePath, bitwidth::Integer, constraints::IORef [Constraint], claferModel::IORef String, claferToSigNameMap::IORef (Map String String), alloyIG::IORef AlloyIG.AlloyIG}
+newtype ClaferIGT m a = ClaferIGT (ErrorT String (StateT ClaferIGEnv m) a)
+    deriving (Monad, MonadError String, MonadIO)
+
+deriving instance MonadException m => MonadException (ClaferIGT m)
+
+fetch :: Monad m => ClaferIGT m ClaferIGEnv
+fetch = ClaferIGT $ lift get
+
+fetches :: Monad m => (ClaferIGEnv -> a) -> ClaferIGT m a
+fetches = ClaferIGT . lift . gets
+
+set :: Monad m => ClaferIGEnv -> ClaferIGT m ()
+set = ClaferIGT . lift . put
+
+runClaferIGT :: MonadIO m => FilePath -> Integer -> ClaferIGT m a -> m (Either String ClaferIGEnv)
+runClaferIGT claferFile bitwidth run =
+    do
+        env <- liftIO $ load claferFile bitwidth
+        evalStateT (runErrorT $ unwrap $ run >> setBitwidth bitwidth >> fetch) env
+    where
+    unwrap (ClaferIGT c) = c
 
 
-data Scope = Scope {name::String, sigName::String, claferIG::ClaferIG}
+data ClaferIGEnv = ClaferIGEnv{claferFile::FilePath, bitwidth::Integer, constraints:: [Constraint], claferModel::String, claferToSigNameMap:: Map String String, alloyIG::AlloyIG.AlloyIG}
+
+
+data Scope = Scope {name::String, sigName::String}
 
 
 data Instance =
@@ -60,33 +89,16 @@ claferIGVersion =
     "ClaferIG " ++ version
     
 
-getClaferModel :: ClaferIG -> IO String
-getClaferModel ClaferIG{claferModel = claferModel} = readIORef claferModel
+getClaferModel :: Monad m => ClaferIGT m String
+getClaferModel = fetches claferModel
 
 
-initClaferIG :: FilePath -> Integer -> IO ClaferIG
-initClaferIG claferFile bitwidth = 
-    do
-        (constraints, claferModel, claferToSigNameMap, alloyIG) <- load claferFile
-        
-        constraintsRef <- newIORef constraints
-        claferModelRef <- newIORef claferModel
-        claferToSigNameMapRef <- newIORef claferToSigNameMap
-        alloyIGRef <- newIORef alloyIG
-        
-        let claferIG = ClaferIG claferFile bitwidth constraintsRef claferModelRef claferToSigNameMapRef alloyIGRef
-        setBitwidth bitwidth claferIG
-        
-        return claferIG
-        
-
-load :: String -> IO ([Constraint], String, Map String String, AlloyIG.AlloyIG)
-load claferFile  =
+load :: String -> Integer -> IO ClaferIGEnv
+load claferFile bitwidth  =
     do
         claferModel <- strictReadFile claferFile
         
-        (alloyModel, mapping) <- callClaferTranslator2 claferModel
-        ir <- callClaferTranslator3 claferModel
+        (ir, alloyModel, mapping) <- callClaferTranslator claferModel
         
         let constraints = parseConstraints ir mapping
         
@@ -96,23 +108,24 @@ load claferFile  =
         sigs <- AlloyIG.getSigs alloyIG
         let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
         
-        return (constraints, claferModel, claferToSigNameMap, alloyIG)
+        return $ ClaferIGEnv claferFile bitwidth constraints claferModel claferToSigNameMap alloyIG
 
 
-callClaferTranslator2 :: String -> IO (String, String)
-callClaferTranslator2 code =
-    return (outputCode result, fromJust $ mappingToAlloy result)
+callClaferTranslator :: String -> IO (String, String, String)
+callClaferTranslator code = do
+    k <- runClaferT args $ do
+        addModuleFragment code
+        parse
+        compile
+        result <- generate
+        return (genXmlModule $ outputIr result, outputCode result, fromJust $ mappingToAlloy result)
+    case k of
+        Left e -> error $ show e
+        Right r -> return r
     where
     args = defaultClaferArgs {keep_unused = Just True, no_stats = Just True}
-    result = generateM args $ compileM args $ addModuleFragment args code
-                
-callClaferTranslator3 :: String -> IO String
-callClaferTranslator3 code =
-    return $ outputCode result
-    where
-    args = defaultClaferArgs{mode = Just Xml, no_stats = Just True}
-    result = generateM args $ compileM args $ addModuleFragment args code
 
+                
 strictReadFile :: FilePath -> IO String 
 strictReadFile filePath = 
     do
@@ -122,72 +135,71 @@ strictReadFile filePath =
         return contents
 
 
-getAlloyModel :: ClaferIG -> IO String
-getAlloyModel ClaferIG{alloyIG = alloyIG} =
+getAlloyModel :: MonadIO m => ClaferIGT m String
+getAlloyModel =
     do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.getAlloyModel alloyIG'
+        alloyIG' <- fetches alloyIG
+        liftIO $ AlloyIG.getAlloyModel alloyIG'
 
 
-solve :: ClaferIG -> IO ()
-solve ClaferIG{alloyIG = alloyIG} =
+solve :: MonadIO m => ClaferIGT m ()
+solve =
     do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.sendResolveCommand alloyIG'
+        alloyIG' <- fetches alloyIG
+        liftIO $ AlloyIG.sendResolveCommand alloyIG'
 
  
-getClafers :: ClaferIG -> IO [String]
-getClafers ClaferIG{alloyIG = alloyIG} =
+getClafers :: MonadIO m => ClaferIGT m [String]
+getClafers =
     do
-        alloyIG' <- readIORef alloyIG
-        sigs <- AlloyIG.getSigs alloyIG'
+        alloyIG' <- fetches alloyIG
+        sigs <- liftIO $ AlloyIG.getSigs alloyIG'
         return $ map sigToClaferName sigs
 
 
-getGlobalScope :: ClaferIG -> IO Integer
-getGlobalScope ClaferIG{alloyIG = alloyIG} =
+getGlobalScope :: MonadIO m => ClaferIGT m Integer
+getGlobalScope =
     do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.getGlobalScope alloyIG'
+        alloyIG' <- fetches alloyIG
+        liftIO $ AlloyIG.getGlobalScope alloyIG'
 
 
-setGlobalScope :: Integer -> ClaferIG -> IO ()
-setGlobalScope scope ClaferIG{alloyIG = alloyIG} =
+setGlobalScope :: MonadIO m => Integer -> ClaferIGT m ()
+setGlobalScope scope =
     do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.sendSetGlobalScopeCommand scope alloyIG'
+        alloyIG' <- fetches alloyIG
+        liftIO $ AlloyIG.sendSetGlobalScopeCommand scope alloyIG'
 
 
-getScopes :: ClaferIG -> IO [Scope]
-getScopes claferIG@ClaferIG{alloyIG = alloyIG} = 
+getScopes :: MonadIO m => ClaferIGT m [Scope]
+getScopes = 
     do
-        alloyIG' <- readIORef alloyIG
-        scopes <- AlloyIG.getScopes alloyIG'
-        return $ [Scope (sigToClaferName sig) sig claferIG | (sig, scope) <- scopes]
+        alloyIG' <- fetches alloyIG
+        scopes <- liftIO $ AlloyIG.getScopes alloyIG'
+        return $ [Scope (sigToClaferName sig) sig | (sig, scope) <- scopes]
         
         
-getScope :: String -> ClaferIG -> IO (Maybe Scope)
-getScope name claferIG@ClaferIG{claferToSigNameMap = claferToSigNameMap} =
+getScope :: MonadIO m => String -> ClaferIGT m Scope
+getScope name =
     do
-        claferToSigNameMap' <- readIORef claferToSigNameMap
-        return $
-            do
-                sigName <- name `Map.lookup` claferToSigNameMap'
-                return $Scope name sigName claferIG
+        claferToSigNameMap' <- fetches claferToSigNameMap
+        case name `Map.lookup` claferToSigNameMap' of
+            Just sigName -> return $ Scope name sigName
+            Nothing      -> throwError $ "Unknown clafer " ++ name
         
 
 nameOfScope :: Scope -> String
 nameOfScope = name
 
 
-valueOfScope :: Scope -> IO Integer
-valueOfScope Scope{sigName = sigName, claferIG = ClaferIG{alloyIG = alloyIG}} =
+valueOfScope :: MonadIO m => Scope -> ClaferIGT m Integer
+valueOfScope Scope{sigName} =
     do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.getScope sigName alloyIG'
+        alloyIG' <- fetches alloyIG
+        liftIO $ AlloyIG.getScope sigName alloyIG'
 
 
-increaseScope :: Integer -> Scope -> IO (Maybe String)
+increaseScope :: MonadIO m => Integer -> Scope -> ClaferIGT m ()
 increaseScope increment scope =
     do
         value <- valueOfScope scope
@@ -195,20 +207,22 @@ increaseScope increment scope =
         setScope value' scope
     
 
-setScope :: Integer -> Scope -> IO (Maybe String)
-setScope scope Scope{sigName = sigName, claferIG = ClaferIG{alloyIG = alloyIG}} =
+setScope :: MonadIO m => Integer -> Scope -> ClaferIGT m ()
+setScope scope Scope{name, sigName} =
     do
-        alloyIG' <- readIORef alloyIG
-        subset <- AlloyIG.sendSetScopeCommand sigName scope alloyIG'
-        return $ sigToClaferName `liftM` subset
+        alloyIG' <- fetches alloyIG
+        subset <- liftIO $ AlloyIG.sendSetScopeCommand sigName scope alloyIG'
+        case sigToClaferName <$> subset of
+            Just _  -> return ()
+            Nothing -> throwError $ "Unknown clafer " ++ name
 
 
-next :: ClaferIG -> IO Instance
-next ClaferIG{alloyIG = alloyIG, constraints = constraints} =
+next :: MonadIO m => ClaferIGT m Instance
+next =
     do
-        alloyIG' <- readIORef alloyIG
-        constraints' <- readIORef constraints
-        nextImpl alloyIG' constraints'
+        alloyIG' <- fetches alloyIG
+        constraints' <- fetches constraints
+        liftIO $ nextImpl alloyIG' constraints'
 
 nextImpl alloyIG constraints = 
     do
@@ -268,46 +282,52 @@ nextImpl alloyIG constraints =
     xmlToModel xml = sugarClaferModel $ buildClaferModel $ parseSolution xml
     
     
-reload :: ClaferIG -> IO ()
-reload claferIG@(ClaferIG claferFile bitwidth constraints claferModel claferToSigNameMap alloyIG) =
+reload :: MonadIO m => ClaferIGT m ()
+reload  =
     do
-        globalScope <- getGlobalScope claferIG
+        globalScope <- getGlobalScope
         
-        quit claferIG
+        quit
         
-        (constraints', claferModel', claferToSigNameMap', alloyIG') <- load claferFile
-        
-        writeIORef constraints constraints'
-        writeIORef claferModel claferModel'
-        writeIORef claferToSigNameMap claferToSigNameMap'
-        writeIORef alloyIG alloyIG'
+        claferFile' <- fetches claferFile
+        bitwidth'   <- fetches bitwidth
+        env <- liftIO $ load claferFile' bitwidth'
+        set env
       
-        setBitwidth bitwidth claferIG  
-        setGlobalScope globalScope claferIG
+        setBitwidth $ bitwidth env
+        setGlobalScope globalScope
         
         return ()
         
         
-setUnsatCoreMinimization :: Integer -> ClaferIG -> IO ()
-setUnsatCoreMinimization level ClaferIG{alloyIG = alloyIG} =
+setUnsatCoreMinimization :: MonadIO m => Integer -> ClaferIGT m ()
+setUnsatCoreMinimization level =
     do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.sendSetUnsatCoreMinimizationCommand level alloyIG'
-        
-        
-setBitwidth :: Integer -> ClaferIG -> IO ()
-setBitwidth bitwidth ClaferIG{alloyIG = alloyIG} =
+        alloyIG' <- fetches alloyIG
+        liftIO $ AlloyIG.sendSetUnsatCoreMinimizationCommand level alloyIG'
+
+
+getClaferFile :: Monad m => ClaferIGT m FilePath
+getClaferFile = fetches claferFile
+
+
+getBitwidth :: Monad m => ClaferIGT m Integer
+getBitwidth = fetches bitwidth
+
+
+setBitwidth :: MonadIO m => Integer -> ClaferIGT m ()
+setBitwidth bitwidth =
     do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.sendSetBitwidthCommand bitwidth alloyIG'
+        alloyIG' <- fetches alloyIG
+        liftIO $ AlloyIG.sendSetBitwidthCommand bitwidth alloyIG'
 
         
     
-quit :: ClaferIG -> IO ()
-quit ClaferIG{alloyIG = alloyIG} =
+quit :: MonadIO m => ClaferIGT m ()
+quit =
     do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.sendQuitCommand alloyIG'
+        alloyIG' <- fetches alloyIG
+        liftIO $ AlloyIG.sendQuitCommand alloyIG'
     
     
 sigToClaferName :: String -> String

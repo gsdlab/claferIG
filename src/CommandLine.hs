@@ -44,15 +44,15 @@ data Context = Context {currentAlloyInstance::Maybe String, saved::[ClaferModel]
 
 
 
-runCommandLine :: ClaferIG -> IO ()
-runCommandLine claferIG =
+runCommandLine :: ClaferIGT IO ()
+runCommandLine =
     do
-        solve claferIG
+        solve
         
-        clafers <- getClafers claferIG
+        clafers <- getClafers
 
-        clafersRef <- newIORef clafers
-        claferInstancesRef <- newIORef []
+        clafersRef <- liftIO $ newIORef clafers
+        claferInstancesRef <- liftIO $ newIORef []
 
         let autoCompleteContext = AutoCompleteContext clafersRef claferInstancesRef
         runInputT Settings {
@@ -61,16 +61,16 @@ runCommandLine claferIG =
             autoAddHistory = True
         } $ loop Next (Context Nothing [] [] autoCompleteContext)
     where 
-    loop :: Command -> Context -> InputT IO ()
+    loop :: Command -> Context -> InputT (ClaferIGT IO) ()
     
     loop Quit _ = return ()
     
     loop Next context =
         do
-            solution <- lift $ next claferIG
+            solution <- lift next
             case solution of
                 Instance claferModel xml -> do
-                    lift $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse claferModel)
+                    liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse claferModel)
                     
                     outputStrLn $ show claferModel
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
@@ -186,46 +186,38 @@ runCommandLine claferIG =
 
     loop Reload context =
         do
-            lift $ reload claferIG
-            lift $ solve claferIG
+            lift $ reload
+            lift $ solve
             nextLoop context
 
     loop (IncreaseGlobalScope i) context =
         do
-            globalScope <- lift $ getGlobalScope claferIG
+            globalScope <- lift getGlobalScope
             let globalScope' = globalScope + i
-            lift $ setGlobalScope globalScope' claferIG
+            lift $ setGlobalScope globalScope'
             
-            scopes <- lift $ getScopes claferIG
+            scopes <- lift getScopes
             lift $ mapM (increaseScope i) scopes
-            lift $ solve claferIG
+            lift solve
             
             outputStrLn ("Global scope increased to " ++ show globalScope')
             nextLoop context
             
     loop (IncreaseScope name i) context =
         do
-            scope <- lift $ getScope name claferIG
-            case scope of
-                Just scope' ->
-                    do
-                        error <- lift $ increaseScope i scope'
-                        case error of
-                            Just subset ->
-                                outputStrLn $ "Cannot increase scope of the reference Clafer \"" ++ name ++ "\". Try increasing the scope of its refered Clafer \"" ++ subset ++ "\"."
-                            Nothing ->
-                                do
-                                    scopeValue <- lift $ valueOfScope scope'
-                                    lift $ solve claferIG
-                                    outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scopeValue)
-                Nothing -> outputStrLn ("Unknown clafer " ++ name)
+            scope <- lift $ getScope name
+            do
+                lift $ increaseScope i scope
+                scopeValue <- lift $ valueOfScope scope
+                lift $ solve
+                outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scopeValue)
             nextLoop context
             
     loop ShowScope context =
         do
-            globalScope <- lift $ getGlobalScope claferIG
+            globalScope <- lift getGlobalScope
             outputStrLn $ "Global scope = " ++ show globalScope
-            scopes <- lift $ getScopes claferIG
+            scopes <- lift getScopes
             mapM_ printScope scopes
             nextLoop context
             
@@ -249,14 +241,14 @@ runCommandLine claferIG =
 
     loop ShowClaferModel context =
         do
-            claferModel <- lift $ getClaferModel claferIG
+            claferModel <- lift getClaferModel
             outputStrLn claferModel
             nextLoop context
             
             
     loop ShowAlloyModel context =
         do
-            alloyModel <- lift $ getAlloyModel claferIG
+            alloyModel <- lift getAlloyModel
             outputStrLn alloyModel
             nextLoop context
 
@@ -274,7 +266,7 @@ runCommandLine claferIG =
                         Fastest -> 2
                         Medium  -> 1
                         Best    -> 0
-            lift $ setUnsatCoreMinimization level' claferIG >> solve claferIG
+            lift $ setUnsatCoreMinimization level' >> solve
             
             nextLoop context
 
@@ -288,14 +280,15 @@ runCommandLine claferIG =
                         Left error    -> outputStrLn (show error) >> nextLoop context
                         Right command -> loop command context
     
-    save :: [ClaferModel] -> Integer -> IO ()
+    save :: MonadIO m => [ClaferModel] -> Integer -> ClaferIGT m ()
     save [] _ = return ()
     save (c:cs) counter =
         do
-            writeFile saveName (show c)
-            putStrLn $ "Saved to " ++ saveName
+            claferFile <- getClaferFile
+            let saveName = claferFile ++ "." ++ (show counter) ++ ".data"
+            liftIO $ writeFile saveName (show c)
+            liftIO $ putStrLn $ "Saved to " ++ saveName
             save cs (counter + 1)
-        where saveName = (claferFile claferIG) ++ "." ++ (show counter) ++ ".data"
     
 
 
