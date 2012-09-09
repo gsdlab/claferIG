@@ -64,10 +64,21 @@ main =
     do
         args <- cmdArgs claferIG
         if (alloySolution args)
-          then
-            runAlloySolution args
-          else
-            either putStrLn (void . return) =<< runClaferIG args
+            then
+                runAlloySolution args
+            else
+                tryClaferIG args
+    where
+    tryClaferIG args =
+        do
+            try <- runClaferIG args
+            case try of
+                Right r -> return r
+                Left l  -> do
+                    mapM putStrLn $ printError l
+                    putStrLn "Press enter to retry."
+                    void getLine
+                    tryClaferIG args
         
 runClaferIG args =
     runClaferIGT (claferModelFile args) (bitwidth args) $ do

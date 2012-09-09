@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns #-}
+
 {-
  Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
 
@@ -20,13 +22,16 @@
  SOFTWARE.
 -}
 
-module CommandLine (claferIGVersion, runCommandLine) where
+module CommandLine (claferIGVersion, runCommandLine, printError) where
 
+
+import Language.ClaferT
 import ClaferIG
 import ClaferModel
 import CommandLineParser
 import Constraints
 import Control.Monad
+import Control.Monad.Error
 import Control.Monad.Trans
 import Data.Char
 import Data.IORef
@@ -77,6 +82,7 @@ runCommandLine =
                 UnsatCore core counterexample -> do
                     outputStrLn "No more instances found. Try increasing scope to get more instances."
                     outputStrLn "The following set of constraints cannot be satisfied in the current scope."
+                    outputStrLn "(Hint: use the setUnsatCoreMinimization command to minimize the set of constraints below)"
                     printConstraints core
                     case counterexample of
                         Just (Counterexample removed claferModel xml) -> do
@@ -205,12 +211,13 @@ runCommandLine =
             
     loop (IncreaseScope name i) context =
         do
-            scope <- lift $ getScope name
-            do
-                lift $ increaseScope i scope
-                scopeValue <- lift $ valueOfScope scope
-                lift $ solve
-                outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scopeValue)
+            try $ do
+                scope <- ErrorT $ lift $ getScope name
+                ErrorT $ lift $ increaseScope i scope
+                scopeValue <- lift $ lift $ valueOfScope scope
+                lift $ lift $ solve
+                lift $ outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scopeValue)
+                
             nextLoop context
             
     loop ShowScope context =
@@ -289,8 +296,10 @@ runCommandLine =
             liftIO $ writeFile saveName (show c)
             liftIO $ putStrLn $ "Saved to " ++ saveName
             save cs (counter + 1)
-    
 
+try :: MonadIO m => ErrorT String (InputT m) a -> InputT m ()
+try e = either outputStrLn (void . return) =<< runErrorT e
+        
 
 -- i Ali|ce
 --     If the cursor is at | then not open. The "ce" prevents autocomplete.
@@ -353,3 +362,15 @@ autoCompleteDetect error
     messages = errorMessages error
     unexpectedMessages = mapMaybe unexpectedMessage messages
     expectedMessages   = mapMaybe expectedMessage messages
+    
+
+printError :: ClaferErrs -> [String]    
+printError (ClaferErrs errs) =
+    map printError errs
+    where
+    printError (ParseErr ErrPos{modelPos = Pos l c} msg) =
+        "Parse error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
+    printError (SemanticErr ErrPos{modelPos = Pos l c} msg) =
+        "Error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
+    printError (ClaferErr msg) =
+        "Error:\n    " ++ msg
