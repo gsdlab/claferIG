@@ -192,7 +192,7 @@ runCommandLine =
 
     loop Reload context =
         do
-            lift $ reload
+            runErrorT $ ErrorT (lift reload) `catchError` (lift . mapM_ outputStrLn . printError)
             lift $ solve
             nextLoop context
 
