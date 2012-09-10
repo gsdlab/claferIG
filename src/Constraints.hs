@@ -61,10 +61,10 @@ instance Show ClaferInfo where
     show (ClaferInfo uniqueId cardinality) = uniqueId ++ " " ++ show cardinality
 
 
-data ConstraintInfo = ConstraintInfo {pId::String, syntax::String}
+data ConstraintInfo = ConstraintInfo {pId::String, pos::Span, syntax::String}
 
 instance Show ConstraintInfo where
-    show ConstraintInfo{syntax = syntax} = syntax
+    show ConstraintInfo{pos = Span (Pos l c) _, syntax} = syntax ++ " (line " ++ show l ++ ", column " ++ show c ++ ")"
     
 
 
@@ -98,7 +98,7 @@ parseConstraints claferModel imodule mapping =
     clafers = mDecls imodule >>= subclafers
     pexps = (mapMaybe constraint $ mDecls imodule ++ concatMap elements clafers) >>= subexpressions
     convert span IrPExp{pUid} =
-        Just $ UserConstraint span $ ConstraintInfo pUid $ extract $ inPos $ findPExp pUid
+        Just $ UserConstraint span $ ConstraintInfo pUid (inPos $ findPExp pUid) $ extract $ inPos $ findPExp pUid
     convert span LowerCard{pUid, isGroup = False} =
         Just $ LowerCardinalityConstraint span $ claferInfo pUid 
     convert span UpperCard{pUid, isGroup = False} =
