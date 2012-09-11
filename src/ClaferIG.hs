@@ -125,10 +125,11 @@ load claferFile bitwidth  =
             parse
             compile
             result <- generate
-            return (outputIr result, outputCode result, mappingToAlloy result)
+            return (fst3 $ fromJust $ cIr $ claferEnv result, outputCode result, mappingToAlloy result)
     args = defaultClaferArgs {keep_unused = Just True, no_stats = Just True}
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
+    fst3 (a, _, _) = a
 
                 
 strictReadFile :: FilePath -> IO String 
