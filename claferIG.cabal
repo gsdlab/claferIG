@@ -29,4 +29,4 @@ Executable claferIG
                      parsec, 
                      process, 
                      transformers
-    Hs-Source-Dirs:  src  
+    Hs-Source-Dirs:  src
