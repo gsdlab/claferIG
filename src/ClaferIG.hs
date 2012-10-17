@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
+
 {-
  Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
 
@@ -20,14 +22,23 @@
  SOFTWARE.
 -}
 
-module ClaferIG (ClaferIG(claferFile), Scope, Instance(..), Counterexample(..), claferIGVersion, getClaferModel, initClaferIG, getAlloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, setUnsatCoreMinimization, setBitwidth, quit, reload) where
+module ClaferIG (ClaferIGT, Scope, Instance(..), Counterexample(..), runClaferIGT, claferIGVersion, getClaferModel, getAlloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, setUnsatCoreMinimization, getClaferFile, getBitwidth, setBitwidth, quit, reload) where
 
+import Debug.Trace
 import Language.Clafer
+import Language.ClaferT
+import Language.Clafer.Front.Absclafer (Span(..))
+import Language.Clafer.Generator.Xml
+import AlloyIGInterface (AlloyIGT)
 import qualified AlloyIGInterface as AlloyIG
 import ClaferModel
 import Constraints
+import Control.Applicative
 import Control.Monad
-import Data.IORef
+import Control.Monad.Error
+import Control.Monad.IO.Class
+import Control.Monad.Trans
+import Control.Monad.Trans.State.Strict
 import Data.List
 import Data.Map as Map hiding (map, null)
 import Data.Maybe
@@ -38,12 +49,39 @@ import System.Directory
 import System.FilePath
 import System.Exit
 import Version
+import System.Console.Haskeline.MonadException
 
 
-data ClaferIG = ClaferIG{claferFile::FilePath, bitwidth::Integer, constraints::IORef [Constraint], claferModel::IORef String, claferToSigNameMap::IORef (Map String String), alloyIG::IORef AlloyIG.AlloyIG}
+newtype ClaferIGT m a = ClaferIGT (StateT ClaferIGEnv (AlloyIGT m) a)
+    deriving (Applicative, Functor, Monad, MonadIO)
+
+deriving instance MonadException m => MonadException (ClaferIGT m)
+
+instance MonadTrans ClaferIGT where
+    lift = ClaferIGT . lift . lift
+
+fetch :: Monad m => ClaferIGT m ClaferIGEnv
+fetch = ClaferIGT get
+
+fetches :: Monad m => (ClaferIGEnv -> a) -> ClaferIGT m a
+fetches = ClaferIGT . gets
+
+set :: Monad m => ClaferIGEnv -> ClaferIGT m ()
+set = ClaferIGT . put
+
+runClaferIGT :: MonadIO m => FilePath -> Integer -> ClaferIGT m a -> m (Either ClaferErrs a)
+runClaferIGT claferFile bitwidth run =
+    AlloyIG.runAlloyIGT $ runErrorT $ do
+        env <- (ErrorT $ load claferFile bitwidth) `catchError` (\x -> lift AlloyIG.sendQuitCommand >> throwError x)
+        lift $ evalStateT (unwrap run) env
+    where
+    unwrap (ClaferIGT c) = c
 
 
-data Scope = Scope {name::String, sigName::String, claferIG::ClaferIG}
+data ClaferIGEnv = ClaferIGEnv{claferFile::FilePath, bitwidth::Integer, constraints:: [Constraint], claferModel::String, claferToSigNameMap:: Map String String}
+
+
+data Scope = Scope {name::String, sigName::String}
 
 
 data Instance =
@@ -60,59 +98,40 @@ claferIGVersion =
     "ClaferIG " ++ version
     
 
-getClaferModel :: ClaferIG -> IO String
-getClaferModel ClaferIG{claferModel = claferModel} = readIORef claferModel
+getClaferModel :: Monad m => ClaferIGT m String
+getClaferModel = fetches claferModel
 
 
-initClaferIG :: FilePath -> Integer -> IO ClaferIG
-initClaferIG claferFile bitwidth = 
-    do
-        (constraints, claferModel, claferToSigNameMap, alloyIG) <- load claferFile
+load :: MonadIO m => String -> Integer -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
+load claferFile bitwidth  =
+    runErrorT $ do
+        claferModel <- liftIO $ strictReadFile claferFile
         
-        constraintsRef <- newIORef constraints
-        claferModelRef <- newIORef claferModel
-        claferToSigNameMapRef <- newIORef claferToSigNameMap
-        alloyIGRef <- newIORef alloyIG
+        (ir, alloyModel, mapping) <- ErrorT $ return $ callClaferTranslator claferModel
         
-        let claferIG = ClaferIG claferFile bitwidth constraintsRef claferModelRef claferToSigNameMapRef alloyIGRef
-        setBitwidth bitwidth claferIG
+        let constraints = parseConstraints claferModel ir mapping
         
-        return claferIG
-        
+        lift $ AlloyIG.sendLoadCommand alloyModel
+        lift $ AlloyIG.sendSetBitwidthCommand bitwidth
 
-load :: String -> IO ([Constraint], String, Map String String, AlloyIG.AlloyIG)
-load claferFile  =
-    do
-        claferModel <- strictReadFile claferFile
-        
-        (alloyModel, mapping) <- callClaferTranslator2 claferModel
-        ir <- callClaferTranslator3 claferModel
-        
-        let constraints = parseConstraints ir mapping
-        
-        alloyIG <- AlloyIG.initAlloyIG alloyModel
-        AlloyIG.sendLoadCommand alloyModel alloyIG
-
-        sigs <- AlloyIG.getSigs alloyIG
+        sigs <- lift $ AlloyIG.getSigs
         let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
         
-        return (constraints, claferModel, claferToSigNameMap, alloyIG)
-
-
-callClaferTranslator2 :: String -> IO (String, String)
-callClaferTranslator2 code =
-    return (outputCode result, fromJust $ mappingToAlloy result)
+        return $ ClaferIGEnv claferFile bitwidth constraints claferModel claferToSigNameMap
     where
+    callClaferTranslator code =
+        mapLeft ClaferErrs $ runClafer args $ do
+            addModuleFragment code
+            parse
+            compile
+            result <- generate
+            return (fst3 $ fromJust $ cIr $ claferEnv result, outputCode result, mappingToAlloy result)
     args = defaultClaferArgs {keep_unused = Just True, no_stats = Just True}
-    result = generateM args $ compileM args $ addModuleFragment args code
-                
-callClaferTranslator3 :: String -> IO String
-callClaferTranslator3 code =
-    return $ outputCode result
-    where
-    args = defaultClaferArgs{mode = Just Xml, no_stats = Just True}
-    result = generateM args $ compileM args $ addModuleFragment args code
+    mapLeft f (Left l) = Left $ f l
+    mapLeft _ (Right r) = Right r
+    fst3 (a, _, _) = a
 
+                
 strictReadFile :: FilePath -> IO String 
 strictReadFile filePath = 
     do
@@ -122,72 +141,54 @@ strictReadFile filePath =
         return contents
 
 
-getAlloyModel :: ClaferIG -> IO String
-getAlloyModel ClaferIG{alloyIG = alloyIG} =
-    do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.getAlloyModel alloyIG'
+getAlloyModel :: MonadIO m => ClaferIGT m String
+getAlloyModel = ClaferIGT $ lift AlloyIG.getAlloyModel
 
 
-solve :: ClaferIG -> IO ()
-solve ClaferIG{alloyIG = alloyIG} =
-    do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.sendResolveCommand alloyIG'
+solve :: MonadIO m => ClaferIGT m ()
+solve = ClaferIGT $ lift AlloyIG.sendResolveCommand
 
  
-getClafers :: ClaferIG -> IO [String]
-getClafers ClaferIG{alloyIG = alloyIG} =
+getClafers :: MonadIO m => ClaferIGT m [String]
+getClafers =
     do
-        alloyIG' <- readIORef alloyIG
-        sigs <- AlloyIG.getSigs alloyIG'
+        sigs <- ClaferIGT $ lift AlloyIG.getSigs
         return $ map sigToClaferName sigs
 
 
-getGlobalScope :: ClaferIG -> IO Integer
-getGlobalScope ClaferIG{alloyIG = alloyIG} =
+getGlobalScope :: MonadIO m => ClaferIGT m Integer
+getGlobalScope = ClaferIGT $ lift AlloyIG.getGlobalScope
+
+
+setGlobalScope :: MonadIO m => Integer -> ClaferIGT m ()
+setGlobalScope scope = ClaferIGT $ lift $ AlloyIG.sendSetGlobalScopeCommand scope
+
+
+getScopes :: MonadIO m => ClaferIGT m [Scope]
+getScopes = 
     do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.getGlobalScope alloyIG'
-
-
-setGlobalScope :: Integer -> ClaferIG -> IO ()
-setGlobalScope scope ClaferIG{alloyIG = alloyIG} =
-    do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.sendSetGlobalScopeCommand scope alloyIG'
-
-
-getScopes :: ClaferIG -> IO [Scope]
-getScopes claferIG@ClaferIG{alloyIG = alloyIG} = 
-    do
-        alloyIG' <- readIORef alloyIG
-        scopes <- AlloyIG.getScopes alloyIG'
-        return $ [Scope (sigToClaferName sig) sig claferIG | (sig, scope) <- scopes]
+        scopes <- ClaferIGT $ lift AlloyIG.getScopes
+        return $ [Scope (sigToClaferName sig) sig | (sig, scope) <- scopes]
         
         
-getScope :: String -> ClaferIG -> IO (Maybe Scope)
-getScope name claferIG@ClaferIG{claferToSigNameMap = claferToSigNameMap} =
+getScope :: MonadIO m => String -> ClaferIGT m (Either String Scope)
+getScope name =
     do
-        claferToSigNameMap' <- readIORef claferToSigNameMap
-        return $
-            do
-                sigName <- name `Map.lookup` claferToSigNameMap'
-                return $Scope name sigName claferIG
+        claferToSigNameMap' <- fetches claferToSigNameMap
+        runErrorT $ case name `Map.lookup` claferToSigNameMap' of
+            Just sigName -> return $ Scope name sigName
+            Nothing      -> throwError $ "Unknown clafer " ++ name
         
 
 nameOfScope :: Scope -> String
 nameOfScope = name
 
 
-valueOfScope :: Scope -> IO Integer
-valueOfScope Scope{sigName = sigName, claferIG = ClaferIG{alloyIG = alloyIG}} =
-    do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.getScope sigName alloyIG'
+valueOfScope :: MonadIO m => Scope -> ClaferIGT m Integer
+valueOfScope Scope{sigName} = ClaferIGT $ lift $ AlloyIG.getScope sigName
 
 
-increaseScope :: Integer -> Scope -> IO (Maybe String)
+increaseScope :: MonadIO m => Integer -> Scope -> ClaferIGT m (Either String ())
 increaseScope increment scope =
     do
         value <- valueOfScope scope
@@ -195,119 +196,88 @@ increaseScope increment scope =
         setScope value' scope
     
 
-setScope :: Integer -> Scope -> IO (Maybe String)
-setScope scope Scope{sigName = sigName, claferIG = ClaferIG{alloyIG = alloyIG}} =
+setScope :: MonadIO m => Integer -> Scope -> ClaferIGT m (Either String ())
+setScope scope Scope{name, sigName} =
     do
-        alloyIG' <- readIORef alloyIG
-        subset <- AlloyIG.sendSetScopeCommand sigName scope alloyIG'
-        return $ sigToClaferName `liftM` subset
+        subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName scope
+        runErrorT $ maybe (return ()) throwError $ sigToClaferName <$> subset
 
 
-next :: ClaferIG -> IO Instance
-next ClaferIG{alloyIG = alloyIG, constraints = constraints} =
+next :: MonadIO m => ClaferIGT m Instance
+next =
     do
-        alloyIG' <- readIORef alloyIG
-        constraints' <- readIORef constraints
-        nextImpl alloyIG' constraints'
+        constraints' <- fetches constraints
+        nextImpl constraints'
 
-nextImpl alloyIG constraints = 
+nextImpl constraints = 
     do
-        xmlSolution <- AlloyIG.sendNextCommand alloyIG
+        xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
         case xmlSolution of
             Just xml -> return $ Instance (xmlToModel xml) xml
             Nothing  -> do
-                AlloyIG.sendSaveStateCommand alloyIG
+                ClaferIGT $ lift AlloyIG.sendSaveStateCommand
                 -- Generating counterexample modifies the state. If we ever want to
                 -- rerun the original model, we need to restore the state.
-                AlloyIG.UnsatCore core <- AlloyIG.sendUnsatCoreCommand alloyIG
+                AlloyIG.UnsatCore core <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
                 c <- counterexample core
-                AlloyIG.sendRestoreStateCommand alloyIG 
+                ClaferIGT $ lift AlloyIG.sendRestoreStateCommand
                 return c
     where
-    counterexample :: [AlloyIG.Constraint] -> IO Instance
     counterexample originalCore =
-        if null claferCore then return NoInstance else counterexample' originalCore []
-        
+        counterexample' originalCore []
         where
-        
-        -- Give back the original core, (but don't return non removable since that would confuse the user.
-        claferCore = [claferConstraint | alloyConstraint <- originalCore, let claferConstraint = lookup alloyConstraint, removable claferConstraint]
-        
         counterexample' core removed =
-            case null core of
-                True  ->
+            case msum $ findRemovable core of
+                Just remove -> do
+                    ClaferIGT $ lift $ AlloyIG.sendRemoveConstraintCommand $ range remove
+                    ClaferIGT $ lift AlloyIG.sendResolveCommand
+                    xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
+                    case xmlSolution of
+                        Just xml -> return $
+                            UnsatCore (catMaybes $ findRemovable core) (Just $ Counterexample (reverse $ remove : removed) (xmlToModel xml) xml)
+                        Nothing ->
+                            do
+                                AlloyIG.UnsatCore core' <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
+                                counterexample' core' $ remove : removed
+                Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
-                False ->
-                    case findRemovable core of
-                        Just remove -> do
-                            AlloyIG.sendRemoveConstraintCommand remove alloyIG
-                            AlloyIG.sendResolveCommand alloyIG
-                            xmlSolution <- AlloyIG.sendNextCommand alloyIG
-                            case xmlSolution of
-                                Just xml -> return $
-                                    UnsatCore claferCore (Just $ Counterexample (reverse $ lookup remove : removed) (xmlToModel xml) xml)
-                                Nothing ->
-                                    do
-                                        AlloyIG.UnsatCore core' <- AlloyIG.sendUnsatCoreCommand alloyIG
-                                        counterexample' core' $ lookup remove : removed
-                        Nothing -> -- It is possible that none of the constraints are removable
-                            return $ UnsatCore claferCore Nothing
 
-    findRemovable core = find (removable . lookup) core
-            
-    lookup x = lookupConstraint x constraints
-
-    -- Only certain types of constraints can be removed for counterexamples.
-    removable SigConstraint{} = False
-    removable SubSigConstraint{} = False
-    removable ParentConstraint{} = False
-    removable InConstraint{} = False
-    removable ExtendsConstraint{} = False
-    removable _ = True
+    findRemovable core = [find ((== c). range) constraints | c <- core]
                 
     xmlToModel xml = sugarClaferModel $ buildClaferModel $ parseSolution xml
     
     
-reload :: ClaferIG -> IO ()
-reload claferIG@(ClaferIG claferFile bitwidth constraints claferModel claferToSigNameMap alloyIG) =
-    do
-        globalScope <- getGlobalScope claferIG
+reload :: MonadIO m => ClaferIGT m (Either ClaferErrs ())
+reload  =
+    runErrorT $ do
+        globalScope <- lift $ getGlobalScope
         
-        quit claferIG
-        
-        (constraints', claferModel', claferToSigNameMap', alloyIG') <- load claferFile
-        
-        writeIORef constraints constraints'
-        writeIORef claferModel claferModel'
-        writeIORef claferToSigNameMap claferToSigNameMap'
-        writeIORef alloyIG alloyIG'
+        claferFile' <- lift $ getClaferFile
+        bitwidth'   <- lift $ getBitwidth
+        env <- ErrorT $ ClaferIGT $ lift $ load claferFile' bitwidth'
+        lift $ set env
       
-        setBitwidth bitwidth claferIG  
-        setGlobalScope globalScope claferIG
-        
-        return ()
+        lift $ setGlobalScope globalScope
         
         
-setUnsatCoreMinimization :: Integer -> ClaferIG -> IO ()
-setUnsatCoreMinimization level ClaferIG{alloyIG = alloyIG} =
-    do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.sendSetUnsatCoreMinimizationCommand level alloyIG'
-        
-        
-setBitwidth :: Integer -> ClaferIG -> IO ()
-setBitwidth bitwidth ClaferIG{alloyIG = alloyIG} =
-    do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.sendSetBitwidthCommand bitwidth alloyIG'
+setUnsatCoreMinimization :: MonadIO m => Integer -> ClaferIGT m ()
+setUnsatCoreMinimization level = ClaferIGT $ lift $ AlloyIG.sendSetUnsatCoreMinimizationCommand level
 
-        
+
+getClaferFile :: Monad m => ClaferIGT m FilePath
+getClaferFile = fetches claferFile
+
+
+getBitwidth :: Monad m => ClaferIGT m Integer
+getBitwidth = fetches bitwidth
+
+
+setBitwidth :: MonadIO m => Integer -> ClaferIGT m ()
+setBitwidth bitwidth = ClaferIGT $ lift $ AlloyIG.sendSetBitwidthCommand bitwidth
+
     
-quit :: ClaferIG -> IO ()
-quit ClaferIG{alloyIG = alloyIG} =
-    do
-        alloyIG' <- readIORef alloyIG
-        AlloyIG.sendQuitCommand alloyIG'
+quit :: MonadIO m => ClaferIGT m ()
+quit = ClaferIGT $ lift AlloyIG.sendQuitCommand
     
     
 sigToClaferName :: String -> String

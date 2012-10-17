@@ -20,9 +20,10 @@
  SOFTWARE.
 -}
 
-module Process (Process, executableDirectory, waitFor, getContentsVerbatim, getMessage, putMessage, pipeProcess) where
+module Process (Process, executableDirectory, waitFor, getContentsVerbatim, getMessage, readMessage, putMessage, pipeProcess) where
 
 import Control.Monad
+import Control.Monad.IO.Class
 import System.Environment.Executable
 import System.IO
 import System.Process
@@ -59,17 +60,19 @@ getContentsVerbatim proc =
 
     
 -- Read the message
-getMessage :: Process -> IO String
+getMessage :: MonadIO m => Process -> m String
 getMessage proc =
-    do
+    liftIO $ do
         length <- read `liftM` hGetLine (stdOut proc)
         mapM hGetChar $ replicate length (stdOut proc)
-        
+       
+readMessage proc = read `liftM` getMessage proc
 
 -- Put the message
-putMessage :: Process -> String -> IO ()
+putMessage :: MonadIO m => Process -> String -> m ()
 putMessage proc message =
-    do
+    liftIO $ do
         hPutStrLn (stdIn proc) (show $ length message)
         hPutStr (stdIn proc) message
         hFlush (stdIn proc)
+       

@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 {-
  Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
 
@@ -26,9 +28,13 @@ import ClaferIG
 import ClaferModel
 import CommandLine
 import Control.Monad
+import Control.Monad.IO.Class
+import Data.Either
 import Data.Maybe
 import Data.IORef
 import Prelude hiding (all)
+import Solution
+import Sugarer
 import System.Console.CmdArgs
 import System.Directory
 import System.FilePath
@@ -38,6 +44,7 @@ data IGArgs = IGArgs {
     all :: Maybe Integer,
     saveDir :: Maybe FilePath,  
     claferModelFile :: FilePath,
+    alloySolution :: Bool,
     bitwidth :: Integer
 } deriving (Show, Data, Typeable)
 
@@ -48,6 +55,7 @@ claferIG = IGArgs {
     saveDir         = def &= help "Specify the directory for storing saved files." &= typ "FILE",
     -- Default bitwidth is 4.
     bitwidth        = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER",
+    alloySolution   = False &= help "Convert Alloy solution to a Clafer solution.",
     claferModelFile = def &= argPos 0 &= typ "FILE"
 } &= summary claferIGVersion
 
@@ -55,24 +63,45 @@ claferIG = IGArgs {
 main =
     do
         args <- cmdArgs claferIG
-        claferIG <- initClaferIG (claferModelFile args) (bitwidth args)
+        if (alloySolution args)
+            then
+                runAlloySolution args
+            else
+                tryClaferIG args
+    where
+    tryClaferIG args =
+        do
+            try <- runClaferIG args
+            case try of
+                Right r -> return r
+                Left l  -> do
+                    mapM putStrLn $ printError l
+                    putStrLn "Press enter to retry."
+                    void getLine
+                    tryClaferIG args
         
+runClaferIG args =
+    runClaferIGT (claferModelFile args) (bitwidth args) $ do
         case all args of
             Just scope ->
                 do
-                    setGlobalScope scope claferIG
-                    solve claferIG
+                    setGlobalScope scope
+                    solve
                     
                     let file = claferModelFile args
-                    counterRef <- newIORef 1
+                    counterRef <- liftIO $ newIORef 1
                     
                     let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir args
-                    saveAll (savePath file counterRef >>= saveDirectory) claferIG
+                    saveAll (savePath file counterRef >>= saveDirectory)
                     return ()
-            Nothing    -> runCommandLine claferIG
+            Nothing    -> runCommandLine
             
-        quit claferIG
-
+        quit
+        
+runAlloySolution args =
+    do
+        content <- readFile $ claferModelFile args -- It's an Alloy XML file in this case
+        putStrLn $ show $ sugarClaferModel $ buildClaferModel $ parseSolution content
 
 savePath :: FilePath -> IORef Int -> IO FilePath
 savePath file counterRef =
@@ -89,14 +118,14 @@ underDirectory dir file =
         return $ joinPath [dir, file]
 
 
-saveAll :: IO FilePath -> ClaferIG -> IO ()
-saveAll nextFile claferIG =
+saveAll :: IO FilePath -> ClaferIGT IO ()
+saveAll nextFile =
     do
-        file <- nextFile
-        createDirectoryIfMissing True $ takeDirectory file
-        solution <- next claferIG
+        file <- liftIO nextFile
+        liftIO $ createDirectoryIfMissing True $ takeDirectory file
+        solution <- next
         case solution of
             Instance{modelInstance = modelInstance} -> do
-                writeFile file (show modelInstance)
-                saveAll nextFile claferIG
+                liftIO $ writeFile file (show modelInstance)
+                saveAll nextFile
             _ -> return ()

@@ -60,9 +60,10 @@ install:
 	cp -f lib/*minisatprover* $(to)/lib
 	cp -f tools/alloy4.jar $(to)/tools
 	cp -f alloyIG.jar $(to)
+	cp -f LICENSE $(to)/
+	cp -f CHANGES.md $(to)/claferIG-CHANGES.md
 	cp -f README.md $(to)/claferIG-README.md
 	cabal install --bindir=$(to)
-
 
 # this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs 
 newVersion:

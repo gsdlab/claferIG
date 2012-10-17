@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving, StandaloneDeriving #-}
+
 {-
  Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
 
@@ -22,14 +24,40 @@
 
 module AlloyIGInterface where
 
+import Control.Applicative
 import Control.Monad
-import Data.IORef
+import Control.Monad.IO.Class
+import Control.Monad.Reader
+import Control.Monad.Trans
+import Control.Monad.Trans.State.Strict
 import Data.Map as Map hiding (null)
+import Data.Maybe
+import Language.Clafer.Front.Absclafer (Span(..), Pos(..))
 import Process
+import System.Console.Haskeline.MonadException
 
 
+newtype AlloyIGT m a = AlloyIGT (StateT (Maybe AlloyIGEnv) (ReaderT Process m) a) deriving (Applicative, Functor, Monad, MonadIO)
 
-data AlloyIG = AlloyIG{proc::Process, alloyModel::IORef String, sigMap::IORef (Map String Sig), scopes::IORef (Map String Integer), globalScope::IORef Integer}
+instance MonadTrans AlloyIGT where
+    lift = AlloyIGT . lift . lift
+
+deriving instance MonadException m => MonadException (AlloyIGT m)
+
+fetch :: Monad m => AlloyIGT m AlloyIGEnv
+fetch = fromMaybe (error "AlloyIG not loaded.") `liftM` AlloyIGT get
+
+fetches :: Monad m => (AlloyIGEnv -> a) -> AlloyIGT m a
+fetches = (`liftM` fetch)
+
+set :: Monad m => AlloyIGEnv -> AlloyIGT m ()
+set = AlloyIGT . put . Just
+
+proc :: Monad m => AlloyIGT m Process
+proc = AlloyIGT ask
+
+
+data AlloyIGEnv = AlloyIGEnv {alloyModel::String, sigMap::Map String Sig, scopes::Map String Integer, globalScope::Integer}
 
 
 data Sig = Sig{s_name::String, s_multiplicity::Multiplicity, s_subset::Maybe String, s_startingScope::Maybe Integer}
@@ -38,13 +66,7 @@ data Sig = Sig{s_name::String, s_multiplicity::Multiplicity, s_subset::Maybe Str
 data Multiplicity = One | Lone | Some | Any deriving (Eq, Read, Show)
 
 
-data UnsatCore = UnsatCore{core::[Constraint]} deriving Show
-
-
-data Constraint = Constraint {from::Position, to::Position} deriving (Show, Eq)
-
-
-data Position = Position {line::Integer, column::Integer} deriving (Show, Eq, Ord)
+data UnsatCore = UnsatCore{core::[Span]} deriving Show
 
 
 
@@ -55,101 +77,96 @@ withinRange scope Some = scope >= 1
 withinRange scope Any = True
 
 
-initAlloyIG :: String -> IO AlloyIG
-initAlloyIG alloyModel =
+runAlloyIGT :: MonadIO m => AlloyIGT m a -> m a
+runAlloyIGT run =
     do
-        execPath <- executableDirectory
-        alloyIGProc <- pipeProcess "java" ["-Djava.library.path=" ++ execPath ++ "lib" , "-jar", execPath ++ "alloyIG.jar"]
+        execPath <- liftIO $ executableDirectory
+        proc     <- liftIO $ pipeProcess "java" ["-Djava.library.path=" ++ execPath ++ "lib" , "-jar", execPath ++ "alloyIG.jar"]
         
-        alloyModelRef <- newIORef ""
-        sigMapRef <- newIORef Map.empty
-        scopesRef <- newIORef Map.empty
-        globalScopeRef <- newIORef 0
-
-        let alloyIG = AlloyIG alloyIGProc alloyModelRef sigMapRef scopesRef globalScopeRef
-
-        return alloyIG
+        runReaderT (evalStateT (unwrap run) Nothing) proc
+    where
+    unwrap (AlloyIGT a) = a
             
 
-getAlloyModel :: AlloyIG -> IO String
-getAlloyModel AlloyIG{alloyModel = alloyModel} = readIORef alloyModel
+getAlloyModel :: MonadIO m => AlloyIGT m String
+getAlloyModel = fetches alloyModel
 
 
-getSigs :: AlloyIG -> IO [String]
-getSigs alloyIG = keys `fmap` readIORef (sigMap alloyIG)
+getSigs :: MonadIO m => AlloyIGT m [String]
+getSigs = keys `liftM` fetches sigMap
 
 
--- Call load before any other commands.
-sendLoadCommand :: String -> AlloyIG -> IO ()
-sendLoadCommand model alloyIG@(AlloyIG proc alloyModel sigMap scopes globalScope) =
+load :: Process -> String -> IO AlloyIGEnv
+load proc alloyModel' =
     do
         putMessage proc "load"
-        putMessage proc model
-        numberOfSigs <- read `liftM` getMessage proc
-        sigs <- replicateM numberOfSigs $ readSig proc
+        putMessage proc alloyModel'
+        numberOfSigs <- readMessage proc
+        sigs <- replicateM numberOfSigs readSig
 
         let sigMap' = fromList [(s_name sig, sig) | sig <- sigs]
         let scopes' = Map.empty
-        globalScope' <- read `liftM` getMessage proc
-        
-        writeIORef alloyModel model
-        writeIORef sigMap sigMap'
-        writeIORef scopes scopes'
-        writeIORef globalScope globalScope'
-        
-        mapM_ resetScope sigs
-        
+        globalScope' <- readMessage proc
+     
+        return $ AlloyIGEnv alloyModel' sigMap' scopes' globalScope'
     where
-    readSig :: Process -> IO Sig
-    readSig proc =
+    readSig =
         do
-            sig <- getMessage proc 
-            multiplicity <- read `liftM` getMessage proc
+            sig <- getMessage proc
+            multiplicity <- readMessage proc
             subset <- getMessage proc
-            hasStartingScope <- read `liftM` getMessage proc
+            hasStartingScope <- readMessage proc
             startingScope <-
-                if hasStartingScope then (Just . read) `liftM` getMessage proc else return Nothing
+                if hasStartingScope then Just <$> readMessage proc else return Nothing
             return $ Sig sig multiplicity (if null subset then Nothing else Just subset) startingScope
-            
-    resetScope :: Sig -> IO ()
+
+
+-- Call load before any other commands.
+sendLoadCommand :: MonadIO m => String -> AlloyIGT m ()
+sendLoadCommand alloyModel' =
+    do
+        proc' <- proc
+        env <- liftIO $ load proc' alloyModel'
+        set env
+        
+        sigs <- elems `liftM` fetches sigMap
+        mapM_ resetScope sigs
+    where
     resetScope Sig{s_name = name, s_startingScope = startingScope} =
         case startingScope of
-            Just scope -> sendSetScopeCommand name scope alloyIG >> return ()
+            Just scope -> sendSetScopeCommand name scope >> return ()
             Nothing    -> return ()
 
 
 -- Get the next solution from alloyIG
-sendNextCommand :: AlloyIG -> IO (Maybe String)
-sendNextCommand AlloyIG{proc=proc} =
+sendNextCommand :: MonadIO m => AlloyIGT m (Maybe String)
+sendNextCommand =
     do
-        putMessage proc "next"
-        status <- read `liftM` getMessage proc
+        putMsg "next"
+        status <- readMsg
         case status of
-            True -> Just `liftM` getMessage proc
+            True  -> Just `liftM` getMsg
             False -> return Nothing
 
 
-getScope :: String -> AlloyIG -> IO Integer
-getScope sig alloyIG =
+getScope :: MonadIO m => String -> AlloyIGT m Integer
+getScope sig =
     do
-        rscopes <- readIORef (scopes alloyIG)
+        rscopes <- fetches scopes
         case Map.lookup sig rscopes of
             Just scope -> return scope
-            Nothing  -> readIORef (globalScope alloyIG)
+            Nothing    -> getGlobalScope
         
 
-getScopes :: AlloyIG -> IO [(String, Integer)]
-getScopes alloyIG =
-    do
-        rscopes <- readIORef (scopes alloyIG)
-        return $ toList rscopes
+getScopes :: MonadIO m => AlloyIGT m [(String, Integer)]
+getScopes = toList `liftM` fetches scopes
             
 
 -- Tell alloyIG to change the scope of a sig
-sendSetScopeCommand :: String -> Integer -> AlloyIG -> IO (Maybe String)
-sendSetScopeCommand sig scope AlloyIG{proc=proc, scopes=scopes, sigMap=sigMap} =
+sendSetScopeCommand :: MonadIO m => String -> Integer -> AlloyIGT m (Maybe String)
+sendSetScopeCommand sig scope =
     do
-        sigMap' <- readIORef sigMap
+        sigMap' <- fetches sigMap
         let Sig{s_multiplicity = multiplicity, s_subset = subset} = sigMap' ! sig
         
         -- Alloy has a fit when trying to set a scope outside its multiplicity
@@ -160,97 +177,104 @@ sendSetScopeCommand sig scope AlloyIG{proc=proc, scopes=scopes, sigMap=sigMap} =
                 do
                     when (withinRange scope multiplicity) $
                         do
-                            putMessage proc "setScope"
-                            putMessage proc sig
-                            putMessage proc (show scope)
-                    rscopes <- readIORef scopes
-                    writeIORef scopes (Map.insert sig scope rscopes)
+                            putMsg "setScope"
+                            putMsg sig
+                            putMsg $ show scope
+                    rscopes <- fetches scopes
+                    env <- fetch
+                    set env {scopes = Map.insert sig scope rscopes}
                     return $ Nothing
             Just sub ->
                 return $ Just sub
         
 
-getGlobalScope :: AlloyIG -> IO Integer
-getGlobalScope alloyIG = readIORef $ globalScope alloyIG
+getGlobalScope :: MonadIO m => AlloyIGT m Integer
+getGlobalScope = fetches globalScope
 
 
 -- Tell alloyIG to change the global scope
-sendSetGlobalScopeCommand :: Integer -> AlloyIG -> IO ()
-sendSetGlobalScopeCommand scope AlloyIG{proc=proc, globalScope=globalScope} =
+sendSetGlobalScopeCommand :: MonadIO m => Integer -> AlloyIGT m ()
+sendSetGlobalScopeCommand scope =
     do
-        putMessage proc "setGlobalScope"
-        putMessage proc (show scope)
-        writeIORef globalScope scope
+        putMsg "setGlobalScope"
+        putMsg $ show scope
+        
+        env <- fetch
+        set env {globalScope = scope}
 
 
 -- Tell alloyIG to recalculate the solution
-sendResolveCommand :: AlloyIG -> IO ()
-sendResolveCommand AlloyIG{proc = proc} = putMessage proc "resolve"
+sendResolveCommand :: MonadIO m => AlloyIGT m ()
+sendResolveCommand = putMsg "resolve"
 
 
 -- Tell alloyIG to save the current state
-sendSaveStateCommand :: AlloyIG -> IO ()
-sendSaveStateCommand AlloyIG{proc = proc} = putMessage proc "saveState"
+sendSaveStateCommand :: MonadIO m => AlloyIGT m ()
+sendSaveStateCommand = putMsg "saveState"
 
 
 -- Tell alloyIG to restore the state
-sendRestoreStateCommand :: AlloyIG -> IO ()
-sendRestoreStateCommand AlloyIG{proc = proc} = putMessage proc "restoreState"
+sendRestoreStateCommand :: MonadIO m => AlloyIGT m ()
+sendRestoreStateCommand = putMsg "restoreState"
 
 
 -- Tell alloyIG to remove the constraint
-sendRemoveConstraintCommand :: Constraint -> AlloyIG -> IO ()
-sendRemoveConstraintCommand (Constraint from to) AlloyIG{proc = proc} =
+sendRemoveConstraintCommand :: MonadIO m => Span -> AlloyIGT m ()
+sendRemoveConstraintCommand (Span from to) =
     do
-        putMessage proc "removeConstraint"
+        putMsg "removeConstraint"
         sendPosition from >> sendPosition to
     where
-    sendPosition (Position line column) =
-        putMessage proc (show line) >> putMessage proc (show column)
+    sendPosition (Pos line column) =
+        putMsg (show line) >> putMsg (show column)
         
 
 -- Tell alloyIG to return the unsat core of the previous operation        
-sendUnsatCoreCommand :: AlloyIG -> IO UnsatCore
-sendUnsatCoreCommand AlloyIG{proc = proc} =
+sendUnsatCoreCommand :: MonadIO m => AlloyIGT m UnsatCore
+sendUnsatCoreCommand =
     do
-        putMessage proc "unsatCore"
-        coreLength         <- read `liftM` getMessage proc
-        core               <- replicateM coreLength readConstraint
+        putMsg "unsatCore"
+        coreLength <- readMsg
+        core       <- replicateM coreLength readConstraint
         return $ UnsatCore core
     where
-    readPosition =
-        do
-            line   <- getMessage proc
-            column <- getMessage proc
-            return $ Position (read line) (read column)
-    readConstraint =
-        do
-            from <- readPosition
-            to   <- readPosition
-            return $ Constraint from to
+    readPosition   = liftM2 Pos readMsg readMsg
+    readConstraint = liftM2 Span readPosition readPosition
             
             
 -- Tell alloyIG to change the unsat core minimization level.
 -- 0 -> Fastest
 -- 1 -> Medium
 -- 2 -> Best
-sendSetUnsatCoreMinimizationCommand :: Integer -> AlloyIG -> IO ()
-sendSetUnsatCoreMinimizationCommand level AlloyIG{proc = proc} =
+sendSetUnsatCoreMinimizationCommand :: MonadIO m => Integer -> AlloyIGT m ()
+sendSetUnsatCoreMinimizationCommand level =
     do
-        putMessage proc "unsatCoreMinimization"
-        putMessage proc (show level)
+        putMsg "unsatCoreMinimization"
+        putMsg $ show level
         
 
 -- Tell alloyIG to change the bitwidth        
-sendSetBitwidthCommand :: Integer -> AlloyIG -> IO ()
-sendSetBitwidthCommand bitwidth AlloyIG{proc = proc} =
+sendSetBitwidthCommand :: MonadIO m => Integer -> AlloyIGT m ()
+sendSetBitwidthCommand bitwidth =
     do
         when (bitwidth < 0) $ fail (show bitwidth ++ " is not a valid bitwidth.")
-        putMessage proc "setBitwidth"
-        putMessage proc (show bitwidth)
+        putMsg "setBitwidth"
+        putMsg $ show bitwidth
 
 
 -- Tell alloyIG to quit
-sendQuitCommand :: AlloyIG -> IO ()
-sendQuitCommand AlloyIG{proc=proc} = putMessage proc "quit"
+sendQuitCommand :: MonadIO m => AlloyIGT m ()
+sendQuitCommand = putMsg "quit"
 
+
+getMsg :: MonadIO m => AlloyIGT m String
+getMsg = getMessage =<< proc
+
+readMsg :: (MonadIO m, Read r) => AlloyIGT m r
+readMsg = read `liftM` getMsg
+
+putMsg :: MonadIO m => String -> AlloyIGT m ()
+putMsg msg =
+    do
+        proc' <- proc
+        putMessage proc' msg

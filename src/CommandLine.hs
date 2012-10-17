@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns #-}
+
 {-
  Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
 
@@ -20,13 +22,16 @@
  SOFTWARE.
 -}
 
-module CommandLine (claferIGVersion, runCommandLine) where
+module CommandLine (claferIGVersion, runCommandLine, printError) where
 
+
+import Language.ClaferT
 import ClaferIG
 import ClaferModel
 import CommandLineParser
 import Constraints
 import Control.Monad
+import Control.Monad.Error
 import Control.Monad.Trans
 import Data.Char
 import Data.IORef
@@ -44,15 +49,15 @@ data Context = Context {currentAlloyInstance::Maybe String, saved::[ClaferModel]
 
 
 
-runCommandLine :: ClaferIG -> IO ()
-runCommandLine claferIG =
+runCommandLine :: ClaferIGT IO ()
+runCommandLine =
     do
-        solve claferIG
+        solve
         
-        clafers <- getClafers claferIG
+        clafers <- getClafers
 
-        clafersRef <- newIORef clafers
-        claferInstancesRef <- newIORef []
+        clafersRef <- liftIO $ newIORef clafers
+        claferInstancesRef <- liftIO $ newIORef []
 
         let autoCompleteContext = AutoCompleteContext clafersRef claferInstancesRef
         runInputT Settings {
@@ -61,22 +66,23 @@ runCommandLine claferIG =
             autoAddHistory = True
         } $ loop Next (Context Nothing [] [] autoCompleteContext)
     where 
-    loop :: Command -> Context -> InputT IO ()
+    loop :: Command -> Context -> InputT (ClaferIGT IO) ()
     
     loop Quit _ = return ()
     
     loop Next context =
         do
-            solution <- lift $ next claferIG
+            solution <- lift next
             case solution of
                 Instance claferModel xml -> do
-                    lift $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse claferModel)
+                    liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse claferModel)
                     
                     outputStrLn $ show claferModel
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 UnsatCore core counterexample -> do
                     outputStrLn "No more instances found. Try increasing scope to get more instances."
                     outputStrLn "The following set of constraints cannot be satisfied in the current scope."
+                    outputStrLn "(Hint: use the setUnsatCoreMinimization command to minimize the set of constraints below)"
                     printConstraints core
                     case counterexample of
                         Just (Counterexample removed claferModel xml) -> do
@@ -186,46 +192,39 @@ runCommandLine claferIG =
 
     loop Reload context =
         do
-            lift $ reload claferIG
-            lift $ solve claferIG
+            runErrorT $ ErrorT (lift reload) `catchError` (lift . mapM_ outputStrLn . printError)
+            lift $ solve
             nextLoop context
 
     loop (IncreaseGlobalScope i) context =
         do
-            globalScope <- lift $ getGlobalScope claferIG
+            globalScope <- lift getGlobalScope
             let globalScope' = globalScope + i
-            lift $ setGlobalScope globalScope' claferIG
+            lift $ setGlobalScope globalScope'
             
-            scopes <- lift $ getScopes claferIG
+            scopes <- lift getScopes
             lift $ mapM (increaseScope i) scopes
-            lift $ solve claferIG
+            lift solve
             
             outputStrLn ("Global scope increased to " ++ show globalScope')
             nextLoop context
             
     loop (IncreaseScope name i) context =
         do
-            scope <- lift $ getScope name claferIG
-            case scope of
-                Just scope' ->
-                    do
-                        error <- lift $ increaseScope i scope'
-                        case error of
-                            Just subset ->
-                                outputStrLn $ "Cannot increase scope of the reference Clafer \"" ++ name ++ "\". Try increasing the scope of its refered Clafer \"" ++ subset ++ "\"."
-                            Nothing ->
-                                do
-                                    scopeValue <- lift $ valueOfScope scope'
-                                    lift $ solve claferIG
-                                    outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scopeValue)
-                Nothing -> outputStrLn ("Unknown clafer " ++ name)
+            try $ do
+                scope <- ErrorT $ lift $ getScope name
+                ErrorT $ lift $ increaseScope i scope
+                scopeValue <- lift $ lift $ valueOfScope scope
+                lift $ lift $ solve
+                lift $ outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scopeValue)
+                
             nextLoop context
             
     loop ShowScope context =
         do
-            globalScope <- lift $ getGlobalScope claferIG
+            globalScope <- lift getGlobalScope
             outputStrLn $ "Global scope = " ++ show globalScope
-            scopes <- lift $ getScopes claferIG
+            scopes <- lift getScopes
             mapM_ printScope scopes
             nextLoop context
             
@@ -249,14 +248,14 @@ runCommandLine claferIG =
 
     loop ShowClaferModel context =
         do
-            claferModel <- lift $ getClaferModel claferIG
+            claferModel <- lift getClaferModel
             outputStrLn claferModel
             nextLoop context
             
             
     loop ShowAlloyModel context =
         do
-            alloyModel <- lift $ getAlloyModel claferIG
+            alloyModel <- lift getAlloyModel
             outputStrLn alloyModel
             nextLoop context
 
@@ -274,7 +273,7 @@ runCommandLine claferIG =
                         Fastest -> 2
                         Medium  -> 1
                         Best    -> 0
-            lift $ setUnsatCoreMinimization level' claferIG >> solve claferIG
+            lift $ setUnsatCoreMinimization level' >> solve
             
             nextLoop context
 
@@ -288,16 +287,19 @@ runCommandLine claferIG =
                         Left error    -> outputStrLn (show error) >> nextLoop context
                         Right command -> loop command context
     
-    save :: [ClaferModel] -> Integer -> IO ()
+    save :: MonadIO m => [ClaferModel] -> Integer -> ClaferIGT m ()
     save [] _ = return ()
     save (c:cs) counter =
         do
-            writeFile saveName (show c)
-            putStrLn $ "Saved to " ++ saveName
+            claferFile <- getClaferFile
+            let saveName = claferFile ++ "." ++ (show counter) ++ ".data"
+            liftIO $ writeFile saveName (show c)
+            liftIO $ putStrLn $ "Saved to " ++ saveName
             save cs (counter + 1)
-        where saveName = (claferFile claferIG) ++ "." ++ (show counter) ++ ".data"
-    
 
+try :: MonadIO m => ErrorT String (InputT m) a -> InputT m ()
+try e = either outputStrLn (void . return) =<< runErrorT e
+        
 
 -- i Ali|ce
 --     If the cursor is at | then not open. The "ce" prevents autocomplete.
@@ -360,3 +362,15 @@ autoCompleteDetect error
     messages = errorMessages error
     unexpectedMessages = mapMaybe unexpectedMessage messages
     expectedMessages   = mapMaybe expectedMessage messages
+    
+
+printError :: ClaferErrs -> [String]    
+printError (ClaferErrs errs) =
+    map printError errs
+    where
+    printError (ParseErr ErrPos{modelPos = Pos l c} msg) =
+        "Parse error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
+    printError (SemanticErr ErrPos{modelPos = Pos l c} msg) =
+        "Error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
+    printError (ClaferErr msg) =
+        "Error:\n    " ++ msg
