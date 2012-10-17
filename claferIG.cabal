@@ -11,6 +11,10 @@ Stability:           Experimental
 Category:            Model
 Build-type:          Simple
 Cabal-version:       >=1.8
+Extra-Source-Files:
+                     CHANGES.md,
+                     LICENSE,
+                     tools/alloy4.jar
 
 Executable claferIG
     build-tools:     ghc >= 7.4.1
