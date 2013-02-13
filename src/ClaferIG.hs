@@ -22,7 +22,32 @@
  SOFTWARE.
 -}
 
-module ClaferIG (ClaferIGT, Scope, Instance(..), Counterexample(..), runClaferIGT, claferIGVersion, getClaferModel, getAlloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, setUnsatCoreMinimization, getClaferFile, getBitwidth, setBitwidth, quit, reload) where
+module ClaferIG (
+    ClaferIGT, 
+    Scope, 
+    Instance(..), 
+    Counterexample(..), 
+    runClaferIGT, 
+    claferIGVersion, 
+    getClaferModel, 
+    getAlloyModel, 
+    solve, 
+    getClafers, 
+    getGlobalScope, 
+    setGlobalScope, 
+    getScopes, 
+    getScope, 
+    nameOfScope, 
+    valueOfScope, 
+    increaseScope, 
+    setScope, 
+    next, 
+    setUnsatCoreMinimization, 
+    getClaferFile, 
+    getBitwidth, 
+    setBitwidth, 
+    quit, 
+    reload) where
 
 import Debug.Trace
 import Language.Clafer
@@ -69,16 +94,23 @@ fetches = ClaferIGT . gets
 set :: Monad m => ClaferIGEnv -> ClaferIGT m ()
 set = ClaferIGT . put
 
-runClaferIGT :: MonadIO m => FilePath -> Integer -> ClaferIGT m a -> m (Either ClaferErrs a)
-runClaferIGT claferFile bitwidth run =
+runClaferIGT :: MonadIO m => FilePath -> Integer -> Bool -> ClaferIGT m a -> m (Either ClaferErrs a)
+runClaferIGT claferFile bitwidth preservenames run =
     AlloyIG.runAlloyIGT $ runErrorT $ do
-        env <- (ErrorT $ load claferFile bitwidth) `catchError` (\x -> lift AlloyIG.sendQuitCommand >> throwError x)
+        env <- (ErrorT $ load claferFile bitwidth preservenames) `catchError` (\x -> lift AlloyIG.sendQuitCommand >> throwError x)
         lift $ evalStateT (unwrap run) env
     where
     unwrap (ClaferIGT c) = c
 
 
-data ClaferIGEnv = ClaferIGEnv{claferFile::FilePath, bitwidth::Integer, constraints:: [Constraint], claferModel::String, claferToSigNameMap:: Map String String}
+data ClaferIGEnv = ClaferIGEnv{
+    claferFile::FilePath, 
+    bitwidth::Integer, 
+    constraints:: [Constraint], 
+    claferModel::String, 
+    claferToSigNameMap:: Map String String,
+    preservenames::Bool
+}
 
 
 data Scope = Scope {name::String, sigName::String}
@@ -102,8 +134,8 @@ getClaferModel :: Monad m => ClaferIGT m String
 getClaferModel = fetches claferModel
 
 
-load :: MonadIO m => String -> Integer -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
-load claferFile bitwidth  =
+load :: MonadIO m => String -> Integer -> Bool -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
+load claferFile bitwidth preservenames =
     runErrorT $ do
         claferModel <- liftIO $ strictReadFile claferFile
         
@@ -117,7 +149,7 @@ load claferFile bitwidth  =
         sigs <- lift $ AlloyIG.getSigs
         let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
         
-        return $ ClaferIGEnv claferFile bitwidth constraints claferModel claferToSigNameMap
+        return $ ClaferIGEnv claferFile bitwidth constraints claferModel claferToSigNameMap preservenames
     where
     callClaferTranslator code =
         mapLeft ClaferErrs $ runClafer args $ do
@@ -207,13 +239,14 @@ next :: MonadIO m => ClaferIGT m Instance
 next =
     do
         constraints' <- fetches constraints
-        nextImpl constraints'
+        preservenames' <- fetches preservenames
+        nextImpl preservenames' constraints'
 
-nextImpl constraints = 
+nextImpl preservenames constraints = 
     do
         xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
         case xmlSolution of
-            Just xml -> return $ Instance (xmlToModel xml) xml
+            Just xml -> return $ Instance (xmlToModel preservenames xml) xml
             Nothing  -> do
                 ClaferIGT $ lift AlloyIG.sendSaveStateCommand
                 -- Generating counterexample modifies the state. If we ever want to
@@ -234,7 +267,7 @@ nextImpl constraints =
                     xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
                     case xmlSolution of
                         Just xml -> return $
-                            UnsatCore (catMaybes $ findRemovable core) (Just $ Counterexample (reverse $ remove : removed) (xmlToModel xml) xml)
+                            UnsatCore (catMaybes $ findRemovable core) (Just $ Counterexample (reverse $ remove : removed) (xmlToModel preservenames xml) xml)
                         Nothing ->
                             do
                                 AlloyIG.UnsatCore core' <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
@@ -243,8 +276,8 @@ nextImpl constraints =
                     return NoInstance
 
     findRemovable core = [find ((== c). range) constraints | c <- core]
-                
-    xmlToModel xml = sugarClaferModel $ buildClaferModel $ parseSolution xml
+
+    xmlToModel preservenames xml = sugarClaferModel preservenames $ buildClaferModel $ parseSolution xml
     
     
 reload :: MonadIO m => ClaferIGT m (Either ClaferErrs ())
@@ -254,7 +287,8 @@ reload  =
         
         claferFile' <- lift $ getClaferFile
         bitwidth'   <- lift $ getBitwidth
-        env <- ErrorT $ ClaferIGT $ lift $ load claferFile' bitwidth'
+        preservenames' <- lift $ getPreservenames
+        env <- ErrorT $ ClaferIGT $ lift $ load claferFile' bitwidth' preservenames'
         lift $ set env
       
         lift $ setGlobalScope globalScope
@@ -271,6 +305,8 @@ getClaferFile = fetches claferFile
 getBitwidth :: Monad m => ClaferIGT m Integer
 getBitwidth = fetches bitwidth
 
+getPreservenames :: Monad m => ClaferIGT m Bool
+getPreservenames = fetches preservenames
 
 setBitwidth :: MonadIO m => Integer -> ClaferIGT m ()
 setBitwidth bitwidth = ClaferIGT $ lift $ AlloyIG.sendSetBitwidthCommand bitwidth
