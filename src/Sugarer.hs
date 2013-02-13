@@ -74,7 +74,7 @@ sugarClaferModel preservenames model@(ClaferModel topLevel) =
         if count == 1 then
             Id finalName 0
         else
-            Id (finalName ++ show ordinal) 0
+            Id (finalName ++ "$" ++ show ordinal) 0
         where
         fullName = i_name id
         (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample
