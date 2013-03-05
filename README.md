@@ -22,8 +22,8 @@ Dependencies
 **Note**: Installing the Clafer translator will satisfy all the following dependencies:
 
 * [The Haskell Platform](http://hackage.haskell.org/platform/) v.2012.2.0.0
-  * On Linux, might need to manually install `zlibg-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
-  * on Ubuntu, execute `sudo apt-get install zlibg-dev libncurses5-dev`
+  * On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
+  * on Ubuntu, execute `sudo apt-get install zlib1g-dev libncurses5-dev`
 * [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) >= 6, 32bit
 * [Alloy4.1](http://alloy.mit.edu/alloy/download.html)
  * MiniSAT Proover (a SAT solver used by Alloy that can produce UnSAT Core, bundled with Alloy)
