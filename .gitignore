@@ -8,3 +8,5 @@ tools
 *.lkshw
 *.jar
 *.dll
+*.sublime-project
+*.sublime-workspace

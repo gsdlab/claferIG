@@ -1,9 +1,12 @@
 Clafer Instance Generator
 =========================
 
-ClaferIG v0.3.1.13-9-2012
+v0.3.2.05-03-2013
 
-**Clafer instance generator** (claferIG) is an API and an interactive tool that generates instances and counter examples of concrete clafers in a Clafer module. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces a counter example that illustrates the constraint violation. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator first returns the minimal instance and subsequently produces instances of increasing size, on-demand. The instance generator can also be used directly as an API (the command line and interactive session interfaces only use the API).
+[Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
+overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
+
+For more information, see [technical report](http://gsd.uwaterloo.ca/node/462).
 
 Getting Clafer Tools
 --------------------
@@ -75,7 +78,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 ### Interactive Session Usage
 In the interactive mode, the users can invoke the following commands by pressing the first letter of the command name or the whole command as marked by boldface:
 
-ClaferIG v0.3.1.13-9-2012
+ClaferIG v0.3.2.05-03-2013
 
 * [tab] - print the available commands or auto-complete command name, a clafer name, or clafer instance name in a given context
 * **n**ext or **[enter]** - to produce the next instance if available, a counterexample, or to output a message that no more instances exist within the given scope
@@ -182,18 +185,7 @@ a1 : A
     [ b ]       // C3
 ```
 
-Constraints C1, C2, and C3 form an UnSAT Core. Removal of any of them will make the model satisfiable. The constraint C1 is part of the model and cannot be removed (part of domain knowledge). Therefore, either C2 or C3 must be removed to remove the inconsistency. The command `claferModel` prints the model as follows:
-
-```clafer
-1. |abstract A
-2. |    a ?
-3. |    b ?
-4. >        [ a ]   <--- UnSAT Core
-5. |
-6. |a1 : A
-7. >    [ no a ]    <--- UnSAT Core
-8. >    [ b ]       <--- UnSAT Core
-```
+Constraints C1, C2, and C3 form an UnSAT Core. Removal of any of them will make the model satisfiable. The constraint C1 is part of the model and cannot be removed (part of domain knowledge). Therefore, either C2 or C3 must be removed to remove the inconsistency. 
 
 On possible counter example that illustrates the inconsistency is as follows:
 
