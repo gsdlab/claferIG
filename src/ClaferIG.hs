@@ -104,6 +104,7 @@ runClaferIGT claferFile bitwidth preservenames run =
 
 
 data ClaferIGEnv = ClaferIGEnv{
+    claferEnv'::ClaferEnv,
     claferFile::FilePath, 
     bitwidth::Integer, 
     constraints:: [Constraint], 
@@ -133,14 +134,18 @@ claferIGVersion =
 getClaferModel :: Monad m => ClaferIGT m String
 getClaferModel = fetches claferModel
 
+getClaferEnv' :: Monad m => ClaferIGT m ClaferEnv
+getClaferEnv' = fetches claferEnv'
 
-load :: MonadIO m => String -> Integer -> Bool -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
-load claferFile bitwidth preservenames =
+
+load :: MonadIO m => String  -> Integer -> Bool -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
+load                 claferFile bitwidth   preservenames =
     runErrorT $ do
         claferModel <- liftIO $ strictReadFile claferFile
         
-        (ir, alloyModel, mapping) <- ErrorT $ return $ callClaferTranslator claferModel
-        
+        (claferEnv', alloyModel, mapping) <- ErrorT $ return $ callClaferTranslator claferModel 
+
+        let ir = fst3 $ fromJust $ cIr claferEnv'
         let constraints = parseConstraints claferModel ir mapping
         
         lift $ AlloyIG.sendLoadCommand alloyModel
@@ -149,7 +154,7 @@ load claferFile bitwidth preservenames =
         sigs <- lift $ AlloyIG.getSigs
         let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
         
-        return $ ClaferIGEnv claferFile bitwidth constraints claferModel claferToSigNameMap preservenames
+        return $ ClaferIGEnv claferEnv' claferFile bitwidth constraints claferModel claferToSigNameMap preservenames
     where
     callClaferTranslator code =
         mapLeft ClaferErrs $ runClafer args $ do
@@ -157,7 +162,7 @@ load claferFile bitwidth preservenames =
             parse
             compile
             result <- generate
-            return (fst3 $ fromJust $ cIr $ claferEnv result, outputCode result, mappingToAlloy result)
+            return (claferEnv result, outputCode result, mappingToAlloy result)
     args = defaultClaferArgs {keep_unused = Just True, no_stats = Just True}
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
