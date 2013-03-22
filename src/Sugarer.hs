@@ -23,6 +23,7 @@
 module Sugarer (sugarClaferModel) where
 
 import ClaferModel
+import qualified Language.Clafer.Intermediate.Analysis as Analysis
 import Control.Monad
 import Data.List as List hiding (map)
 import Data.Map as Map hiding (map, foldr, foldl)
@@ -63,25 +64,40 @@ claferModelCensus (ClaferModel topLevel) =
 
 
 -- Rewrite the model into a human-friendlier format
-sugarClaferModel:: Bool -> ClaferModel -> ClaferModel
-sugarClaferModel preservenames model@(ClaferModel topLevel) =
+sugarClaferModel:: Bool          -> Maybe Analysis.Info -> ClaferModel                  -> ClaferModel
+sugarClaferModel   preservenames    info             model@(ClaferModel topLevel) =
     ClaferModel $ map sugarClafer topLevel
     where
     Census sample counts = claferModelCensus model
     
-    sugarId :: Bool -> Id -> Id
-    sugarId preservenames id =
+    sugarId :: Bool -> Bool -> Id -> Id
+    sugarId preservenames addRefDecl id =
         if count == 1 then
             Id finalName 0
         else
-            Id (finalName ++ "$" ++ show ordinal) 0
+            Id (finalName ++ "$" ++ show ordinal ++ (if addRefDecl then refDecl info else "")) 0
         where
         fullName = i_name id
+        refDecl (Just info) = retrieveSuper info $ i_name id
+        refDecl Nothing = ""
         (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample
         count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts
         finalName = if preservenames then fullName else simpleName
     
-    sugarClafer (Clafer id value children) = Clafer (sugarId preservenames id) (sugarValue `liftM` value) (map sugarClafer children)
+    sugarClafer (Clafer id value children) = Clafer (sugarId preservenames True id) (sugarValue `liftM` value) (map sugarClafer children)
 
-    sugarValue (AliasValue alias) = AliasValue $ sugarId preservenames alias
+    sugarValue (AliasValue alias) = AliasValue $ sugarId preservenames False alias
     sugarValue x = x
+
+retrieveSuper :: Analysis.Info -> String -> String
+retrieveSuper info uid = 
+    if (Analysis.isBase sclafer)
+        then ""
+        else maybe "" sugarSuper (Analysis.super sclafer)
+    where
+        sclafer = Analysis.runAnalysis (Analysis.claferWithUid uid) info
+
+        sugarSuper :: Analysis.SSuper -> String
+        sugarSuper (Analysis.Ref s) = " -> " ++ s
+        sugarSuper (Analysis.Colon s) = " : " ++ s
+      
