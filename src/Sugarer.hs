@@ -65,28 +65,28 @@ claferModelCensus (ClaferModel topLevel) =
 
 -- Rewrite the model into a human-friendlier format
 sugarClaferModel:: Bool          -> Maybe Analysis.Info -> ClaferModel                  -> ClaferModel
-sugarClaferModel   preservenames    info             model@(ClaferModel topLevel) =
+sugarClaferModel   addUidsAndTypes    info             model@(ClaferModel topLevel) =
     ClaferModel $ map sugarClafer topLevel
     where
     Census sample counts = claferModelCensus model
     
     sugarId :: Bool -> Bool -> Id -> Id
-    sugarId preservenames addRefDecl id =
+    sugarId addUidsAndTypes addRefDecl id =
         if count == 1 then
             Id finalName 0
         else
-            Id (finalName ++ "$" ++ show ordinal ++ (if addRefDecl then refDecl info else "")) 0
+            Id (finalName ++ "$" ++ show ordinal ++ (if addRefDecl && addUidsAndTypes then refDecl info else "")) 0
         where
         fullName = i_name id
         refDecl (Just info) = retrieveSuper info $ i_name id
         refDecl Nothing = ""
         (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample
         count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts
-        finalName = if preservenames then fullName else simpleName
+        finalName = if addUidsAndTypes then fullName else simpleName
     
-    sugarClafer (Clafer id value children) = Clafer (sugarId preservenames True id) (sugarValue `liftM` value) (map sugarClafer children)
+    sugarClafer (Clafer id value children) = Clafer (sugarId addUidsAndTypes True id) (sugarValue `liftM` value) (map sugarClafer children)
 
-    sugarValue (AliasValue alias) = AliasValue $ sugarId preservenames False alias
+    sugarValue (AliasValue alias) = AliasValue $ sugarId addUidsAndTypes False alias
     sugarValue x = x
 
 retrieveSuper :: Analysis.Info -> String -> String
