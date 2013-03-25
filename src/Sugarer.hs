@@ -72,14 +72,14 @@ sugarClaferModel   addUidsAndTypes    info             model@(ClaferModel topLev
     
     sugarId :: Bool -> Bool -> Id -> Id
     sugarId addUidsAndTypes addRefDecl id =
-        if count == 1 then
-            Id finalName 0
-        else
-            Id (finalName ++ "$" ++ show ordinal ++ (if addRefDecl && addUidsAndTypes then refDecl info else "")) 0
+        if count == 1 
+            then Id (finalName ++ (refDecl addUidsAndTypes addRefDecl info)) 0
+            else Id (finalName ++ "$" ++ show ordinal ++ (refDecl addUidsAndTypes addRefDecl info)) 0  
         where
         fullName = i_name id
-        refDecl (Just info) = retrieveSuper info $ i_name id
-        refDecl Nothing = ""
+        refDecl :: Bool -> Bool -> Maybe Analysis.Info -> String
+        refDecl    True    True    (Just info) = retrieveSuper info $ i_name id
+        refDecl    _       _       _ = ""
         (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample
         count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts
         finalName = if addUidsAndTypes then fullName else simpleName
