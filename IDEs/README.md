@@ -13,6 +13,7 @@ This build system assumes that Clafer and ClaferIG executables are in system `PA
 
 ### Installation 
 
-Copy `Packages\SublimeREPL\config\ClaferIG` into your home directory Sublime Text 2 folder.
+1. Install `SublimeREPL` plugin.
+2. Copy `Packages\SublimeREPL\config\ClaferIG` into your home directory Sublime Text 2 folder.
 
 > Note: on Windows 7 and 8, the `Packages` folder is located at `<user name>\AppData\Roaming\Sublime Text 2\Packages\`.

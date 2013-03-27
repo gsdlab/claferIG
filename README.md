@@ -14,6 +14,11 @@ Getting Clafer Tools
 Binary distributions of Clafer and ClaferIG for Windows, Mac, and Linux, can be downloaded from [ClaferIG Downloads Page](https://github.com/gsdlab/claferig/downloads). 
 In case these binaries do not work on your particular machine configuration, the tools can be easily built from source code, as described below.
 
+Integration with Sublime Text 2
+-------------------------------
+
+See [IDEs/README.md](IDEs/README.md)
+
 Building & Installation From Source Code
 ----------------------------------------
 
