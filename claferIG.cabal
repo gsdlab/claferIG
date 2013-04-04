@@ -27,7 +27,7 @@ Executable claferIG
                      directory, 
                      executable-path, 
                      filepath, 
-                     haskeline, 
+                     haskeline >= 0.7.0, 
                      HaXml, 
                      mtl, 
                      parsec, 
