@@ -1,7 +1,7 @@
 Clafer Instance Generator
 =========================
 
-v0.3.2.5-3-2013
+v0.3.2.11-4-2013
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
 overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
@@ -11,8 +11,28 @@ For more information, see [technical report](http://gsd.uwaterloo.ca/node/462).
 Getting Clafer Tools
 --------------------
 
-Binary distributions of Clafer and ClaferIG for Windows, Mac, and Linux, can be downloaded from [ClaferIG Downloads Page](https://github.com/gsdlab/claferig/downloads). 
+Binary distributions of Clafer and ClaferIG for Windows, Mac, and Linux, can be downloaded from [Clafer Tools - Binary Distributions](http://gsd.uwaterloo.ca/node/516). 
+Clafer Wiki requires Haskell Platform and MinGW to run on Windows.
+
 In case these binaries do not work on your particular machine configuration, the tools can be easily built from source code, as described below.
+
+The following tools are not part of the binary distribution and they have to be downloaded separately:
+
+* [ClaferMOO](https://github.com/gsdlab/ClaferMooStandalone) is a set of scripts in Python (cross-platform). 
+* [ClaferMooVisualizer](https://github.com/gsdlab/ClaferMooVisualizer) is a client/server web application written JavaScript.
+* [ClaferConfigurator](https://github.com/gsdlab/ClaferConfigurator) is a client/server web application written JavaScript.
+
+### Dependencies for running
+
+* [Clafer](https://github.com/gsdlab/clafer) v0.3.2
+* [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) v6+, 32bit
+* [Alloy4.1](http://alloy.mit.edu/alloy/download.html)
+
+### Installation
+
+1. download the binaries and unpack `<target directory>` of your choice
+2. add the `<target directory>` to your system path so that the executables can be found
+3. copy Alloy 4.1's jar to the `<target directory>/tools` folder
 
 Integration with Sublime Text 2
 -------------------------------
@@ -22,26 +42,15 @@ See [IDEs/README.md](IDEs/README.md)
 Building & Installation From Source Code
 ----------------------------------------
 
-Dependencies
-------------
+### Additional dependencies for building
 
 * [Clafer compiler](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`)). The version number of the compiler must match the version of the instance generator.
-
-**Note**: Installing the Clafer translator will satisfy all the following dependencies:
-
-* [The Haskell Platform](http://hackage.haskell.org/platform/) v.2012.2.0.0
-  * On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
+* On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
   * on Ubuntu, execute `sudo apt-get install zlib1g-dev libncurses5-dev`
-* [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) >= 6, 32bit
-* [Alloy4.1](http://alloy.mit.edu/alloy/download.html)
- * MiniSAT Proover (a SAT solver used by Alloy that can produce UnSAT Core, bundled with Alloy)
-* [Git](http://git-scm.com/)
 
-On Windows only
+### Important: Branches must correspond
 
-* [Cygwin](http://www.cygwin.com/) with packages `make`, `wget`
-
-Clafer and ClaferIG are following the  *simultaneous release model*. 
+Clafer, ClaferIG, ClaferWiki, ClaferMoo, and ClaferMooVisualizer are following the *simultaneous release model*. 
 The branch `master` contains releases, whereas the branch `develop` contains code under development. 
 When building the tools, the branches should match:
 Releases `clafer/master` and `claferIG/master` are guaranteed to work well together.
@@ -65,11 +74,30 @@ Development versions `clafer/develop` and `claferIG/develop` should work well to
 > On Windows, use `/` with the `make` command instead of `\`.
 
 Usage
------
+=====
 
 Clafer Instance Generator can be used in interactive and batch modes, as well as, an API.
 
 ### Command-line Usage
+
+(As printed by `claferIG --help`)
+
+```
+ClaferIG v0.3.2.11-4-2013
+
+igargs [OPTIONS] FILE
+
+Common flags:
+     --all=INT           Saves all instances up to the provided scope or a
+                         counterexample.
+  -s --savedir=FILE      Specify the directory for storing saved files.
+     --alloysolution     Convert Alloy solution to a Clafer solution.
+  -b --bitwidth=INTEGER  Set the bitwidth for integers.
+     --adduidsandtypes   Preserve unique clafer names and add super/reference
+                         types in Clafer solution.
+  -? --help              Display help message
+  -V --version           Print version information
+```
 
 `claferIG <model file name>.cfr`
 
@@ -79,11 +107,10 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 
 - opens a non-interactive session and saves all instances up to the provided scope or a counterexample to files named `<model file name>.cfr.<instance number>.data`, one instance per file.
 
-
 ### Interactive Session Usage
 In the interactive mode, the users can invoke the following commands by pressing the first letter of the command name or the whole command as marked by boldface:
 
-ClaferIG v0.3.2.5-3-2013
+ClaferIG v0.3.2.11-4-2013
 
 * [tab] - print the available commands or auto-complete command name, a clafer name, or clafer instance name in a given context
 * **n**ext or **[enter]** - to produce the next instance if available, a counterexample, or to output a message that no more instances exist within the given scope
@@ -125,6 +152,7 @@ The instance data notation is very similar to a regular Clafer notation for conc
 
 * no constraints
 * no types and super types
+    * except when `--adduidsandtypes` parameter is used
 * no clafer and group cardinalities (each clafer has the default group `(0..*)` and clafer `(1..1)` cardinality)
 * no clafers not present in the instance
 
@@ -158,22 +186,25 @@ A possible instance data looks as follows:
 
 ```clafer
 a1
-    b1
-    b2
+    b$1
+    b$2
     c = 10
-    d = e1, e2    // concise reference notation - no children
-    g1 = e1       // expanded reference notation - with children
+    d$1 = e1
+    d$2 = e2    
+    g1 = e1       
         h = 5     
     g2 = e2
         h = 2
 
 e1
-    f = 2, 3, 4   // concise multivalue notation
+    f$1 = 2
+    f$2 = 3
+    f$3 = 4 
 ```
 
-### Counter example
+### Near-miss instance
 
-The counter example notation is the same as the instance data notation. Additionally, it indicates which constraints belong to the UnSAT Core.
+Near-miss instance notation is the same as the instance data notation. Additionally, it indicates which constraints belong to the UnSAT Core.
 
 #### Example 
 
@@ -192,7 +223,7 @@ a1 : A
 
 Constraints C1, C2, and C3 form an UnSAT Core. Removal of any of them will make the model satisfiable. The constraint C1 is part of the model and cannot be removed (part of domain knowledge). Therefore, either C2 or C3 must be removed to remove the inconsistency. 
 
-On possible counter example that illustrates the inconsistency is as follows:
+On possible near-miss instance:
 
 ```clafer
 a1
@@ -215,4 +246,7 @@ The Clafer instance generator:
 
 Need help?
 ==========
-Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `claferig` (so that we know what they are related to) and with `jimmy-liang` (so that Jimmy gets a notification).
+
+* See [Project's website](http://gsd.uwaterloo.ca/clafer) for news, technical reports and more
+* Try live instance of [ClaferWiki](http://gsd.uwaterloo.ca:5001) - it contains many example models.
+* Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `clafer` (so that we know what they are related to) and with `kacper-bak`, `jimmy-liang`, or `michal` (so that Kacper, Jimmy, or Michał gets a notification).
