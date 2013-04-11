@@ -8,45 +8,51 @@ else
 	ONAME := $(shell uname -o | tr "A-Z" "a-z")
 endif
 
-
 MNAME := $(shell uname -m | tr "A-Z" "a-z")
 
 ifeq ($(UNAME), linux)
 	ifeq ($(MNAME), i686)
-        LIB := x86-linux/libminisatprover*
-    endif
+		LIB := x86-linux/libminisatprover*
+	endif
 	ifeq ($(MNAME), x86_64)
-        # amd64 is a nickname for x86_64
-        LIB := amd64-linux/libminisatprover*
-    endif
+		# amd64 is a nickname for x86_64
+		LIB := amd64-linux/libminisatprover*
+	endif
 endif
 ifeq ($(UNAME), windows)
 	ifeq ($(MNAME), i686)
-        LIB := x86-windows/minisatprover*
-    endif
+		LIB := x86-windows/minisatprover*
+	endif
 	ifeq ($(MNAME), x86_64)
-        LIB := x86-windows/minisatprover*
-    endif
+		LIB := x86-windows/minisatprover*
+	endif
+endif
+ifeq ($(UNAME), mingw32_nt-6.2)
+	ifeq ($(MNAME), i686)
+		LIB := x86-windows/minisatprover*
+	endif
+	ifeq ($(MNAME), x86_64)
+		LIB := x86-windows/minisatprover*
+	endif
 endif
 ifeq ($(ONAME), cygwin)
 	ifeq ($(MNAME), i686)
-        LIB := x86-windows/minisatprover*
-    endif
+		LIB := x86-windows/minisatprover*
+	endif
 	ifeq ($(MNAME), x86_64)
-        LIB := x86-windows/minisatprover*
-    endif
+		LIB := x86-windows/minisatprover*
+	endif
 endif
-
 ifeq ($(UNAME), darwin)
 	ifeq ($(MNAME), i686)
-        LIB := x86-mac/libminisatprover*
-    endif
+		LIB := x86-mac/libminisatprover*
+	endif
 	ifeq ($(MNAME), x86_64)
-        LIB := x86-mac/libminisatprover*
-    endif
-    WGET_COMMAND := curl -O
+		LIB := x86-mac/libminisatprover*
+	endif
+	WGET_COMMAND := curl -O
 else
-    WGET_COMMAND := wget
+	WGET_COMMAND := wget
 endif
 
 # Calling `make` should only build
@@ -93,7 +99,7 @@ lib:
 	fi
 	
 runTests:
-    # Only test a subset of the suite. The other cases do not work yet.
+	# Only test a subset of the suite. The other cases do not work yet.
 	./claferIG --all=4 -s dist/run test/suite/backquoted.cfr
 	./claferIG --all=4 -s dist/run test/suite/BobsTeam.cfr
 	./claferIG --all=4 -s dist/run test/suite/inconsistent.cfr

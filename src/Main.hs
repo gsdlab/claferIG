@@ -45,7 +45,8 @@ data IGArgs = IGArgs {
     saveDir :: Maybe FilePath,  
     claferModelFile :: FilePath,
     alloySolution :: Bool,
-    bitwidth :: Integer
+    bitwidth :: Integer,
+    addUidsAndTypes :: Bool
 } deriving (Show, Data, Typeable)
 
 
@@ -56,7 +57,8 @@ claferIG = IGArgs {
     -- Default bitwidth is 4.
     bitwidth        = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER",
     alloySolution   = False &= help "Convert Alloy solution to a Clafer solution.",
-    claferModelFile = def &= argPos 0 &= typ "FILE"
+    claferModelFile = def &= argPos 0 &= typ "FILE",
+    addUidsAndTypes   = False &= help "Preserve unique clafer names and add super/reference types in Clafer solution."
 } &= summary claferIGVersion
 
 
@@ -81,7 +83,7 @@ main =
                     tryClaferIG args
         
 runClaferIG args =
-    runClaferIGT (claferModelFile args) (bitwidth args) $ do
+    runClaferIGT (claferModelFile args) (bitwidth args) (addUidsAndTypes args) $ do
         case all args of
             Just scope ->
                 do
@@ -101,7 +103,7 @@ runClaferIG args =
 runAlloySolution args =
     do
         content <- readFile $ claferModelFile args -- It's an Alloy XML file in this case
-        putStrLn $ show $ sugarClaferModel $ buildClaferModel $ parseSolution content
+        putStrLn $ show $ sugarClaferModel (addUidsAndTypes args) Nothing $ buildClaferModel $ parseSolution content
 
 savePath :: FilePath -> IORef Int -> IO FilePath
 savePath file counterRef =

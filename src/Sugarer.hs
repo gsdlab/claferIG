@@ -23,6 +23,7 @@
 module Sugarer (sugarClaferModel) where
 
 import ClaferModel
+import qualified Language.Clafer.Intermediate.Analysis as Analysis
 import Control.Monad
 import Data.List as List hiding (map)
 import Data.Map as Map hiding (map, foldr, foldl)
@@ -30,7 +31,10 @@ import Data.Map as Map hiding (map, foldr, foldl)
 
 -- Sample: maps the id to the its simple name and the number of times its simple name appeared in the census before it
 -- Count: maps the simple name to the total count of the simple name
-data Census = Census {sample::Map Id (Int, String), counts::Map String Int} deriving Show
+data Census = Census {
+    sample::Map Id (Int, String), 
+    counts::Map String Int
+} deriving Show
 
 
 -- Adds the full name to the census
@@ -39,11 +43,16 @@ poll id (Census sample counts) =
     Census sample' counts'
     where
     fullName = i_name id
-    name = simpleName fullName
+    name = makeSimpleName fullName
     counts' = insertWith (+) name 1 counts
     ordinal' = findWithDefault (error $ "Did not find " ++ name ++ " in counts.") name counts'
     sample' = insertWith (error $ "Polled " ++ fullName ++ " twice in the census.") id (ordinal', name) sample
-
+    -- Transforms c2_name -> name
+    makeSimpleName :: String -> String
+    makeSimpleName name =
+        case snd $ break ('_' ==) name of
+            [] ->  error "Unexpected Clafer name " ++ name
+            x -> tail x
 
 -- Count the number of each clafer
 claferModelCensus :: ClaferModel -> Census
@@ -55,32 +64,40 @@ claferModelCensus (ClaferModel topLevel) =
 
 
 -- Rewrite the model into a human-friendlier format
-sugarClaferModel:: ClaferModel -> ClaferModel
-sugarClaferModel model@(ClaferModel topLevel) =
+sugarClaferModel:: Bool          -> Maybe Analysis.Info -> ClaferModel                  -> ClaferModel
+sugarClaferModel   addUidsAndTypes    info             model@(ClaferModel topLevel) =
     ClaferModel $ map sugarClafer topLevel
     where
     Census sample counts = claferModelCensus model
     
-    sugarId :: Id -> Id
-    sugarId id =
-        if count == 1 then
-            Id simpleName 0
-        else
-            Id (simpleName ++ show ordinal) 0
+    sugarId :: Bool -> Bool -> Id -> Id
+    sugarId addUidsAndTypes addRefDecl id =
+        if count == 1 
+            then Id (finalName ++ (refDecl addUidsAndTypes addRefDecl info)) 0
+            else Id (finalName ++ "$" ++ show ordinal ++ (refDecl addUidsAndTypes addRefDecl info)) 0  
         where
         fullName = i_name id
+        refDecl :: Bool -> Bool -> Maybe Analysis.Info -> String
+        refDecl    True    True    (Just info) = retrieveSuper info $ i_name id
+        refDecl    _       _       _ = ""
         (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample
         count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts
+        finalName = if addUidsAndTypes then fullName else simpleName
     
-    sugarClafer (Clafer id value children) = Clafer (sugarId id) (sugarValue `liftM` value) (map sugarClafer children)
+    sugarClafer (Clafer id value children) = Clafer (sugarId addUidsAndTypes True id) (sugarValue `liftM` value) (map sugarClafer children)
 
-    sugarValue (AliasValue alias) = AliasValue $ sugarId alias
+    sugarValue (AliasValue alias) = AliasValue $ sugarId addUidsAndTypes False alias
     sugarValue x = x
 
+retrieveSuper :: Analysis.Info -> String -> String
+retrieveSuper info uid = 
+    if (Analysis.isBase sclafer)
+        then ""
+        else maybe "" sugarSuper (Analysis.super sclafer)
+    where
+        sclafer = Analysis.runAnalysis (Analysis.claferWithUid uid) info
 
--- Transforms c2_name -> name
-simpleName :: String -> String
-simpleName n =
-    case snd $ break ('_' ==) n of
-        [] ->  error "Unexpected Clafer name " ++ n
-        x -> tail x
+        sugarSuper :: Analysis.SSuper -> String
+        sugarSuper (Analysis.Ref s) = " -> " ++ s
+        sugarSuper (Analysis.Colon s) = " : " ++ s
+      

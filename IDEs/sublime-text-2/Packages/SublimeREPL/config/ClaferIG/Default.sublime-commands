@@ -1,0 +1,10 @@
+[
+    {
+        "caption": "SublimeREPL: ClaferIG",
+        "command": "run_existing_window_command", "args":
+        {
+            "id": "repl_claferIG",
+            "file": "config/ClaferIG/Main.sublime-menu"
+        }
+    }
+]

@@ -22,13 +22,39 @@
  SOFTWARE.
 -}
 
-module ClaferIG (ClaferIGT, Scope, Instance(..), Counterexample(..), runClaferIGT, claferIGVersion, getClaferModel, getAlloyModel, solve, getClafers, getGlobalScope, setGlobalScope, getScopes, getScope, nameOfScope, valueOfScope, increaseScope, setScope, next, setUnsatCoreMinimization, getClaferFile, getBitwidth, setBitwidth, quit, reload) where
+module ClaferIG (
+    ClaferIGT, 
+    Scope, 
+    Instance(..), 
+    Counterexample(..), 
+    runClaferIGT, 
+    claferIGVersion, 
+    getClaferModel, 
+    getAlloyModel, 
+    solve, 
+    getClafers, 
+    getGlobalScope, 
+    setGlobalScope, 
+    getScopes, 
+    getScope, 
+    nameOfScope, 
+    valueOfScope, 
+    increaseScope, 
+    setScope, 
+    next, 
+    setUnsatCoreMinimization, 
+    getClaferFile, 
+    getBitwidth, 
+    setBitwidth, 
+    quit, 
+    reload) where
 
 import Debug.Trace
 import Language.Clafer
 import Language.ClaferT
 import Language.Clafer.Front.Absclafer (Span(..))
 import Language.Clafer.Generator.Xml
+import qualified Language.Clafer.Intermediate.Analysis as Analysis
 import AlloyIGInterface (AlloyIGT)
 import qualified AlloyIGInterface as AlloyIG
 import ClaferModel
@@ -69,16 +95,25 @@ fetches = ClaferIGT . gets
 set :: Monad m => ClaferIGEnv -> ClaferIGT m ()
 set = ClaferIGT . put
 
-runClaferIGT :: MonadIO m => FilePath -> Integer -> ClaferIGT m a -> m (Either ClaferErrs a)
-runClaferIGT claferFile bitwidth run =
+runClaferIGT :: MonadIO m => FilePath -> Integer -> Bool -> ClaferIGT m a -> m (Either ClaferErrs a)
+runClaferIGT claferFile bitwidth addUidsAndTypes run =
     AlloyIG.runAlloyIGT $ runErrorT $ do
-        env <- (ErrorT $ load claferFile bitwidth) `catchError` (\x -> lift AlloyIG.sendQuitCommand >> throwError x)
+        env <- (ErrorT $ load claferFile bitwidth addUidsAndTypes) `catchError` (\x -> lift AlloyIG.sendQuitCommand >> throwError x)
         lift $ evalStateT (unwrap run) env
     where
     unwrap (ClaferIGT c) = c
 
 
-data ClaferIGEnv = ClaferIGEnv{claferFile::FilePath, bitwidth::Integer, constraints:: [Constraint], claferModel::String, claferToSigNameMap:: Map String String}
+data ClaferIGEnv = ClaferIGEnv{
+    claferEnv'::ClaferEnv,
+    claferFile::FilePath, 
+    bitwidth::Integer, 
+    constraints:: [Constraint], 
+    claferModel::String, 
+    claferToSigNameMap:: Map String String,
+    addUidsAndTypes::Bool, 
+    info :: Analysis.Info
+}
 
 
 data Scope = Scope {name::String, sigName::String}
@@ -101,14 +136,18 @@ claferIGVersion =
 getClaferModel :: Monad m => ClaferIGT m String
 getClaferModel = fetches claferModel
 
+getClaferEnv' :: Monad m => ClaferIGT m ClaferEnv
+getClaferEnv' = fetches claferEnv'
 
-load :: MonadIO m => String -> Integer -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
-load claferFile bitwidth  =
+
+load :: MonadIO m => String  -> Integer -> Bool -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
+load                 claferFile bitwidth   addUidsAndTypes =
     runErrorT $ do
         claferModel <- liftIO $ strictReadFile claferFile
         
-        (ir, alloyModel, mapping) <- ErrorT $ return $ callClaferTranslator claferModel
-        
+        (claferEnv', alloyModel, mapping) <- ErrorT $ return $ callClaferTranslator claferModel 
+
+        let ir = fst3 $ fromJust $ cIr claferEnv'
         let constraints = parseConstraints claferModel ir mapping
         
         lift $ AlloyIG.sendLoadCommand alloyModel
@@ -117,7 +156,9 @@ load claferFile bitwidth  =
         sigs <- lift $ AlloyIG.getSigs
         let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
         
-        return $ ClaferIGEnv claferFile bitwidth constraints claferModel claferToSigNameMap
+        let info = Analysis.gatherInfo ir 
+
+        return $ ClaferIGEnv claferEnv' claferFile bitwidth constraints claferModel claferToSigNameMap addUidsAndTypes info
     where
     callClaferTranslator code =
         mapLeft ClaferErrs $ runClafer args $ do
@@ -125,7 +166,7 @@ load claferFile bitwidth  =
             parse
             compile
             result <- generate
-            return (fst3 $ fromJust $ cIr $ claferEnv result, outputCode result, mappingToAlloy result)
+            return (claferEnv result, outputCode result, mappingToAlloy result)
     args = defaultClaferArgs {keep_unused = Just True, no_stats = Just True}
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
@@ -207,13 +248,15 @@ next :: MonadIO m => ClaferIGT m Instance
 next =
     do
         constraints' <- fetches constraints
-        nextImpl constraints'
+        addUidsAndTypes' <- fetches addUidsAndTypes
+        info' <- fetches info
+        nextImpl addUidsAndTypes' constraints' (Just info')
 
-nextImpl constraints = 
+nextImpl addUidsAndTypes constraints info = 
     do
         xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
         case xmlSolution of
-            Just xml -> return $ Instance (xmlToModel xml) xml
+            Just xml -> return $ Instance (xmlToModel addUidsAndTypes xml) xml
             Nothing  -> do
                 ClaferIGT $ lift AlloyIG.sendSaveStateCommand
                 -- Generating counterexample modifies the state. If we ever want to
@@ -234,7 +277,7 @@ nextImpl constraints =
                     xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
                     case xmlSolution of
                         Just xml -> return $
-                            UnsatCore (catMaybes $ findRemovable core) (Just $ Counterexample (reverse $ remove : removed) (xmlToModel xml) xml)
+                            UnsatCore (catMaybes $ findRemovable core) (Just $ Counterexample (reverse $ remove : removed) (xmlToModel addUidsAndTypes xml) xml)
                         Nothing ->
                             do
                                 AlloyIG.UnsatCore core' <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
@@ -243,8 +286,8 @@ nextImpl constraints =
                     return NoInstance
 
     findRemovable core = [find ((== c). range) constraints | c <- core]
-                
-    xmlToModel xml = sugarClaferModel $ buildClaferModel $ parseSolution xml
+
+    xmlToModel addUidsAndTypes xml = sugarClaferModel addUidsAndTypes info $ buildClaferModel $ parseSolution xml
     
     
 reload :: MonadIO m => ClaferIGT m (Either ClaferErrs ())
@@ -254,7 +297,8 @@ reload  =
         
         claferFile' <- lift $ getClaferFile
         bitwidth'   <- lift $ getBitwidth
-        env <- ErrorT $ ClaferIGT $ lift $ load claferFile' bitwidth'
+        addUidsAndTypes' <- lift $ getaddUidsAndTypes
+        env <- ErrorT $ ClaferIGT $ lift $ load claferFile' bitwidth' addUidsAndTypes'
         lift $ set env
       
         lift $ setGlobalScope globalScope
@@ -271,6 +315,8 @@ getClaferFile = fetches claferFile
 getBitwidth :: Monad m => ClaferIGT m Integer
 getBitwidth = fetches bitwidth
 
+getaddUidsAndTypes :: Monad m => ClaferIGT m Bool
+getaddUidsAndTypes = fetches addUidsAndTypes
 
 setBitwidth :: MonadIO m => Integer -> ClaferIGT m ()
 setBitwidth bitwidth = ClaferIGT $ lift $ AlloyIG.sendSetBitwidthCommand bitwidth

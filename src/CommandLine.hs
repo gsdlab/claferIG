@@ -39,7 +39,7 @@ import Data.List
 import qualified Data.Map as Map
 import Data.Maybe
 import System.Console.Haskeline
-
+import System.IO
 
 data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_UnsatCoreMinimization | Auto_Space | Auto_Digit | No_Auto deriving Show
 
@@ -80,19 +80,19 @@ runCommandLine =
                     outputStrLn $ show claferModel
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 UnsatCore core counterexample -> do
-                    outputStrLn "No more instances found. Try increasing scope to get more instances."
-                    outputStrLn "The following set of constraints cannot be satisfied in the current scope."
-                    outputStrLn "(Hint: use the setUnsatCoreMinimization command to minimize the set of constraints below)"
+                    liftIO $ hPutStrLn stderr "No more instances found. Try increasing scope to get more instances."
+                    liftIO $ hPutStrLn stderr "The following set of constraints cannot be satisfied in the current scope."
+                    liftIO $ hPutStrLn stderr "(Hint: use the setUnsatCoreMinimization command to minimize the set of constraints below)"
                     printConstraints core
                     case counterexample of
                         Just (Counterexample removed claferModel xml) -> do
-                            outputStrLn "Altering the following constraints produced a counterexample."
+                            liftIO $ hPutStrLn stderr "Altering the following constraints produced the following near-miss example:"
                             printTransformations removed
                             outputStrLn $ show claferModel
                         Nothing -> return ()
                     nextLoop context
                 NoInstance -> do
-                    outputStrLn "No more instances found. Try increasing scope to get more instances."
+                    liftIO $ hPutStrLn stderr "No more instances found. Try increasing scope to get more instances."
                     nextLoop context
             where
             printConstraint UserConstraint{constraintInfo = info} = show info
@@ -102,7 +102,7 @@ runCommandLine =
             printConstraints' _ [] = return ()
             printConstraints' i (c:cs) =
                 do
-                    outputStrLn $ "  " ++ show i ++ ") " ++ printConstraint c
+                    liftIO $ hPutStrLn stderr $ "  " ++ show i ++ ") " ++ printConstraint c
                     printConstraints' (i + 1) cs
             
             printTransformation :: Constraint -> [Constraint] -> (String, [Constraint])        
@@ -129,7 +129,7 @@ runCommandLine =
             printTransformations' i (c:cs) =
                 do
                     let (print, rest) = printTransformation c cs
-                    outputStrLn $ "  " ++ show i ++ ") " ++ print
+                    liftIO $ hPutStrLn stderr $ "  " ++ show i ++ ") " ++ print
                     printTransformations' (i + 1) rest
                     
             setLower info@ClaferInfo{cardinality = c} lower = info{cardinality = c{lower = lower}}
@@ -192,7 +192,7 @@ runCommandLine =
 
     loop Reload context =
         do
-            runErrorT $ ErrorT (lift reload) `catchError` (lift . mapM_ outputStrLn . printError)
+            runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
             lift $ solve
             nextLoop context
 
