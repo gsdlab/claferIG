@@ -69,6 +69,7 @@ install:
 	cp -f LICENSE $(to)/
 	cp -f CHANGES.md $(to)/claferIG-CHANGES.md
 	cp -f README.md $(to)/claferIG-README.md
+	cp -f -R IDEs $(to)
 	cabal install --bindir=$(to)
 
 # this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs 
