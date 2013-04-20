@@ -30,6 +30,7 @@ import ClaferIG
 import ClaferModel
 import CommandLineParser
 import Constraints
+import JSONGenerator
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.Trans
@@ -73,11 +74,15 @@ runCommandLine =
     loop Next context =
         do
             solution <- lift next
+            claferIGArgs' <- lift getClaferIGArgs 
+            info <- lift getInfo
             case solution of
                 Instance claferModel xml -> do
                     liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse claferModel)
                     
-                    outputStrLn $ show claferModel
+                    outputStrLn $ if json claferIGArgs' 
+                        then generateJSON info claferModel
+                        else show claferModel
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 UnsatCore core counterexample -> do
                     liftIO $ hPutStrLn stderr "No more instances found. Try increasing scope to get more instances."
@@ -289,13 +294,14 @@ runCommandLine =
     
     save :: MonadIO m => [ClaferModel] -> Integer -> ClaferIGT m ()
     save [] _ = return ()
-    save (c:cs) counter =
-        do
-            claferFile <- getClaferFile
-            let saveName = claferFile ++ "." ++ (show counter) ++ ".data"
-            liftIO $ writeFile saveName (show c)
-            liftIO $ putStrLn $ "Saved to " ++ saveName
-            save cs (counter + 1)
+    save (c:cs) counter = do
+        claferIGArgs' <- getClaferIGArgs
+        let 
+            claferModelFile' = claferModelFile claferIGArgs'
+            saveName = claferModelFile' ++ "." ++ (show counter) ++ ".data"
+        liftIO $ writeFile saveName (show c)
+        liftIO $ putStrLn $ "Saved to " ++ saveName
+        save cs (counter + 1)
 
 try :: MonadIO m => ErrorT String (InputT m) a -> InputT m ()
 try e = either outputStrLn (void . return) =<< runErrorT e

@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012, 2013 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -56,38 +56,41 @@ poll id (Census sample counts) =
 
 -- Count the number of each clafer
 claferModelCensus :: ClaferModel -> Census
-claferModelCensus (ClaferModel topLevel) =
-    clafersCensus (Census Map.empty Map.empty) topLevel
+claferModelCensus (ClaferModel topLevelClafers) =
+    clafersCensus (Census Map.empty Map.empty) topLevelClafers
     where
     clafersCensus = foldl claferCensus
     claferCensus census Clafer{c_id=id, c_children=children} = poll id (clafersCensus census children) 
 
 
 -- Rewrite the model into a human-friendlier format
-sugarClaferModel:: Bool          -> Maybe Analysis.Info -> ClaferModel                  -> ClaferModel
-sugarClaferModel   addUidsAndTypes    info             model@(ClaferModel topLevel) =
-    ClaferModel $ map sugarClafer topLevel
+sugarClaferModel:: Bool -> Bool  -> Maybe Analysis.Info -> ClaferModel                        -> ClaferModel
+sugarClaferModel   useUids addTypes info                   model@(ClaferModel topLevelClafers) =
+    ClaferModel $ map sugarClafer topLevelClafers
     where
+    sugarClafer (Clafer id value children) = 
+        Clafer (sugarId useUids addTypes True id) (sugarValue `liftM` value) (map sugarClafer children)
+
+    sugarValue (AliasValue alias) = AliasValue $ sugarId useUids addTypes False alias
+    sugarValue x = x
+
     Census sample counts = claferModelCensus model
     
-    sugarId :: Bool -> Bool -> Id -> Id
-    sugarId addUidsAndTypes addRefDecl id =
+    sugarId :: Bool -> Bool  -> Bool    -> Id -> Id
+    sugarId    useUids addTypes addRefDecl id  =
         if count == 1 
-            then Id (finalName ++ (refDecl addUidsAndTypes addRefDecl info)) 0
-            else Id (finalName ++ "$" ++ show ordinal ++ (refDecl addUidsAndTypes addRefDecl info)) 0  
+            then Id (finalName ++ (refDecl addTypes addRefDecl info)) 0
+            else Id (finalName ++ "$" ++ show ordinal ++ (refDecl addTypes addRefDecl info)) 0  
         where
         fullName = i_name id
+
         refDecl :: Bool -> Bool -> Maybe Analysis.Info -> String
-        refDecl    True    True    (Just info) = retrieveSuper info $ i_name id
-        refDecl    _       _       _ = ""
+        refDecl    True    True    (Just info)          = retrieveSuper info $ i_name id
+        refDecl    _       _       _                    = ""
+        
         (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample
         count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts
-        finalName = if addUidsAndTypes then fullName else simpleName
-    
-    sugarClafer (Clafer id value children) = Clafer (sugarId addUidsAndTypes True id) (sugarValue `liftM` value) (map sugarClafer children)
-
-    sugarValue (AliasValue alias) = AliasValue $ sugarId addUidsAndTypes False alias
-    sugarValue x = x
+        finalName = if useUids then fullName else simpleName
 
 retrieveSuper :: Analysis.Info -> String -> String
 retrieveSuper info uid = 

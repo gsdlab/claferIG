@@ -39,37 +39,29 @@ import System.Console.CmdArgs
 import System.Directory
 import System.FilePath
 
-
-data IGArgs = IGArgs {
-    all :: Maybe Integer,
-    saveDir :: Maybe FilePath,  
-    claferModelFile :: FilePath,
-    alloySolution :: Bool,
-    bitwidth :: Integer,
-    addUidsAndTypes :: Bool
-} deriving (Show, Data, Typeable)
-
-
-
-claferIG = IGArgs {
+claferIGArgsDef = IGArgs {
     all             = def &= help "Saves all instances up to the provided scope or a counterexample.",
     saveDir         = def &= help "Specify the directory for storing saved files." &= typ "FILE",
-    -- Default bitwidth is 4.
-    bitwidth        = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER",
+    bitwidth        = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER", -- Default bitwidth is 4.
     alloySolution   = False &= help "Convert Alloy solution to a Clafer solution.",
     claferModelFile = def &= argPos 0 &= typ "FILE",
-    addUidsAndTypes   = False &= help "Preserve unique clafer names and add super/reference types in Clafer solution."
+    useUids         = False &= help "Use unique clafer names in the Clafer solution.",
+    addTypes        = False &= help "Add colon/reference types to the Clafer solution.",
+    json            = False &= help "Render solution as JSON (forces 'addUids')."
 } &= summary claferIGVersion
 
 
 main =
     do
-        args <- cmdArgs claferIG
+        args <- cmdArgs claferIGArgsDef
         if (alloySolution args)
             then
                 runAlloySolution args
-            else
-                tryClaferIG args
+            else if (json args)
+                then 
+                    tryClaferIG (args { useUids = True })
+                else
+                    tryClaferIG args
     where
     tryClaferIG args =
         do
@@ -83,7 +75,7 @@ main =
                     tryClaferIG args
         
 runClaferIG args =
-    runClaferIGT (claferModelFile args) (bitwidth args) (addUidsAndTypes args) $ do
+    runClaferIGT args $ do
         case all args of
             Just scope ->
                 do
@@ -103,7 +95,7 @@ runClaferIG args =
 runAlloySolution args =
     do
         content <- readFile $ claferModelFile args -- It's an Alloy XML file in this case
-        putStrLn $ show $ sugarClaferModel (addUidsAndTypes args) Nothing $ buildClaferModel $ parseSolution content
+        putStrLn $ show $ sugarClaferModel (useUids args) (addTypes args) Nothing $ buildClaferModel $ parseSolution content
 
 savePath :: FilePath -> IORef Int -> IO FilePath
 savePath file counterRef =
