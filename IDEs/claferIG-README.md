@@ -8,13 +8,18 @@ We provide a configuration for SublimeREPL for running ClaferIG inside Sublime a
 
 ### Usage
 
-Use `<CTRL>+I`, `G`, `4` to open a Clafer `.cfr` file with ClaferIG and `--bitwidth=4` setting. 
-This build system assumes that Clafer and ClaferIG executables are in system `PATH`.
+Use `<CTRL>+I`, `G`, `4` to open a Clafer `.cfr` file with ClaferIG and `--bitwidth=4` setting.
+We defined key bindings for bitwidth `4..8`.
+This commands assume that Clafer and ClaferIG executables are in system `PATH`.
 
 ### Installation 
 
 1. Install `SublimeREPL` plugin.
-2. Copy `Packages\SublimeREPL\config\ClaferIG` into your home directory Sublime Text 2 folder.
+  * You need to install `Package Control` first - see [installation](http://wbond.net/sublime_packages/package_control/installation). To open the Console, go to `View->Show Console`.
+  * Go to `Preferences->Package Control`
+  * type `Install`, `<Enter>`
+  * type `SublimeREPL`, `<Enter>`
+2. Copy the folder `ClaferIG` from `IDEs\sublime-text-2\Packages\SublimeREPL\config\` to `Packages\SublimeREPL\config\` in Sublime Text 2 folder inside your home directory.
 3. In Sublime, open `Preferences->Key Bindings - User` and add the following key bindings there (inside the `[ ]`, remember about commas `,` to have a proper list)
 
 ```
@@ -60,4 +65,6 @@ This build system assumes that Clafer and ClaferIG executables are in system `PA
     }
 ```
 
-> Note: on Windows 7 and 8, the `Packages` folder is located at `<user name>\AppData\Roaming\Sublime Text 2\Packages\`.
+> Note: 
+> on Windows 7 and 8, the folder is `<user name>\AppData\Roaming\Sublime Text 2\Packages`.
+> on Mac, the folder is `~/Library/Application Support/Sublime Text 2/Packages`.

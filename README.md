@@ -37,7 +37,7 @@ The following tools are not part of the binary distribution and they have to be 
 Integration with Sublime Text 2
 -------------------------------
 
-See [IDEs/README.md](IDEs/README.md)
+See [IDEs/claferIG-README.md](IDEs/claferIG-README.md)
 
 Building & Installation From Source Code
 ----------------------------------------
