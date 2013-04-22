@@ -42,8 +42,8 @@ printClafer    info      clafer@(M.Clafer id value children) =
 
 		getSuper :: Maybe A.SSuper    -> (Bool, String)
 		getSuper    Nothing            = (False, "")
-		getSuper    (Just (A.Ref s))   = (False, s)
-		getSuper    (Just (A.Colon s)) = (True, s)
+		getSuper    (Just (A.Ref s))   = (True, s)
+		getSuper    (Just (A.Colon s)) = (False, s)
 
 		(isOverlapping, super) = getSuper $ A.super sclafer
 		cardMin = A.low sclafer
