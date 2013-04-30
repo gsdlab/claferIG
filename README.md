@@ -48,6 +48,13 @@ Building & Installation From Source Code
 * On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
   * on Ubuntu, execute `sudo apt-get install zlib1g-dev libncurses5-dev`
 
+On Windows 
+
+* [MinGW+MSYS](http://mingw.org) 
+  * since the Haskell Platform already contains MinGW, you may choose to install MinGW+MSYS to the same location, e.g., `c:\...\Haskell Platform\2012.2.0.0`
+  * add the `bin` folders of MinGW (`MinGW\bin`) and MSYS (`MinGW\MSYS\1.0\bin`) to your system path
+  * `unzip` will be automatically installed 
+
 ### Important: Branches must correspond
 
 Clafer, ClaferIG, ClaferWiki, ClaferMoo, and ClaferMooVisualizer are following the *simultaneous release model*. 
