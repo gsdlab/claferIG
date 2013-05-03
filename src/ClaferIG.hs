@@ -40,6 +40,7 @@ module ClaferIG (
     solve, 
     getClafers, 
     getGlobalScope, 
+    getBitwidth,
     setGlobalScope, 
     getScopes, 
     getScope, 
@@ -220,6 +221,11 @@ getClafers =
 getGlobalScope :: MonadIO m => ClaferIGT m Integer
 getGlobalScope = ClaferIGT $ lift AlloyIG.getGlobalScope
 
+getBitwidth :: MonadIO m => ClaferIGT m Integer
+getBitwidth = 
+    do
+        claferIGArgs' <- getClaferIGArgs
+        return $ bitwidth claferIGArgs'
 
 setGlobalScope :: MonadIO m => Integer -> ClaferIGT m ()
 setGlobalScope scope = ClaferIGT $ lift $ AlloyIG.sendSetGlobalScopeCommand scope

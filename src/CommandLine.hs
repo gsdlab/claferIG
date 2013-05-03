@@ -67,6 +67,13 @@ runCommandLine =
             autoAddHistory = True
         } $ loop Next (Context Nothing [] [] autoCompleteContext)
     where 
+
+    getScopeinfo :: Integer -> Integer -> (Integer, String)    
+    getScopeinfo bwcapacity requestedScope = 
+        let a = min requestedScope bwcapacity
+            b =  if (requestedScope > bwcapacity) then "Requested scope is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")\n" else ""
+        in (a,b)
+
     loop :: Command -> Context -> InputT (ClaferIGT IO) ()
     
     loop Quit _ = return ()
@@ -204,24 +211,30 @@ runCommandLine =
     loop (IncreaseGlobalScope i) context =
         do
             globalScope <- lift getGlobalScope
-            let globalScope' = globalScope + i
+            bitwidth' <- lift getBitwidth
+            let scopeinfo' = getScopeinfo (2 ^ (bitwidth' - 1) - 1) (globalScope+i)
+            let globalScope' = (fst scopeinfo')
             lift $ setGlobalScope globalScope'
             
             scopes <- lift getScopes
             lift $ mapM (increaseScope i) scopes
             lift solve
             
-            outputStrLn ("Global scope increased to " ++ show globalScope')
+            outputStrLn ((snd scopeinfo') ++ "Global scope increased to " ++ show globalScope')
             nextLoop context
             
     loop (IncreaseScope name i) context =
         do
             try $ do
                 scope <- ErrorT $ lift $ getScope name
+                bitwidth' <- lift $ lift getBitwidth
                 ErrorT $ lift $ increaseScope i scope
                 scopeValue <- lift $ lift $ valueOfScope scope
+                let scopeinfo' = getScopeinfo (2 ^ (bitwidth' - 1) - 1) scopeValue
+                let scopeValue = (fst scopeinfo')
+
                 lift $ lift $ solve
-                lift $ outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scopeValue)
+                lift $ outputStrLn ((snd scopeinfo') ++ "Scope of " ++ name ++ " increased to " ++ show scopeValue)
                 
             nextLoop context
             
