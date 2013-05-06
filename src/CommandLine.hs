@@ -24,7 +24,6 @@
 
 module CommandLine (claferIGVersion, runCommandLine, printError) where
 
-
 import Language.ClaferT
 import ClaferIG
 import ClaferModel
@@ -47,7 +46,6 @@ data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_Unsa
 data AutoCompleteContext = AutoCompleteContext {clafers::IORef [String], claferInstances::IORef [String]}
 
 data Context = Context {currentAlloyInstance::Maybe String, saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
-
 
 
 runCommandLine :: ClaferIGT IO ()
@@ -212,7 +210,7 @@ runCommandLine =
         do
             globalScope <- lift getGlobalScope
             bitwidth' <- lift getBitwidth
-            let (globalScope',errMsg) = getScopeinfo (2 ^ (bitwidth' - 1) - 1) (globalScope+i)
+            let (globalScope',errMsg) = getScopeinfo ((2 ^ (bitwidth' - 1)) - 1) (globalScope+i)
             lift $ setGlobalScope globalScope'
             
             scopes <- lift getScopes
@@ -226,14 +224,13 @@ runCommandLine =
         do
             try $ do
                 scope <- ErrorT $ lift $ getScope name
-                scope' <- lift $ lift $ valueOfScope scope 
+                scopeValue <- lift $ lift $ valueOfScope scope 
                 bitwidth' <- lift $ lift getBitwidth
-                let (newscope, errorMsg) = getScopeinfo (2 ^ (bitwidth' - 1) - 1) (scope'+i) 
-                ErrorT $ lift $ increaseScope (newscope-scope') scope
-                scopeValue <- lift $ lift $ valueOfScope scope
+                let (scopeValue', errorMsg) = getScopeinfo ((2 ^ (bitwidth' - 1)) - 1) (scopeValue+i) 
+                ErrorT $ lift $ setScope scopeValue' scope
                 
                 lift $ lift $ solve
-                lift $ outputStrLn (errorMsg ++ "Scope of " ++ name ++ " increased to " ++ show scopeValue)
+                lift $ outputStrLn (errorMsg ++ "Scope of " ++ name ++ " increased to " ++ show scopeValue')
                 
             nextLoop context
             
