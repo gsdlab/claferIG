@@ -91,6 +91,11 @@ alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/cl
 	jar cfm alloyIG.jar src/manifest -C dist/javabuild org/clafer/ig/ -C dist/javabuild edu
 
 lib:
+
+	@if [[ "$(UNAME)"=="mingw32_nt-6.1" && -z "$(shell which unzip)" ]] ; then \
+		mingw-get install msys-unzip-bin; \
+	fi 	
+	
 	@if test -z $(LIB); then \
 		echo "[WARNING] Did not find a minisat prover binary suitable for your system. You may need to build the binary yourself."; \
 	else \
