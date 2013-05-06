@@ -212,29 +212,28 @@ runCommandLine =
         do
             globalScope <- lift getGlobalScope
             bitwidth' <- lift getBitwidth
-            let scopeinfo' = getScopeinfo (2 ^ (bitwidth' - 1) - 1) (globalScope+i)
-            let globalScope' = (fst scopeinfo')
+            let (globalScope',errMsg) = getScopeinfo (2 ^ (bitwidth' - 1) - 1) (globalScope+i)
             lift $ setGlobalScope globalScope'
             
             scopes <- lift getScopes
             lift $ mapM (increaseScope i) scopes
             lift solve
             
-            outputStrLn ((snd scopeinfo') ++ "Global scope increased to " ++ show globalScope')
+            outputStrLn (errMsg ++ "Global scope increased to " ++ show globalScope')
             nextLoop context
             
     loop (IncreaseScope name i) context =
         do
             try $ do
                 scope <- ErrorT $ lift $ getScope name
+                scope' <- lift $ lift $ valueOfScope scope 
                 bitwidth' <- lift $ lift getBitwidth
-                ErrorT $ lift $ increaseScope i scope
+                let (newscope, errorMsg) = getScopeinfo (2 ^ (bitwidth' - 1) - 1) (scope'+i) 
+                ErrorT $ lift $ increaseScope (newscope-scope') scope
                 scopeValue <- lift $ lift $ valueOfScope scope
-                let scopeinfo' = getScopeinfo (2 ^ (bitwidth' - 1) - 1) scopeValue
-                let scopeValue = (fst scopeinfo')
-
+                
                 lift $ lift $ solve
-                lift $ outputStrLn ((snd scopeinfo') ++ "Scope of " ++ name ++ " increased to " ++ show scopeValue)
+                lift $ outputStrLn (errorMsg ++ "Scope of " ++ name ++ " increased to " ++ show scopeValue)
                 
             nextLoop context
             
