@@ -210,10 +210,15 @@ runCommandLine =
         do
             globalScope <- lift getGlobalScope
             bitwidth' <- lift getBitwidth
-            let (globalScope',errMsg) = getScopeinfo ((2 ^ (bitwidth' - 1)) - 1) (globalScope+i)
+            let bwcapacity = ((2 ^ (bitwidth' - 1)) - 1)
+            let (globalScope',errMsg) = getScopeinfo bwcapacity (globalScope+i)
             lift $ setGlobalScope globalScope'
             
             scopes <- lift getScopes
+            forM scopes (\x -> do
+                value <- lift $ valueOfScope x
+                let eMsg = if ((value+i) > bwcapacity) then "Requested scope is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")" else ""
+                outputStrLn $ eMsg)
             lift $ mapM (increaseScope i) scopes
             lift solve
             
