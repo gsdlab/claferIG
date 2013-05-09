@@ -66,10 +66,10 @@ runCommandLine =
         } $ loop Next (Context Nothing [] [] autoCompleteContext)
     where 
 
-    getScopeinfo :: Integer -> Integer -> (Integer, String)    
-    getScopeinfo bwcapacity requestedScope = 
+    getScopeinfo :: Integer -> Integer -> String -> (Integer, String)    
+    getScopeinfo bwcapacity requestedScope name = 
         let a = min requestedScope bwcapacity
-            b =  if (requestedScope > bwcapacity) then "Requested scope is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")\n" else ""
+            b =  if (requestedScope > bwcapacity) then "Requested scope for " ++ name ++ " is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")\n" else ""
         in (a,b)
 
     loop :: Command -> Context -> InputT (ClaferIGT IO) ()
@@ -211,13 +211,13 @@ runCommandLine =
             globalScope <- lift getGlobalScope
             bitwidth' <- lift getBitwidth
             let bwcapacity = ((2 ^ (bitwidth' - 1)) - 1)
-            let (globalScope',errMsg) = getScopeinfo bwcapacity (globalScope+i)
+            let (globalScope',errMsg) = getScopeinfo bwcapacity (globalScope+i) "Global Scope"
             lift $ setGlobalScope globalScope'
             
             scopes <- lift getScopes
             forM scopes (\x -> do
                 value <- lift $ valueOfScope x
-                if ((value+i) > bwcapacity) then outputStrLn $ "Requested scope is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")" else return ())
+                if ((value+i) > bwcapacity) then outputStrLn $ "Requested scope for " ++ (nameOfScope x) ++ " is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")" else return ())
             lift $ mapM (increaseScope i) scopes
             lift solve
             
@@ -230,7 +230,7 @@ runCommandLine =
                 scope <- ErrorT $ lift $ getScope name
                 scopeValue <- lift $ lift $ valueOfScope scope 
                 bitwidth' <- lift $ lift getBitwidth
-                let (scopeValue', errorMsg) = getScopeinfo ((2 ^ (bitwidth' - 1)) - 1) (scopeValue+i) 
+                let (scopeValue', errorMsg) = getScopeinfo ((2 ^ (bitwidth' - 1)) - 1) (scopeValue+i) name
                 ErrorT $ lift $ setScope scopeValue' scope
                 
                 lift $ lift $ solve
