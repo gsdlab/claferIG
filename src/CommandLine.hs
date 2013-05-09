@@ -217,8 +217,7 @@ runCommandLine =
             scopes <- lift getScopes
             forM scopes (\x -> do
                 value <- lift $ valueOfScope x
-                let eMsg = if ((value+i) > bwcapacity) then "Requested scope is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")" else ""
-                outputStrLn $ eMsg)
+                if ((value+i) > bwcapacity) then outputStrLn $ "Requested scope is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")" else return ())
             lift $ mapM (increaseScope i) scopes
             lift solve
             
