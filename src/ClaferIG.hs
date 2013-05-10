@@ -40,6 +40,7 @@ module ClaferIG (
     solve, 
     getClafers, 
     getGlobalScope, 
+    getBitwidth,
     setGlobalScope, 
     getScopes, 
     getScope, 
@@ -220,6 +221,11 @@ getClafers =
 getGlobalScope :: MonadIO m => ClaferIGT m Integer
 getGlobalScope = ClaferIGT $ lift AlloyIG.getGlobalScope
 
+getBitwidth :: MonadIO m => ClaferIGT m Integer
+getBitwidth = 
+    do
+        claferIGArgs' <- getClaferIGArgs
+        return $ bitwidth claferIGArgs'
 
 setGlobalScope :: MonadIO m => Integer -> ClaferIGT m ()
 setGlobalScope scope = ClaferIGT $ lift $ AlloyIG.sendSetGlobalScopeCommand scope
@@ -253,7 +259,8 @@ increaseScope :: MonadIO m => Integer -> Scope -> ClaferIGT m (Either String ())
 increaseScope increment scope =
     do
         value <- valueOfScope scope
-        let value' = value + increment
+        bitwidth' <- getBitwidth
+        let value' = min (value + increment) ((2 ^ (bitwidth' - 1)) - 1)
         setScope value' scope
     
 

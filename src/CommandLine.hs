@@ -24,7 +24,6 @@
 
 module CommandLine (claferIGVersion, runCommandLine, printError) where
 
-
 import Language.ClaferT
 import ClaferIG
 import ClaferModel
@@ -49,7 +48,6 @@ data AutoCompleteContext = AutoCompleteContext {clafers::IORef [String], claferI
 data Context = Context {currentAlloyInstance::Maybe String, saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
 
 
-
 runCommandLine :: ClaferIGT IO ()
 runCommandLine =
     do
@@ -67,6 +65,13 @@ runCommandLine =
             autoAddHistory = True
         } $ loop Next (Context Nothing [] [] autoCompleteContext)
     where 
+
+    getScopeinfo :: Integer -> Integer -> String -> (Integer, String)    
+    getScopeinfo bwcapacity requestedScope name = 
+        let a = min requestedScope bwcapacity
+            b =  if (requestedScope > bwcapacity) then "Requested scope for " ++ name ++ " is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")\n" else ""
+        in (a,b)
+
     loop :: Command -> Context -> InputT (ClaferIGT IO) ()
     
     loop Quit _ = return ()
@@ -204,24 +209,32 @@ runCommandLine =
     loop (IncreaseGlobalScope i) context =
         do
             globalScope <- lift getGlobalScope
-            let globalScope' = globalScope + i
+            bitwidth' <- lift getBitwidth
+            let bwcapacity = ((2 ^ (bitwidth' - 1)) - 1)
+            let (globalScope',errMsg) = getScopeinfo bwcapacity (globalScope+i) "Global Scope"
             lift $ setGlobalScope globalScope'
             
             scopes <- lift getScopes
+            forM scopes (\x -> do
+                value <- lift $ valueOfScope x
+                if ((value+i) > bwcapacity) then outputStrLn $ "Requested scope for " ++ (nameOfScope x) ++ " is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")" else return ())
             lift $ mapM (increaseScope i) scopes
             lift solve
             
-            outputStrLn ("Global scope increased to " ++ show globalScope')
+            outputStrLn (errMsg ++ "Global scope increased to " ++ show globalScope')
             nextLoop context
             
     loop (IncreaseScope name i) context =
         do
             try $ do
                 scope <- ErrorT $ lift $ getScope name
-                ErrorT $ lift $ increaseScope i scope
-                scopeValue <- lift $ lift $ valueOfScope scope
+                scopeValue <- lift $ lift $ valueOfScope scope 
+                bitwidth' <- lift $ lift getBitwidth
+                let (scopeValue', errorMsg) = getScopeinfo ((2 ^ (bitwidth' - 1)) - 1) (scopeValue+i) name
+                ErrorT $ lift $ setScope scopeValue' scope
+                
                 lift $ lift $ solve
-                lift $ outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scopeValue)
+                lift $ outputStrLn (errorMsg ++ "Scope of " ++ name ++ " increased to " ++ show scopeValue')
                 
             nextLoop context
             
