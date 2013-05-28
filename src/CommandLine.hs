@@ -270,12 +270,11 @@ runCommandLine =
             outputStrLn claferModel
             nextLoop context
             
-            
     loop ShowAlloyModel context =
         do
             alloyModel <- lift getAlloyModel
             outputStrLn alloyModel
-            nextLoop context
+            nextLoop context            
 
     loop ShowAlloyInstance context =
         do

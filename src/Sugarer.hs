@@ -24,7 +24,11 @@ module Sugarer (sugarClaferModel) where
 
 import ClaferModel
 import qualified Language.Clafer.Intermediate.Analysis as Analysis
+import Language.Clafer 
+import Language.ClaferT
+import Language.Clafer.ClaferArgs
 import Control.Monad
+import Data.Maybe (fromJust)
 import Data.List as List hiding (map)
 import Data.Map as Map hiding (map, foldr, foldl)
 
@@ -60,19 +64,31 @@ claferModelCensus (ClaferModel topLevelClafers) =
     clafersCensus (Census Map.empty Map.empty) topLevelClafers
     where
     clafersCensus = foldl claferCensus
-    claferCensus census Clafer{c_id=id, c_children=children} = poll id (clafersCensus census children) 
+    claferCensus census ClaferModel.Clafer{c_id=id, c_children=children} = poll id (clafersCensus census children) 
 
 
 -- Rewrite the model into a human-friendlier format
-sugarClaferModel:: Bool -> Bool  -> Maybe Analysis.Info -> ClaferModel                        -> ClaferModel
-sugarClaferModel   useUids addTypes info                   model@(ClaferModel topLevelClafers) =
+sugarClaferModel:: Bool -> Bool  -> Maybe Analysis.Info -> ClaferModel -> (Map Int String) -> ClaferModel
+sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMap =
     ClaferModel $ map sugarClafer topLevelClafers
     where
-    sugarClafer (Clafer id value children) = 
-        Clafer (sugarId useUids addTypes True id) (sugarValue `liftM` value) (map sugarClafer children)
+    sugarClafer (ClaferModel.Clafer id value children) = 
+        ClaferModel.Clafer (sugarId useUids addTypes True id) (sugarValue (ClaferModel.Clafer id value children)) (map sugarClafer children)
 
-    sugarValue (AliasValue alias) = AliasValue $ sugarId useUids addTypes False alias
-    sugarValue x = x
+    cType (ClaferModel.Clafer id value children) = 
+        case (fromJust (Analysis.super (Analysis.runAnalysis (Analysis.claferWithUid (i_name id)) (fromJust info)))) of
+            (Analysis.Ref s) -> s
+            (Analysis.Colon s) -> s
+    {-
+    cTypeCheck "string" = "string"
+    cTypeCheck "integer" = "integer"
+    cTypeCheck ""
+    -}
+    
+    getString c = fromJust $  (Map.lookup (read (v_value (fromJust (c_value c))))) sMap
+    fourth (_,_,_,x) = x
+    sugarValue (ClaferModel.Clafer _ (Just (AliasValue alias)) _) = Just $ AliasValue $ sugarId useUids addTypes False alias
+    sugarValue c  = if (cType c) == "string" then (Just ((IntValue) (getString c))) else (c_value c)
 
     Census sample counts = claferModelCensus model
     
@@ -102,5 +118,4 @@ retrieveSuper info uid =
 
         sugarSuper :: Analysis.SSuper -> String
         sugarSuper (Analysis.Ref s) = " -> " ++ s
-        sugarSuper (Analysis.Colon s) = " : " ++ s
-      
+        sugarSuper (Analysis.Colon s) = " : " ++ s    

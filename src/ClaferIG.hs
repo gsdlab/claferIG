@@ -30,6 +30,7 @@ module ClaferIG (
     getConstraints,
     getClaferModel,
     getInfo,
+    getStrMap,
     ClaferIGT, 
     Scope, 
     Instance(..), 
@@ -128,7 +129,8 @@ data ClaferIGEnv = ClaferIGEnv{
     constraints:: [Constraint], 
     claferModel::String, 
     claferToSigNameMap:: Map String String,
-    info :: Analysis.Info
+    info :: Analysis.Info,
+    strMap :: (Map Int String)
 }
 
 data Scope = Scope {name::String, sigName::String}
@@ -156,6 +158,9 @@ getConstraints = fetches constraints
 getClaferModel :: Monad m => ClaferIGT m String
 getClaferModel = fetches claferModel
 
+getStrMap :: Monad m => ClaferIGT m (Map Int String)
+getStrMap = fetches strMap
+
 getInfo :: Monad m => ClaferIGT m Analysis.Info
 getInfo = fetches info
 
@@ -164,7 +169,7 @@ load                 igArgs    =
     runErrorT $ do
         claferModel <- liftIO $ strictReadFile claferFile'
         
-        (claferEnv', alloyModel, mapping) <- ErrorT $ return $ callClaferTranslator claferModel 
+        (claferEnv', alloyModel, mapping, sMap) <- ErrorT $ return $ callClaferTranslator claferModel 
 
         let ir = fst3 $ fromJust $ cIr claferEnv'
         let constraints = parseConstraints claferModel ir mapping
@@ -177,20 +182,20 @@ load                 igArgs    =
         
         let info = Analysis.gatherInfo ir 
 
-        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel claferToSigNameMap info
+        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel claferToSigNameMap info sMap
     where
-    claferFile' = claferModelFile igArgs
-    bitwidth' = bitwidth igArgs
     callClaferTranslator code =
         mapLeft ClaferErrs $ runClafer claferArgs $ do
             addModuleFragment code
             parse
             compile
             result <- generate
-            return (claferEnv result, outputCode result, mappingToAlloy result)
-    claferArgs = defaultClaferArgs {keep_unused = Just True, no_stats = Just True}
+            return (claferEnv result, outputCode result, mappingToAlloy result, stringMap result)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
+    claferArgs = defaultClaferArgs {keep_unused = Just True, no_stats = Just True}
+    claferFile' = claferModelFile igArgs
+    bitwidth' = bitwidth igArgs
     fst3 (a, _, _) = a
 
                 
@@ -280,20 +285,21 @@ next = do
     constraints' <- getConstraints
     info' <- getInfo
     xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
+    sMap <- getStrMap
     case xmlSolution of
-        Just xml -> return $ Instance (xmlToModel useUids' addTypes' info' xml) xml
+        Just xml -> return $ Instance (xmlToModel useUids' addTypes' info' xml sMap) xml
         Nothing  -> do
             ClaferIGT $ lift AlloyIG.sendSaveStateCommand
             -- Generating counterexample modifies the state. If we ever want to
             -- rerun the original model, we need to restore the state.
             AlloyIG.UnsatCore core <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-            c <- counterexample core useUids' addTypes' info' constraints'
+            c <- counterexample core useUids' addTypes' info' constraints' sMap
             ClaferIGT $ lift AlloyIG.sendRestoreStateCommand
             return c
     where
-    counterexample originalCore useUids' addTypes' info' constraints' = counterexample' originalCore [] useUids' addTypes' info' constraints'
+    counterexample originalCore useUids' addTypes' info' constraints' sMap = counterexample' originalCore [] useUids' addTypes' info' constraints' sMap
         where
-        counterexample' core removed useUids' addTypes' info' constraints' =
+        counterexample' core removed useUids' addTypes' info' constraints' sMap =
             case msum $ findRemovable core constraints' of
                 Just remove -> do
                     ClaferIGT $ lift $ AlloyIG.sendRemoveConstraintCommand $ range remove
@@ -301,18 +307,18 @@ next = do
                     xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
                     case xmlSolution of
                         Just xml -> return $
-                            UnsatCore (catMaybes $ findRemovable core constraints') (Just $ Counterexample (reverse $ remove : removed) (xmlToModel useUids' addTypes' info' xml) xml)
+                            UnsatCore (catMaybes $ findRemovable core constraints') (Just $ Counterexample (reverse $ remove : removed) (xmlToModel useUids' addTypes' info' xml sMap) xml)
                         Nothing ->
                             do
                                 AlloyIG.UnsatCore core' <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-                                counterexample' core' (remove : removed) useUids' addTypes' info' constraints'
+                                counterexample' core' (remove : removed) useUids' addTypes' info' constraints' sMap
                 Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
 
     findRemovable core constraints' = [find ((== c). range) constraints' | c <- core]
     
-    xmlToModel :: Bool -> Bool -> Analysis.Info -> String -> ClaferModel
-    xmlToModel  useUids' addTypes' info' xml     = sugarClaferModel useUids' addTypes' (Just info') $ buildClaferModel $ parseSolution xml
+    xmlToModel :: Bool -> Bool -> Analysis.Info -> String -> (Map Int String) -> ClaferModel
+    xmlToModel  useUids' addTypes' info' xml sMap = (sugarClaferModel useUids' addTypes' (Just info') $ buildClaferModel $ parseSolution xml) sMap
 
 reload :: MonadIO m => ClaferIGT m (Either ClaferErrs ())
 reload  =

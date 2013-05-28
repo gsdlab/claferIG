@@ -32,7 +32,7 @@ import Debug.Trace
 
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
 data Clafer = Clafer {c_id::Id, c_value::Maybe Value, c_children::[Clafer]}
-data Value = AliasValue {c_alias::Id} | IntValue {v_value::Int} deriving Show
+data Value = AliasValue {c_alias::Id} | IntValue {v_value::String} deriving Show
 
 c_name = i_name . c_id
 
@@ -52,7 +52,7 @@ instance Show Clafer where
             indent ++ i_name id ++ maybe "" displayValue value ++
             "\n" ++ concatMap (displayClafer $ indent ++ "  ") children
         displayValue (AliasValue alias) = " = " ++ i_name alias
-        displayValue (IntValue value) = " = " ++ show value
+        displayValue (IntValue value) = " = " ++ value 
             
 
 
@@ -176,7 +176,7 @@ buildClaferModel solution =
         children = getChildren id ftree
     buildClafer (ValueNode value ntype) =
         if ntype == intType then
-            Right $ IntValue (read name)
+            Right $ IntValue name
         else
             Right $ AliasValue value
         where
