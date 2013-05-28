@@ -74,13 +74,13 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
 
     cType (Clafer id value children) = 
         case (fromJust (Analysis.super (Analysis.runAnalysis (Analysis.claferWithUid (i_name id)) (fromJust info)))) of
-            (Analysis.Ref s) -> s
-            (Analysis.Colon s) -> s
-    {-
+            (Analysis.Ref s) -> cTypeSolve s
+            (Analysis.Colon s) -> cTypeSolve s
+    
     cTypeSolve "string" = "string"
     cTypeSolve "integer" = "integer"
-    cTypeSolve x = ...
-    -}
+    cTypeSolve x = cType (Clafer (Id x 0) Nothing []) 
+    
     
     getString c = fromJust $  (Map.lookup (read (v_value (fromJust (c_value c))))) sMap
     fourth (_,_,_,x) = x
