@@ -83,11 +83,11 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
     cTypeSolve x = cType (Clafer (Id x 0) Nothing []) 
     
     
-    getString c = fromJust $  (Map.lookup (read (v_value (fromJust (c_value c))))) sMap
+    getString c = fromJust $  (Map.lookup (v_value (fromJust (c_value c)))) sMap
     fourth (_,_,_,x) = x
     sugarValue (Clafer _ (Just (AliasValue alias)) _) = Just $ AliasValue $ sugarId useUids addTypes False alias
     sugarValue (Clafer _ Nothing _) = Nothing
-    sugarValue c  = if (cType c) == "string" then (Just ((IntValue) (getString c))) else (c_value c)
+    sugarValue c  = if (cType c) == "string" then (Just ((StringValue) (getString c))) else (c_value c)
 
     Census sample counts = claferModelCensus model
     

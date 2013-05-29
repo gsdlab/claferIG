@@ -52,7 +52,7 @@ printClafer    info      clafer@(M.Clafer id value children) =
 
 		addValue :: Maybe M.Value        -> Object -> Object
 		addValue    Nothing                 object = object
-		addValue 	(Just (M.IntValue i))   object = addIntValue (read i) object
+		addValue 	(Just (M.IntValue i))   object = addIntValue i object
 		addValue 	(Just (M.AliasValue a)) object = addStringValue (M.i_name a) object
 
 		completeClaferObject = addValue value basicClaferObject
