@@ -72,6 +72,15 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
     sugarClafer (Clafer id value children) = 
         Clafer (sugarId useUids addTypes True id) (sugarValue (Clafer id value children)) (map sugarClafer children)
 
+    sugarValue (Clafer _ (Just (AliasValue alias)) _) = Just $ AliasValue $ sugarId useUids addTypes False alias
+    sugarValue (Clafer _ Nothing _) = Nothing
+    sugarValue c  = if (cType c) == "string" then (Just ((StringValue) (getString c))) else (c_value c)
+
+    getString c = case (Map.lookup strNumber sMap) of
+        Nothing -> "<text " ++ show strNumber ++ ">"
+        Just s -> s
+        where strNumber = v_value  $ fromJust  $ c_value c
+
     cType (Clafer id value children) = 
         case (fromJust (Analysis.super (Analysis.runAnalysis (Analysis.claferWithUid (i_name id)) (fromJust info)))) of
             (Analysis.Ref s) -> cTypeSolve s
@@ -83,12 +92,6 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
     cTypeSolve x = cType (Clafer (Id x 0) Nothing []) 
     
     
-    getString c = fromJust $  (Map.lookup (v_value (fromJust (c_value c)))) sMap
-    fourth (_,_,_,x) = x
-    sugarValue (Clafer _ (Just (AliasValue alias)) _) = Just $ AliasValue $ sugarId useUids addTypes False alias
-    sugarValue (Clafer _ Nothing _) = Nothing
-    sugarValue c  = if (cType c) == "string" then (Just ((StringValue) (getString c))) else (c_value c)
-
     Census sample counts = claferModelCensus model
     
     sugarId :: Bool -> Bool  -> Bool    -> Id -> Id
