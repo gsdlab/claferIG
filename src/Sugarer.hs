@@ -87,7 +87,7 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
     cTypeSolve x = cType (Clafer (Id x 0) Nothing []) 
 
     getString c = case (Map.lookup strNumber sMap) of
-        Nothing -> "<text " ++ show strNumber ++ ">"
+        Nothing -> "\"<text " ++ show strNumber ++ ">\""
         Just s -> s
         where strNumber = v_value  $ fromJust  $ c_value c
     
