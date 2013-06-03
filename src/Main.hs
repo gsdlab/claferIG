@@ -32,6 +32,7 @@ import Language.Clafer.IG.Sugarer
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
+import qualified Data.Map as Map
 import Data.Maybe
 import Data.IORef
 import Prelude hiding (all)
@@ -95,7 +96,8 @@ runClaferIG args =
 runAlloySolution args =
     do
         content <- readFile $ claferModelFile args -- It's an Alloy XML file in this case
-        putStrLn $ show $ sugarClaferModel (useUids args) (addTypes args) Nothing $ buildClaferModel $ parseSolution content
+        let sMap = Map.empty
+        putStrLn $ show $ (sugarClaferModel (useUids args) (addTypes args) Nothing $ buildClaferModel $ parseSolution content) $ sMap
 
 savePath :: FilePath -> IORef Int -> IO FilePath
 savePath file counterRef =
@@ -122,4 +124,4 @@ saveAll nextFile =
             Instance{modelInstance = modelInstance} -> do
                 liftIO $ writeFile file (show modelInstance)
                 saveAll nextFile
-            _ -> return ()
+            _ -> return ()  

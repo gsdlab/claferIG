@@ -25,6 +25,7 @@ module Language.Clafer.IG.Sugarer (sugarClaferModel) where
 import Language.Clafer.IG.ClaferModel
 import qualified Language.Clafer.Intermediate.Analysis as Analysis
 import Control.Monad
+import Data.Maybe (fromJust)
 import Data.List as List hiding (map)
 import Data.Map as Map hiding (map, foldr, foldl)
 
@@ -64,15 +65,32 @@ claferModelCensus (ClaferModel topLevelClafers) =
 
 
 -- Rewrite the model into a human-friendlier format
-sugarClaferModel:: Bool -> Bool  -> Maybe Analysis.Info -> ClaferModel                        -> ClaferModel
-sugarClaferModel   useUids addTypes info                   model@(ClaferModel topLevelClafers) =
+sugarClaferModel:: Bool -> Bool  -> Maybe Analysis.Info -> ClaferModel -> (Map Int String) -> ClaferModel
+sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMap =
     ClaferModel $ map sugarClafer topLevelClafers
     where
     sugarClafer (Clafer id value children) = 
-        Clafer (sugarId useUids addTypes True id) (sugarValue `liftM` value) (map sugarClafer children)
+        Clafer (sugarId useUids addTypes True id) (sugarValue (Clafer id value children)) (map sugarClafer children)
 
-    sugarValue (AliasValue alias) = AliasValue $ sugarId useUids addTypes False alias
-    sugarValue x = x
+    sugarValue (Clafer _ (Just (AliasValue alias)) _) = Just $ AliasValue $ sugarId useUids addTypes False alias
+    sugarValue (Clafer _ Nothing _) = Nothing
+    sugarValue c  = if (cType c) == "string" then (Just ((StringValue) (getString c))) else (c_value c)
+
+    cType (Clafer id value children) = 
+        case (fromJust (Analysis.super (Analysis.runAnalysis (Analysis.claferWithUid (i_name id)) (fromJust info)))) of
+            (Analysis.Ref s) -> cTypeSolve s
+            (Analysis.Colon s) -> cTypeSolve s
+    
+    cTypeSolve "string" = "string"
+    cTypeSolve "integer" = "integer"
+    cTypeSolve "real" = "real"
+    cTypeSolve x = cType (Clafer (Id x 0) Nothing []) 
+
+    getString c = case (Map.lookup strNumber sMap) of
+        Nothing -> "\"<text " ++ show strNumber ++ ">\""
+        Just s -> s
+        where strNumber = v_value  $ fromJust  $ c_value c
+    
 
     Census sample counts = claferModelCensus model
     
@@ -102,5 +120,4 @@ retrieveSuper info uid =
 
         sugarSuper :: Analysis.SSuper -> String
         sugarSuper (Analysis.Ref s) = " -> " ++ s
-        sugarSuper (Analysis.Colon s) = " : " ++ s
-      
+        sugarSuper (Analysis.Colon s) = " : " ++ s    
