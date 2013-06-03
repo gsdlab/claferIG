@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 {-
- Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -22,14 +22,14 @@
  SOFTWARE.
 -}
 
-module CommandLine (claferIGVersion, runCommandLine, printError) where
+module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError) where
 
 import Language.ClaferT
-import ClaferIG
-import ClaferModel
-import CommandLineParser
-import Constraints
-import JSONGenerator
+import Language.Clafer.IG.ClaferIG
+import Language.Clafer.IG.ClaferModel
+import Language.Clafer.IG.CommandLineParser
+import Language.Clafer.IG.Constraints
+import Language.Clafer.IG.JSONGenerator
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.Trans

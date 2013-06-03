@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -20,13 +20,13 @@
  SOFTWARE.
 -}
 
-module ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), c_name, buildClaferModel, traverse) where
+module Language.Clafer.IG.ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), c_name, buildClaferModel, traverse) where
 
 import Data.List 
 import Data.Either
 import Data.Map as Map hiding (filter, map, foldr)
 import Data.Maybe
-import Solution
+import Language.Clafer.IG.Solution
 import Debug.Trace
 
 

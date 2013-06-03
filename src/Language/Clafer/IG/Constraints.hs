@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 {-
- Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -22,9 +22,9 @@
  SOFTWARE.
 -}
 
-module Constraints (Constraint(..), Cardinality(..), ClaferInfo(..), ConstraintInfo(..), isLowerCardinalityConstraint, isUpperCardinalityConstraint, lookupConstraint, parseConstraints)  where
+module Language.Clafer.IG.Constraints (Constraint(..), Cardinality(..), ClaferInfo(..), ConstraintInfo(..), isLowerCardinalityConstraint, isUpperCardinalityConstraint, lookupConstraint, parseConstraints)  where
 
-import qualified AlloyIGInterface as AlloyIG
+import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
 import Data.List
 import Data.Maybe
 import Data.Ord

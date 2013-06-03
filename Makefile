@@ -75,7 +75,7 @@ install:
 # this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs 
 newVersion:
 	ghc -isrc src/dateVer.hs dist/build/autogen/Paths_claferIG.hs -outputdir dist/build --make -o dateVer
-	./dateVer > src/Version.hs
+	./dateVer > src/Language/Clafer/IG/Version.hs
 
 
 # Build takes less time. For ease of development.

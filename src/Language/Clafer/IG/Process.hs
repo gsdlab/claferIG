@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module Process (Process, executableDirectory, waitFor, getContentsVerbatim, getMessage, readMessage, putMessage, pipeProcess) where
+module Language.Clafer.IG.Process (Process, executableDirectory, waitFor, getContentsVerbatim, getMessage, readMessage, putMessage, pipeProcess) where
 
 import Control.Monad
 import Control.Monad.IO.Class

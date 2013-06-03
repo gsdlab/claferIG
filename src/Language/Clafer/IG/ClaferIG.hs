@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns, GeneralizedNewtypeDeriving, StandaloneDeriving, DeriveDataTypeable #-}
 
 {-
- Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -22,7 +22,7 @@
  SOFTWARE.
 -}
 
-module ClaferIG (
+module Language.Clafer.IG.ClaferIG (
     IGArgs(..),
     ClaferIGEnv(..),
     getClaferEnv,
@@ -60,11 +60,15 @@ import Language.ClaferT
 import Language.Clafer.Front.Absclafer (Span(..))
 import Language.Clafer.Generator.Xml
 import qualified Language.Clafer.Intermediate.Analysis as Analysis
-import AlloyIGInterface (AlloyIGT)
-import qualified AlloyIGInterface as AlloyIG
-import ClaferModel
-import Constraints
-import JSONGenerator
+import Language.Clafer.IG.AlloyIGInterface (AlloyIGT)
+import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
+import Language.Clafer.IG.ClaferModel
+import Language.Clafer.IG.Constraints
+import Language.Clafer.IG.JSONGenerator
+import Language.Clafer.IG.Process
+import Language.Clafer.IG.Solution
+import Language.Clafer.IG.Sugarer
+import Language.Clafer.IG.Version
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Error
@@ -76,13 +80,9 @@ import Data.Map as Map hiding (map, null)
 import Data.Maybe
 import Data.Data
 import Data.Typeable
-import Process
-import Solution
-import Sugarer
 import System.Directory
 import System.FilePath
 import System.Exit
-import Version
 import System.Console.Haskeline.MonadException
 
 data IGArgs = IGArgs {
