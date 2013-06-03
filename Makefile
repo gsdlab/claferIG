@@ -106,6 +106,9 @@ lib:
 	
 runTests:
 	# Only test a subset of the suite. The other cases do not work yet.
+	cabal configure --enable-tests
+	cabal build
+	cabal test
 	./claferIG --all=4 -s dist/run test/suite/backquoted.cfr
 	./claferIG --all=4 -s dist/run test/suite/BobsTeam.cfr
 	./claferIG --all=4 -s dist/run test/suite/inconsistent.cfr
