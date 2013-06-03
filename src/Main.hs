@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
 {-
- Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,9 +24,11 @@
 
 module Main where
 
-import ClaferIG
-import ClaferModel
-import CommandLine
+import Language.Clafer.IG.ClaferIG 
+import Language.Clafer.IG.ClaferModel
+import Language.Clafer.IG.CommandLine
+import Language.Clafer.IG.Solution
+import Language.Clafer.IG.Sugarer
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
@@ -34,8 +36,6 @@ import qualified Data.Map as Map
 import Data.Maybe
 import Data.IORef
 import Prelude hiding (all)
-import Solution
-import Sugarer
 import System.Console.CmdArgs
 import System.Directory
 import System.FilePath

@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2012, 2013 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -20,9 +20,9 @@
  SOFTWARE.
 -}
 
-module Sugarer (sugarClaferModel) where
+module Language.Clafer.IG.Sugarer (sugarClaferModel) where
 
-import ClaferModel
+import Language.Clafer.IG.ClaferModel
 import qualified Language.Clafer.Intermediate.Analysis as Analysis
 import Control.Monad
 import Data.Maybe (fromJust)

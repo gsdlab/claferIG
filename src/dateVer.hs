@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2012 Kacper Bak <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Kacper Bak <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -28,7 +28,7 @@ import Data.Version (showVersion)
 
 header = unlines
  [ "{-"
- , "Copyright (C) 2012 Kacper Bak <http://gsd.uwaterloo.ca>"
+ , "Copyright (C) 2012-2013 Kacper Bak <http://gsd.uwaterloo.ca>"
  , ""
  , "Permission is hereby granted, free of charge, to any person obtaining a copy of"
  , "this software and associated documentation files (the \"Software\"), to deal in"
@@ -49,7 +49,7 @@ header = unlines
  , "SOFTWARE."
  , "-}"
  , ""
- , "module Version where"]
+ , "module Language.Clafer.IG.Version where"]
 
 main = do
   timeZone <- getCurrentTimeZone

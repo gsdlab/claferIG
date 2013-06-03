@@ -20,10 +20,10 @@
  SOFTWARE.
 -}
 
-module JSONGenerator (generateJSON) where
+module Language.Clafer.IG.JSONGenerator (generateJSON) where
 
-import qualified ClaferModel as M
-import Sugarer
+import qualified Language.Clafer.IG.ClaferModel as M
+import Language.Clafer.IG.Sugarer
 import qualified Language.Clafer.Intermediate.Analysis as A
 import Data.Json.Builder
 import Data.String.Conversions
