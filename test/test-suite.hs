@@ -20,11 +20,11 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE.
  -}
-import ClaferIG
-import ClaferModel
-import CommandLine
-import Solution
-import Sugarer
+import Language.Clafer.IG.ClaferIG
+import Language.Clafer.IG.ClaferModel
+import Language.Clafer.IG.CommandLine
+import Language.Clafer.IG.Solution
+import Language.Clafer.IG.Sugarer
 import Test.Framework
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
