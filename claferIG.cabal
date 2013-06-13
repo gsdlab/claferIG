@@ -85,7 +85,7 @@ library
 
 
 Test-Suite test-suite
-    type:           exitcode-stdio-1.0  
+    type:           exitcode-stdio-1.0 
     main-is:        test/test-suite.hs
     build-depends:   
                      base >= 4 && < 5, 
@@ -109,5 +109,8 @@ Test-Suite test-suite
                      test-framework-hunit, 
                      test-framework-quickcheck2,
                      test-framework-th,
+                     haskeline,
                      QuickCheck, 
+                     directory,
+                     transformers,
                      HUnit 
