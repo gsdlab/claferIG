@@ -27,7 +27,7 @@ ifeq ($(UNAME), windows)
 		LIB := x86-windows/minisatprover*
 	endif
 endif
-ifeq ($(UNAME), mingw32_nt-6.2)
+ifeq ($(basename $(UNAME)), mingw32_nt-6)
 	ifeq ($(MNAME), i686)
 		LIB := x86-windows/minisatprover*
 	endif
@@ -92,7 +92,7 @@ alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/cl
 
 lib:
 
-	@if [[ "$(UNAME)"=="mingw32_nt-6.1" && -z "$(shell which unzip)" ]] ; then \
+	@if [[ "$(basename $(UNAME))"=="mingw32_nt-6" && -z "$(shell which unzip)" ]] ; then \
 		mingw-get install msys-unzip-bin; \
 	fi 	
 	
