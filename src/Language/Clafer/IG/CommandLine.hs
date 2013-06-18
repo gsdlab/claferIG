@@ -176,6 +176,7 @@ runCommandLine =
                 "'s'ave          - to save all instances displayed so far or a counterexample to files named \n" ++
                 "                  <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                 "'q'uit          - to quit the interactive session\n" ++
+                "'r'eload        - to reload your clafer model\n" ++
                 "'h'elp          - to display this menu options summary\n" ++
                 "'scope'         - to print out the values of the global scope and individual Clafer scopes\n" ++
                 "'setUnsatCoreMinimization' - to choose UnSAT core minimization strategy [fastest | medium | best]. Default: fastest\n" ++ 
@@ -202,7 +203,13 @@ runCommandLine =
 
     loop Reload context =
         do
+            scopes <- lift getScopes
+            scopeVals <- mapM (lift . valueOfScope) scopes
+            bitwidth' <- lift getBitwidth
+            let scopePairs = zip scopes scopeVals
             runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
+            lift $ setBitwidth bitwidth'
+            lift $ forM scopePairs (\(s, val) -> increaseScope (val - 1) s)
             lift $ solve
             nextLoop context
 
