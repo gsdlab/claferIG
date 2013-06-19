@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 
 {-
- Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -22,7 +22,7 @@
  SOFTWARE.
 -}
 
-module AlloyIGInterface where
+module Language.Clafer.IG.AlloyIGInterface where
 
 import Control.Applicative
 import Control.Monad
@@ -33,7 +33,7 @@ import Control.Monad.Trans.State.Strict
 import Data.Map as Map hiding (null)
 import Data.Maybe
 import Language.Clafer.Front.Absclafer (Span(..), Pos(..))
-import Process
+import Language.Clafer.IG.Process
 import System.Console.Haskeline.MonadException
 
 

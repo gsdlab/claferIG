@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -20,19 +20,19 @@
  SOFTWARE.
 -}
 
-module ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), c_name, buildClaferModel, traverse) where
+module Language.Clafer.IG.ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), c_name, buildClaferModel, traverse) where
 
 import Data.List 
 import Data.Either
 import Data.Map as Map hiding (filter, map, foldr)
 import Data.Maybe
-import Solution
+import Language.Clafer.IG.Solution
 import Debug.Trace
 
 
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
 data Clafer = Clafer {c_id::Id, c_value::Maybe Value, c_children::[Clafer]}
-data Value = AliasValue {c_alias::Id} | IntValue {v_value::Int} deriving Show
+data Value = AliasValue {c_alias::Id} | IntValue {v_value::Int} | StringValue {v_str ::String} deriving Show
 
 c_name = i_name . c_id
 
@@ -52,7 +52,8 @@ instance Show Clafer where
             indent ++ i_name id ++ maybe "" displayValue value ++
             "\n" ++ concatMap (displayClafer $ indent ++ "  ") children
         displayValue (AliasValue alias) = " = " ++ i_name alias
-        displayValue (IntValue value) = " = " ++ show value
+        displayValue (IntValue value) = " = " ++ show value 
+        displayValue (StringValue value) = " = " ++ value
             
 
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 {-
- Copyright (C) 2012 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -22,14 +22,14 @@
  SOFTWARE.
 -}
 
-module CommandLine (claferIGVersion, runCommandLine, printError) where
-
+module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError) where
 
 import Language.ClaferT
-import ClaferIG
-import ClaferModel
-import CommandLineParser
-import Constraints
+import Language.Clafer.IG.ClaferIG
+import Language.Clafer.IG.ClaferModel
+import Language.Clafer.IG.CommandLineParser
+import Language.Clafer.IG.Constraints
+import Language.Clafer.IG.JSONGenerator
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.Trans
@@ -46,7 +46,6 @@ data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_Unsa
 data AutoCompleteContext = AutoCompleteContext {clafers::IORef [String], claferInstances::IORef [String]}
 
 data Context = Context {currentAlloyInstance::Maybe String, saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
-
 
 
 runCommandLine :: ClaferIGT IO ()
@@ -66,6 +65,13 @@ runCommandLine =
             autoAddHistory = True
         } $ loop Next (Context Nothing [] [] autoCompleteContext)
     where 
+
+    getScopeinfo :: Integer -> Integer -> String -> (Integer, String)    
+    getScopeinfo bwcapacity requestedScope name = 
+        let a = min requestedScope bwcapacity
+            b =  if (requestedScope > bwcapacity) then "Requested scope for " ++ name ++ " is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")\n" else ""
+        in (a,b)
+
     loop :: Command -> Context -> InputT (ClaferIGT IO) ()
     
     loop Quit _ = return ()
@@ -73,11 +79,15 @@ runCommandLine =
     loop Next context =
         do
             solution <- lift next
+            claferIGArgs' <- lift getClaferIGArgs 
+            info <- lift getInfo
             case solution of
                 Instance claferModel xml -> do
                     liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse claferModel)
                     
-                    outputStrLn $ show claferModel
+                    outputStrLn $ if json claferIGArgs' 
+                        then generateJSON info claferModel
+                        else show claferModel
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 UnsatCore core counterexample -> do
                     liftIO $ hPutStrLn stderr "No more instances found. Try increasing scope to get more instances."
@@ -166,6 +176,7 @@ runCommandLine =
                 "'s'ave          - to save all instances displayed so far or a counterexample to files named \n" ++
                 "                  <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                 "'q'uit          - to quit the interactive session\n" ++
+                "'r'eload        - to reload your clafer model\n" ++
                 "'h'elp          - to display this menu options summary\n" ++
                 "'scope'         - to print out the values of the global scope and individual Clafer scopes\n" ++
                 "'setUnsatCoreMinimization' - to choose UnSAT core minimization strategy [fastest | medium | best]. Default: fastest\n" ++ 
@@ -192,31 +203,45 @@ runCommandLine =
 
     loop Reload context =
         do
+            scopes <- lift getScopes
+            scopeVals <- mapM (lift . valueOfScope) scopes
+            bitwidth' <- lift getBitwidth
+            let scopePairs = zip scopes scopeVals
             runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
+            lift $ setBitwidth bitwidth'
+            lift $ forM scopePairs (\(s, val) -> increaseScope (val - 1) s)
             lift $ solve
             nextLoop context
 
     loop (IncreaseGlobalScope i) context =
         do
             globalScope <- lift getGlobalScope
-            let globalScope' = globalScope + i
+            bitwidth' <- lift getBitwidth
+            let bwcapacity = ((2 ^ (bitwidth' - 1)) - 1)
+            let (globalScope',errMsg) = getScopeinfo bwcapacity (globalScope+i) "Global Scope"
             lift $ setGlobalScope globalScope'
             
             scopes <- lift getScopes
+            forM scopes (\x -> do
+                value <- lift $ valueOfScope x
+                if ((value+i) > bwcapacity) then outputStrLn $ "Requested scope for " ++ (nameOfScope x) ++ " is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")" else return ())
             lift $ mapM (increaseScope i) scopes
             lift solve
             
-            outputStrLn ("Global scope increased to " ++ show globalScope')
+            outputStrLn (errMsg ++ "Global scope increased to " ++ show globalScope')
             nextLoop context
             
     loop (IncreaseScope name i) context =
         do
             try $ do
                 scope <- ErrorT $ lift $ getScope name
-                ErrorT $ lift $ increaseScope i scope
-                scopeValue <- lift $ lift $ valueOfScope scope
+                scopeValue <- lift $ lift $ valueOfScope scope 
+                bitwidth' <- lift $ lift getBitwidth
+                let (scopeValue', errorMsg) = getScopeinfo ((2 ^ (bitwidth' - 1)) - 1) (scopeValue+i) name
+                ErrorT $ lift $ setScope scopeValue' scope
+                
                 lift $ lift $ solve
-                lift $ outputStrLn ("Scope of " ++ name ++ " increased to " ++ show scopeValue)
+                lift $ outputStrLn (errorMsg ++ "Scope of " ++ name ++ " increased to " ++ show scopeValue')
                 
             nextLoop context
             
@@ -252,12 +277,11 @@ runCommandLine =
             outputStrLn claferModel
             nextLoop context
             
-            
     loop ShowAlloyModel context =
         do
             alloyModel <- lift getAlloyModel
             outputStrLn alloyModel
-            nextLoop context
+            nextLoop context            
 
     loop ShowAlloyInstance context =
         do
@@ -289,13 +313,14 @@ runCommandLine =
     
     save :: MonadIO m => [ClaferModel] -> Integer -> ClaferIGT m ()
     save [] _ = return ()
-    save (c:cs) counter =
-        do
-            claferFile <- getClaferFile
-            let saveName = claferFile ++ "." ++ (show counter) ++ ".data"
-            liftIO $ writeFile saveName (show c)
-            liftIO $ putStrLn $ "Saved to " ++ saveName
-            save cs (counter + 1)
+    save (c:cs) counter = do
+        claferIGArgs' <- getClaferIGArgs
+        let 
+            claferModelFile' = claferModelFile claferIGArgs'
+            saveName = claferModelFile' ++ "." ++ (show counter) ++ ".data"
+        liftIO $ writeFile saveName (show c)
+        liftIO $ putStrLn $ "Saved to " ++ saveName
+        save cs (counter + 1)
 
 try :: MonadIO m => ErrorT String (InputT m) a -> InputT m ()
 try e = either outputStrLn (void . return) =<< runErrorT e
