@@ -52,6 +52,8 @@ runCommandLine :: ClaferIGT IO ()
 runCommandLine =
     do
         solve
+        bitwidth' <- getBitwidth
+        when (bitwidth' > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show bitwidth' ++ ". This is a very large bitwidth, alloy may be usuing a large amout of memory. This may cause slow down."
         
         clafers <- getClafers
 
