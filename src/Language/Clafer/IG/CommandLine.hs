@@ -30,6 +30,7 @@ import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLineParser
 import Language.Clafer.IG.Constraints
 import Language.Clafer.IG.JSONGenerator
+import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.Trans
@@ -176,6 +177,7 @@ runCommandLine =
                 "'s'ave          - to save all instances displayed so far or a counterexample to files named \n" ++
                 "                  <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                 "'q'uit          - to quit the interactive session\n" ++
+                "'r'eload        - to reload your clafer model\n" ++
                 "'h'elp          - to display this menu options summary\n" ++
                 "'scope'         - to print out the values of the global scope and individual Clafer scopes\n" ++
                 "'setUnsatCoreMinimization' - to choose UnSAT core minimization strategy [fastest | medium | best]. Default: fastest\n" ++ 
@@ -202,9 +204,25 @@ runCommandLine =
 
     loop Reload context =
         do
+            oldScopes <- lift getScopes
+            let oldScopeNames = map nameOfScope oldScopes
+            oldScopeVals <- mapM (lift . valueOfScope) oldScopes
+            bitwidth' <- lift getBitwidth
             runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
+            lift $ setBitwidth bitwidth'
+            newScopes <- lift getScopes
+            lift $ setScopes (zip oldScopeNames oldScopeVals) newScopes
             lift $ solve
             nextLoop context
+            where
+                setScopes _ [] = return()
+                setScopes old new = let oldval = lookup (nameOfScope $ head new) old
+                                    in if (oldval == Nothing) then (setScopes old $ tail new) else do 
+                                        newVal <- valueOfScope $ head new
+                                        setScope (max newVal $ fromJust oldval) $ head new
+                                        setScopes old $ tail new 
+                                            
+
 
     loop (IncreaseGlobalScope i) context =
         do
