@@ -135,7 +135,7 @@ sendLoadCommand alloyModel' =
     resetScope Sig{s_name = name, s_startingScope = startingScope} =
         case startingScope of
             Just scope -> sendSetScopeCommand name scope >> return ()
-            Nothing    -> return ()
+            Nothing    -> sendSetScopeCommand name 1 >> return ()
 
 
 -- Get the next solution from alloyIG

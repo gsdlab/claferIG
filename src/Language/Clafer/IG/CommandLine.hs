@@ -30,6 +30,7 @@ import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLineParser
 import Language.Clafer.IG.Constraints
 import Language.Clafer.IG.JSONGenerator
+import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
 import Control.Monad
 import Control.Monad.Error
 import Control.Monad.Trans
@@ -203,15 +204,25 @@ runCommandLine =
 
     loop Reload context =
         do
-            scopes <- lift getScopes
-            scopeVals <- mapM (lift . valueOfScope) scopes
+            oldScopes <- lift getScopes
+            let oldScopeNames = map nameOfScope oldScopes
+            oldScopeVals <- mapM (lift . valueOfScope) oldScopes
             bitwidth' <- lift getBitwidth
-            let scopePairs = zip scopes scopeVals
             runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
             lift $ setBitwidth bitwidth'
-            lift $ forM scopePairs (\(s, val) -> increaseScope (val - 1) s)
+            newScopes <- lift getScopes
+            lift $ setScopes (zip oldScopeNames oldScopeVals) newScopes
             lift $ solve
             nextLoop context
+            where
+                setScopes _ [] = return()
+                setScopes old new = let oldval = lookup (nameOfScope $ head new) old
+                                    in if (oldval == Nothing) then (setScopes old $ tail new) else do 
+                                        newVal <- valueOfScope $ head new
+                                        setScope (max newVal $ fromJust oldval) $ head new
+                                        setScopes old $ tail new 
+                                            
+
 
     loop (IncreaseGlobalScope i) context =
         do
