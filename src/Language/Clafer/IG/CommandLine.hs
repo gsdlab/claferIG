@@ -22,7 +22,7 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError) where
+module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError, findNecessaryBitwidth) where
 
 import Language.ClaferT
 import Language.Clafer.IG.ClaferIG
@@ -205,6 +205,10 @@ runCommandLine =
     loop Reload context =
         do
             runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
+            oldBw <- lift getBitwidth
+            args <- lift getClaferIGArgs
+            cModel <- liftIO $ strictReadFile $ claferModelFile args
+            lift $ setBitwidth $ findNecessaryBitwidth cModel oldBw
             lift $ solve
             nextLoop context
 
@@ -394,3 +398,14 @@ printError (ClaferErrs errs) =
         "Error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
     printError (ClaferErr msg) =
         "Error:\n    " ++ msg
+
+findNecessaryBitwidth :: String -> Integer -> Integer
+findNecessaryBitwidth model oldBw = if (newBw < oldBw) then oldBw else newBw
+    where
+        newBw = ceiling $ logBase 2 $ 1 + 2 * maxInModel model []
+        digitToFloat = toEnum . digitToInt
+        maxInModel [] [] = 0
+        maxInModel [] acc = maximum acc
+        maxInModel (x:xs) acc = if (isNumber x) then (findFullNum xs (digitToFloat x) acc) else (maxInModel xs acc)
+        findFullNum [] n acc = maximum $ n:acc
+        findFullNum (x:xs) n acc = if (isNumber x) then (findFullNum xs (n * 10 + (digitToFloat x)) acc) else maxInModel xs (n:acc)
