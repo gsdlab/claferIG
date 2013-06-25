@@ -32,7 +32,7 @@ module Language.Clafer.IG.ClaferIG (
     getInfo,
     getStrMap,
     ClaferIGT, 
-    Scope, 
+    Scope(..), 
     Instance(..), 
     Counterexample(..), 
     runClaferIGT, 
