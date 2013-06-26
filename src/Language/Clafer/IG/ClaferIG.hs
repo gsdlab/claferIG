@@ -32,7 +32,7 @@ module Language.Clafer.IG.ClaferIG (
     getInfo,
     getStrMap,
     ClaferIGT, 
-    Scope(..), 
+    Scope(nameOfScope), 
     Instance(..), 
     Counterexample(..), 
     runClaferIGT, 
@@ -45,7 +45,6 @@ module Language.Clafer.IG.ClaferIG (
     setGlobalScope, 
     getScopes, 
     getScope, 
-    nameOfScope, 
     valueOfScope, 
     increaseScope, 
     setScope, 
@@ -140,7 +139,7 @@ data ClaferIGEnv = ClaferIGEnv{
     strMap :: (Map Int String)
 }
 
-data Scope = Scope {name::String, sigName::String}
+data Scope = Scope {nameOfScope::String, sigName::String}
 
 data Instance =
     Instance {modelInstance::ClaferModel, alloyModelInstance::String} |
@@ -259,10 +258,6 @@ getScope name =
             Nothing      -> throwError $ "Unknown clafer " ++ name
         
 
-nameOfScope :: Scope -> String
-nameOfScope = name
-
-
 valueOfScope :: MonadIO m => Scope -> ClaferIGT m Integer
 valueOfScope Scope{sigName} = ClaferIGT $ lift $ AlloyIG.getScope sigName
 
@@ -277,7 +272,7 @@ increaseScope increment scope =
     
 
 setScope :: MonadIO m => Integer -> Scope -> ClaferIGT m (Either String ())
-setScope scope Scope{name, sigName} =
+setScope scope Scope{nameOfScope, sigName} =
     do
         subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName scope
         runErrorT $ maybe (return ()) throwError $ sigToClaferName <$> subset
