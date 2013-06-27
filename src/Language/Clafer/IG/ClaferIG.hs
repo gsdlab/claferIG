@@ -32,7 +32,7 @@ module Language.Clafer.IG.ClaferIG (
     getInfo,
     getStrMap,
     ClaferIGT, 
-    Scope, 
+    Scope(nameOfScope), 
     Instance(..), 
     Counterexample(..), 
     runClaferIGT, 
@@ -45,7 +45,6 @@ module Language.Clafer.IG.ClaferIG (
     setGlobalScope, 
     getScopes, 
     getScope, 
-    nameOfScope, 
     valueOfScope, 
     increaseScope, 
     setScope, 
@@ -59,6 +58,7 @@ module Language.Clafer.IG.ClaferIG (
 import Debug.Trace
 import Language.Clafer
 import Language.ClaferT
+import Language.Clafer.ClaferArgs
 import Language.Clafer.Front.Absclafer (Span(..))
 import Language.Clafer.Generator.Xml
 import qualified Language.Clafer.Intermediate.Analysis as Analysis
@@ -95,7 +95,13 @@ data IGArgs = IGArgs {
     bitwidth :: Integer,
     useUids :: Bool,
     addTypes :: Bool,
-    json :: Bool
+    json :: Bool,
+    flatten_inheritance_comp :: Bool,
+    no_layout_comp :: Bool,
+    check_duplicates_comp :: Bool,
+    skip_resolver_comp :: Bool,
+    scope_strategy_comp :: ScopeStrategy
+
 } deriving (Show, Data, Typeable)
 
 newtype ClaferIGT m a = ClaferIGT (StateT ClaferIGEnv (AlloyIGT m) a)
@@ -134,7 +140,7 @@ data ClaferIGEnv = ClaferIGEnv{
     strMap :: (Map Int String)
 }
 
-data Scope = Scope {name::String, sigName::String}
+data Scope = Scope {nameOfScope::String, sigName::String}
 
 data Instance =
     Instance {modelInstance::ClaferModel, alloyModelInstance::String} |
@@ -194,7 +200,7 @@ load                 igArgs    =
             return (claferEnv result, outputCode result, mappingToAlloy result, stringMap result)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
-    claferArgs = defaultClaferArgs {keep_unused = Just True, no_stats = Just True}
+    claferArgs = defaultClaferArgs{keep_unused = True, no_stats = True, flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
     claferFile' = claferModelFile igArgs
     bitwidth' = bitwidth igArgs
     fst3 (a, _, _) = a
@@ -253,10 +259,6 @@ getScope name =
             Nothing      -> throwError $ "Unknown clafer " ++ name
         
 
-nameOfScope :: Scope -> String
-nameOfScope = name
-
-
 valueOfScope :: MonadIO m => Scope -> ClaferIGT m Integer
 valueOfScope Scope{sigName} = ClaferIGT $ lift $ AlloyIG.getScope sigName
 
@@ -271,7 +273,7 @@ increaseScope increment scope =
     
 
 setScope :: MonadIO m => Integer -> Scope -> ClaferIGT m (Either String ())
-setScope scope Scope{name, sigName} =
+setScope scope Scope{nameOfScope, sigName} =
     do
         subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName scope
         runErrorT $ maybe (return ()) throwError $ sigToClaferName <$> subset

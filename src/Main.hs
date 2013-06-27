@@ -29,6 +29,7 @@ import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLine
 import Language.Clafer.IG.Solution
 import Language.Clafer.IG.Sugarer
+import Language.Clafer.ClaferArgs
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
@@ -42,14 +43,19 @@ import System.Directory
 import System.FilePath
 
 claferIGArgsDef = IGArgs {
-    all             = def &= help "Saves all instances up to the provided scope or a counterexample.",
-    saveDir         = def &= help "Specify the directory for storing saved files." &= typ "FILE",
-    bitwidth        = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER", -- Default bitwidth is 4.
-    alloySolution   = False &= help "Convert Alloy solution to a Clafer solution.",
-    claferModelFile = def &= argPos 0 &= typ "FILE",
-    useUids         = False &= help "Use unique clafer names in the Clafer solution.",
-    addTypes        = False &= help "Add colon/reference types to the Clafer solution.",
-    json            = False &= help "Render solution as JSON (forces 'addUids')."
+    all                         = def &= help "Saves all instances up to the provided scope or a counterexample.",
+    saveDir                     = def &= help "Specify the directory for storing saved files." &= typ "FILE",
+    bitwidth                    = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER", -- Default bitwidth is 4.
+    alloySolution               = False &= help "Convert Alloy solution to a Clafer solution.",
+    claferModelFile             = def &= argPos 0 &= typ "FILE",
+    useUids                     = False &= help "Use unique clafer names in the Clafer solution.",
+    addTypes                    = False &= help "Add colon/reference types to the Clafer solution.",
+    json                        = False &= help "Render solution as JSON (forces 'addUids').",
+    flatten_inheritance_comp    = def &= help "Flatten inheritance during compiling ('alloy' and 'alloy42' modes only)" &= name "i",
+    no_layout_comp              = def &= help "Don't resolve off-side rule layout during compiling" &= name "l",
+    check_duplicates_comp       = def &= help "Check duplicated clafer names during compiling"  &= name "c",
+    skip_resolver_comp          = def &= help "Skip name resolution during compiling" &= name "f",
+    scope_strategy_comp         = Simple &= help "Use scope computation strategy during compiling: none, simple (default), or full." &= name "ss"
 } &= summary claferIGVersion
 
 
