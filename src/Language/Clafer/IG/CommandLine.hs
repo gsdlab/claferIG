@@ -305,8 +305,8 @@ runCommandLine =
                 addUnSat us ls = unlines $ addUnSatHelp us us ls
                 addUnSatHelp uss _ [] = []
                 addUnSatHelp uss [] (l:ls) = l : addUnSatHelp uss uss ls
-                addUnSatHelp uss (u:us) (l:ls) = if (u `isInfixOf` l) then ((replaceLine1 l) ++ " <- UnSAT") : addUnSatHelp uss uss ls
-                    else addUnSatHelp uss us (l:ls)
+                addUnSatHelp uss (u:us) (l:ls) = if ((u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == (takeWhile isNumber l))) then 
+                    ((replaceLine1 l) ++ " <- UnSAT") : addUnSatHelp uss uss ls else addUnSatHelp uss us (l:ls)
                     where
                         replaceLine1 :: String -> String
                         replaceLine1 [] = []
