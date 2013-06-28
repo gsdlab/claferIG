@@ -296,9 +296,9 @@ runCommandLine =
                 addScopeVal :: [String] -> [(String, Integer)] -> Int -> [String]    
                 addScopeVal (l:ls) ss m = let name = (takeWhile (`notElem` [' ', '\n']) $ dropWhile (not . isLetter) l)
                                         in if (name=="abstract") then 
-                                                (l ++ (replicate (3 + m - (length l)) ' ') ++ " | scope = " ++ (show $ fromJust $ Data.List.lookup (takeWhile (`notElem` [' ', '\n']) $ dropWhile (not . isLetter) $ tail $ tail $ dropWhile (/='c') l) ss)) : addScopeVals ls ss m
-                                                    else if (Data.List.lookup name ss == Nothing) then  (l ++ (replicate (3 + m - (length l)) ' ') ++ " | scope = Nothing") : addScopeVals ls ss m else 
-                                                        (l ++ (replicate (3 + m - (length l)) ' ') ++ " | scope = " ++ (show $ fromJust $ Data.List.lookup name ss)) : addScopeVals ls ss m           
+                                                (l ++ (replicate (3 + m - (length l)) ' ') ++ " |      scope = " ++ (show $ fromJust $ Data.List.lookup (takeWhile (`notElem` [' ', '\n']) $ dropWhile (not . isLetter) $ tail $ tail $ dropWhile (/='c') l) ss)) : addScopeVals ls ss m
+                                                    else if (Data.List.lookup name ss == Nothing) then  (l ++ (replicate (3 + m - (length l)) ' ') ++ " |      scope = Nothing") : addScopeVals ls ss m else 
+                                                        (l ++ (replicate (3 + m - (length l)) ' ') ++ " |      scope = " ++ (show $ fromJust $ Data.List.lookup name ss)) : addScopeVals ls ss m           
                 findConstraintEnd :: [String] -> [(String, Integer)] -> Int -> [String]                                                                   
                 findConstraintEnd (l:ls) ss  m = if (']' `elem` l) then (l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : addScopeVals ls ss m else (l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : findConstraintEnd ls ss m
                 addUnSat :: [String] -> [String] -> String
@@ -306,16 +306,24 @@ runCommandLine =
                 addUnSatHelp uss _ [] = []
                 addUnSatHelp uss [] (l:ls) = l : addUnSatHelp uss uss ls
                 addUnSatHelp uss (u:us) (l:ls) = if ((u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == (takeWhile isNumber l))) then 
-                    ((replaceLine1 l) ++ " <- UnSAT") : addUnSatHelp uss uss ls else addUnSatHelp uss us (l:ls)
+                    (replaceLine l) : addUnSatHelp uss uss ls else addUnSatHelp uss us (l:ls)
                     where
-                        replaceLine1 :: String -> String
-                        replaceLine1 [] = []
-                        replaceLine1 ('|':xs) = '>' : replaceLine2 xs
-                        replaceLine1 (x:xs) = x : replaceLine1 xs
-                        replaceLine2 :: String -> String
-                        replaceLine2 [] = []
-                        replaceLine2 ('|':xs) = '<' : xs
-                        replaceLine2 (x:xs) = x : replaceLine2 xs
+                        replaceLine :: String -> String
+                        replaceLine = reverse . replaceLine2 . reverse . replaceLine1
+                            where
+                                replaceLine1 :: String -> String
+                                replaceLine1 [] = []
+                                replaceLine1 ('|':xs) = '>' : xs
+                                replaceLine1 (x:xs) = x : replaceLine1 xs
+                                replaceLine2 :: String -> String
+                                replaceLine2 [] = []
+                                replaceLine2 ('|':xs) = " taSnU<" ++ xs
+                                replaceLine2 ('s' : xs) = 's' : replaceLine3 xs
+                                replaceLine2 (x:xs) = x : replaceLine2 xs
+                                replaceLine3 :: String -> String
+                                replaceLine3 ('|':xs) = " taSnU<" ++ xs
+                                replaceLine3 (' ' : xs) = replaceLine3 xs
+                                replaceLine3 (x:xs) = x : replaceLine3 xs
 
     loop ShowAlloyModel context =
         do
