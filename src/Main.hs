@@ -36,6 +36,7 @@ import Data.Either
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.IORef
+import Data.Char
 import Prelude hiding (all)
 import System.Console.CmdArgs
 import System.Directory
@@ -83,12 +84,16 @@ main =
         
 runClaferIG args =
     runClaferIGT args $ do
+        oldBw <- getBitwidth
+        cModel <- liftIO $ strictReadFile $ claferModelFile args
+        setBitwidth $ findNecessaryBitwidth cModel oldBw
+        solve
         case all args of
             Just scope ->
                 do
                     setGlobalScope scope
                     solve
-                    
+   
                     let file = claferModelFile args
                     counterRef <- liftIO $ newIORef 1
                     
@@ -98,6 +103,7 @@ runClaferIG args =
             Nothing    -> runCommandLine
             
         quit
+            
         
 runAlloySolution args =
     do

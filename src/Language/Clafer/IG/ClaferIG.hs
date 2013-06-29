@@ -55,7 +55,8 @@ module Language.Clafer.IG.ClaferIG (
     setBitwidth, 
     quit, 
     reload,
-    findRemovable) where
+    findRemovable,
+    strictReadFile) where
 
 import Debug.Trace
 import Language.Clafer
@@ -340,7 +341,11 @@ setUnsatCoreMinimization level = ClaferIGT $ lift $ AlloyIG.sendSetUnsatCoreMini
 
 
 setBitwidth :: MonadIO m => Integer -> ClaferIGT m ()
-setBitwidth bitwidth = ClaferIGT $ lift $ AlloyIG.sendSetBitwidthCommand bitwidth
+setBitwidth bitwidth' = do
+    claferIGArgs' <- getClaferIGArgs
+    igEnv <- fetch
+    set igEnv{claferIGArgs = claferIGArgs'{bitwidth=bitwidth'}}
+    ClaferIGT $ lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
 
     
 quit :: MonadIO m => ClaferIGT m ()
