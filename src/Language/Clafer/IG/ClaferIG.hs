@@ -31,6 +31,8 @@ module Language.Clafer.IG.ClaferIG (
     getClaferModel,
     getInfo,
     getStrMap,
+    ClaferIGT(..), 
+    Scope(nameOfScope), 
     ClaferIGT, 
     Scope(nameOfScope), 
     Instance(..), 
@@ -53,6 +55,7 @@ module Language.Clafer.IG.ClaferIG (
     setBitwidth, 
     quit, 
     reload,
+    findRemovable,
     strictReadFile) where
 
 import Debug.Trace
@@ -318,7 +321,7 @@ next = do
                 Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
 
-    findRemovable core constraints' = [find ((== c). range) constraints' | c <- core]
+    
     
     xmlToModel :: Bool -> Bool -> Analysis.Info -> String -> (Map Int String) -> ClaferModel
     xmlToModel  useUids' addTypes' info' xml sMap = (sugarClaferModel useUids' addTypes' (Just info') $ buildClaferModel $ parseSolution xml) sMap
@@ -354,3 +357,5 @@ sigToClaferName n =
     case snd $ break ('_' ==) n of
         [] ->  n
         x -> tail x
+
+findRemovable core constraints' = [find ((== c). range) constraints' | c <- core]
