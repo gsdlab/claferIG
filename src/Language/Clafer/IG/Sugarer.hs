@@ -83,6 +83,7 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
     
     cTypeSolve "string" = "string"
     cTypeSolve "integer" = "integer"
+    cTypeSolve "int" = "integer"
     cTypeSolve "real" = "real"
     cTypeSolve x = cType (Clafer (Id x 0) Nothing []) 
 
