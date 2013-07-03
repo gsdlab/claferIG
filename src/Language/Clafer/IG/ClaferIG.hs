@@ -56,7 +56,8 @@ module Language.Clafer.IG.ClaferIG (
     quit, 
     reload,
     findRemovable,
-    strictReadFile) where
+    strictReadFile,
+    getlineNumMap) where
 
 import Debug.Trace
 import Language.Clafer
@@ -64,6 +65,8 @@ import Language.ClaferT
 import Language.Clafer.ClaferArgs
 import Language.Clafer.Front.Absclafer (Span(..))
 import Language.Clafer.Generator.Xml
+import Language.Clafer.Intermediate.Tracing
+import Language.Clafer.Intermediate.Intclafer
 import qualified Language.Clafer.Intermediate.Analysis as Analysis
 import Language.Clafer.IG.AlloyIGInterface (AlloyIGT)
 import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
@@ -81,6 +84,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans
 import Control.Monad.Trans.State.Strict
 import Data.List
+import Data.Tuple (swap)
 import Data.Map as Map hiding (map, null)
 import Data.Maybe
 import Data.Data
@@ -138,9 +142,10 @@ data ClaferIGEnv = ClaferIGEnv{
     claferIGArgs :: IGArgs,
     constraints:: [Constraint], 
     claferModel::String, 
-    claferToSigNameMap:: Map String String,
+    claferToSigNameMap :: Map String String,
     info :: Analysis.Info,
-    strMap :: (Map Int String)
+    strMap :: Map Int String,
+    lineNumMap :: Map Integer String
 }
 
 data Scope = Scope {nameOfScope::String, sigName::String}
@@ -158,6 +163,9 @@ claferIGVersion =
     
 getClaferEnv :: Monad m => ClaferIGT m ClaferEnv
 getClaferEnv = fetches claferEnv'
+
+getlineNumMap :: Monad m => ClaferIGT m (Map Integer String)
+getlineNumMap = fetches lineNumMap
 
 getClaferIGArgs :: Monad m => ClaferIGT m IGArgs
 getClaferIGArgs = fetches claferIGArgs
@@ -191,9 +199,24 @@ load                 igArgs    =
         let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
         
         let info = Analysis.gatherInfo ir 
+        let irTrace = editMap $ irModuleTrace claferEnv'
 
-        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel claferToSigNameMap info sMap
+        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel claferToSigNameMap info sMap irTrace
     where
+    editMap :: (Map.Map Span [Ir]) -> (Map.Map Integer String) -- Map Line Number to Clafer Name
+    editMap = 
+        fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case (getIClafer ir) of 
+            Just (IClafer _ _ _ i _ _ _ _ _) -> (num, i) : acc
+            _ -> acc) [] . tail . (Data.List.foldr (\x acc -> case x of
+                ((Span (Pos l1 _) (Pos l2 _)), irs) -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
+                ((PosSpan _ (Pos l1 _) (Pos l2 _)), irs) -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs) ++ acc)) []) . toList
+    getIClafer :: [Ir] -> Maybe IClafer
+    getIClafer [] = Nothing
+    getIClafer ((IRClafer c):rs) = Just c 
+    getIClafer (r:rs) = getIClafer rs
+    removeConstraints :: [(Integer, String)] -> [(Integer, String)]
+    removeConstraints = map swap . reverse . toList . fromList . reverse . map swap
+
     callClaferTranslator code =
         mapLeft ClaferErrs $ runClafer claferArgs $ do
             addModuleFragment code

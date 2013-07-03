@@ -30,6 +30,7 @@ import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLineParser
 import Language.Clafer.IG.Constraints
 import Language.Clafer.IG.JSONGenerator
+import Language.Clafer.Comments
 import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
 import Control.Monad
 import Control.Monad.Error
@@ -37,6 +38,8 @@ import Control.Monad.Trans
 import Data.Char
 import Data.IORef
 import Data.List
+import Data.Monoid
+import Data.Foldable (foldMap)
 import qualified Data.Map as Map
 import Data.Maybe
 import System.Console.Haskeline
@@ -276,72 +279,69 @@ runCommandLine =
 
     loop ShowClaferModel context =
         do
-            claferModel <- lift getClaferModel
             scopes <- lift getScopes
-            globalScope' <- lift getGlobalScope
             scopeVals <- lift $ mapM valueOfScope scopes
+            globalScope' <- lift getGlobalScope
+
             constraints' <- lift getConstraints
             AlloyIG.UnsatCore core <- lift $ ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-            let unSats = map printConstraint $ catMaybes $ findRemovable core constraints'
-            let claferLines = lines $ editModel claferModel
-            outputStrLn $ addUnSat unSats $ (("global scope = " ++ show globalScope' ++ "\n") :) $ map (\(num, line) -> (show num) ++ ('.' : (replicate (1 + (numberOfDigits $ length claferLines) - (numberOfDigits num)) ' ') ++ ('|' : ' ' : line))) $ zip [1..(length claferLines)] $ addScopeVals claferLines (zip (map nameOfScope scopes) scopeVals) (maximum $ map length claferLines) 
+            let unSATs = map printConstraint $ catMaybes $ findRemovable core constraints'
+
+            claferModel <- lift getClaferModel
+            let commentLines = getCommentLines claferModel
+            lineMap <- lift getlineNumMap
+
+            outputStrLn $ editModel claferModel commentLines unSATs globalScope' lineMap (zip (map nameOfScope scopes) scopeVals)
             nextLoop context
             where
-                addScopeVals :: [String] -> [(String, Integer)] -> Int -> [String]
-                addScopeVals [] _ _ = []
-                addScopeVals (l:ls) ss m = if (isEmptyLine l) then ((l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : (addScopeVals ls ss m)) else    -- Empty line
-                    if ('[' `elem` l && ']' `notElem` l) then ((l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : (findConstraintEnd ls ss m)) else  -- Multiple line constraint
-                        if ('[' `elem` l && ']' `elem` l) then (l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : addScopeVals ls ss m else          -- Single line constraint
-                            addScopeVal (l:ls) ss m 
-                addScopeVal :: [String] -> [(String, Integer)] -> Int -> [String]    
-                addScopeVal (l:ls) ss m = let name = (takeWhile (`notElem` [' ', '\n']) $ dropWhile (not . isLetter) l)
-                                        in if (name=="abstract") then 
-                                                (l ++ (replicate (3 + m - (length l)) ' ') ++ " |      scope = " ++ (show $ fromJust $ Data.List.lookup (takeWhile (`notElem` [' ', '\n']) $ dropWhile (not . isLetter) $ tail $ tail $ dropWhile (/='c') l) ss)) : addScopeVals ls ss m
-                                                    else if (Data.List.lookup name ss == Nothing) then  (l ++ (replicate (3 + m - (length l)) ' ') ++ " |      scope = Nothing") : addScopeVals ls ss m else 
-                                                        (l ++ (replicate (3 + m - (length l)) ' ') ++ " |      scope = " ++ (show $ fromJust $ Data.List.lookup name ss)) : addScopeVals ls ss m           
-                findConstraintEnd :: [String] -> [(String, Integer)] -> Int -> [String]                                                                   
-                findConstraintEnd (l:ls) ss  m = if (']' `elem` l) then (l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : addScopeVals ls ss m else (l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : findConstraintEnd ls ss m
-                addUnSat :: [String] -> [String] -> String
-                addUnSat us ls = unlines $ addUnSatHelp us us ls
-                addUnSatHelp uss _ [] = []
-                addUnSatHelp uss [] (l:ls) = l : addUnSatHelp uss uss ls
-                addUnSatHelp uss (u:us) (l:ls) = if ((u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == (takeWhile isNumber l))) then 
-                    (replaceLine l) : addUnSatHelp uss uss ls else addUnSatHelp uss us (l:ls)
-                    where
-                        replaceLine :: String -> String
-                        replaceLine = reverse . replaceLine2 . reverse . replaceLine1
-                            where
-                                replaceLine1 :: String -> String
-                                replaceLine1 [] = []
-                                replaceLine1 ('|':xs) = '>' : xs
-                                replaceLine1 (x:xs) = x : replaceLine1 xs
-                                replaceLine2 :: String -> String
-                                replaceLine2 [] = []
-                                replaceLine2 ('|':xs) = " taSnU<" ++ xs
-                                replaceLine2 ('s' : xs) = 's' : replaceLine3 xs
-                                replaceLine2 (x:xs) = x : replaceLine2 xs
-                                replaceLine3 :: String -> String
-                                replaceLine3 ('|':xs) = " taSnU<" ++ xs
-                                replaceLine3 (' ' : xs) = replaceLine3 xs
-                                replaceLine3 (x:xs) = x : replaceLine3 xs
+                editModel :: String -> [Integer] -> [String] -> Integer -> (Map.Map Integer String) -> [(String, Integer)] -> String
+                editModel model cLines unSATs globalScope' lineMap s = 
+                    let claferLines = lines $ removeCommentsAndUnify model
+                    in unlines $ (("global scope = " ++ show globalScope' ++ "\n") :) $ editLines cLines unSATs (numberOfDigits $ length claferLines) (maximum $ map length claferLines) s lineMap (zip [1..] claferLines)
+
+                editLines :: [Integer] -> [String] -> Int -> Int -> [(String, Integer)] -> (Map.Map Integer String) -> [(Integer, String)] -> [String]
+                editLines _ _ _ _ _ _ [] = []
+                editLines cLines unSATs m1 m2 s lineMap ((num, l):rest) = 
+                    if (num `elem` cLines && isEmptyLine l) then editLines cLines unSATs m1 m2 s lineMap rest else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s l (Map.lookup num lineMap))) : editLines cLines unSATs m1 m2 s lineMap rest
+
+                isUnSAT :: [String] -> String -> Integer -> Bool
+                isUnSAT us l ln = getAny $ foldMap (\u -> Any ((u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == show ln))) us
+
+                addScopeVal :: [(String, Integer)] -> String -> (Maybe String) ->String
+                addScopeVal s l Nothing = ""
+                addScopeVal s l (Just name) = "scope = " ++ (fromJustShow $ Data.List.lookup name s) 
+
+                fromJustShow :: (Maybe Integer) -> String
+                fromJustShow (Just x) = show x
+                fromJustShow Nothing = "Nothing"
+
+                getCommentLines :: String -> [Integer]
+                getCommentLines = foldr (\(s, _) acc -> case s of
+                    (Span (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc
+                    (PosSpan _ (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc) [] . getComments
 
     loop ShowAlloyModel context =
         do
-            globalScope <- lift getGlobalScope
+            globalScope' <- lift getGlobalScope
             alloyModel <- lift getAlloyModel
             scopes <- lift getScopes
-            scopeValues <- mapM (lift . valueOfScope) scopes
-            let alloyLines = lines $ editModel alloyModel
-            let splitNum = length $ takeWhile (("sig" `notElem`) . words) alloyLines
-            let (alloyInfo, alloyLines') = splitAt splitNum $ alloyLines
-            outputStrLn $ unlines $ (("global scope = " ++ show globalScope ++ "\n") :) $ alloyInfo ++ map (\(num, line) -> show num ++ ('.' : (replicate (1 + (numberOfDigits $ length alloyLines) - (numberOfDigits num)) ' ') ++ ('|' : ' ' : line))) (zip [(1 + splitNum)..(splitNum + (length $ lines alloyModel))] (addScopeValsA alloyLines' (zip (map nameOfScope scopes) scopeValues) (maximum $ map length alloyLines')))
+            scopeValues <- lift $ mapM valueOfScope scopes
+
+            outputStrLn $ editAlloyModel alloyModel (zip (map nameOfScope scopes) scopeValues) globalScope'
             nextLoop context    
             where
-                addScopeValsA [] _ _ = []
-                addScopeValsA (l:ls) ss m = 
+                editAlloyModel :: String -> [(String, Integer)] -> Integer -> String
+                editAlloyModel model s globalScope' = 
+                    let alloyLines = lines $ removeCommentsAndUnify model
+                        splitNum = 1 + (length $ takeWhile (not . isEmptyLine) alloyLines)
+                        (alloyInfo, alloyLines') = splitAt splitNum $ alloyLines
+                    in unlines $ (("global scope = " ++ show globalScope' ++ "\n") :) $ alloyInfo ++ map (\(num, line) -> show num ++ ('.' : (replicate (1 + (numberOfDigits $ length alloyLines) - (numberOfDigits num)) ' ') ++ ('|' : ' ' : line))) (zip [(1 + splitNum)..] (addScopeVals alloyLines' s (maximum $ map length alloyLines')))
+                addScopeVals :: [String] -> [(String, Integer)] -> Int -> [String]
+                addScopeVals [] _ _ = []
+                addScopeVals (l:ls) ss m = 
                     let val = Data.List.lookup (tail $ dropWhile (/='_') l) ss 
-                    in if ("sig" `notElem` words l) then ((l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : addScopeValsA ls ss m)
-                        else (l ++ (replicate (3 + m - (length l)) ' ') ++ " | scope = " ++ (show $ fromJust val)) : addScopeValsA ls ss m       
+                    in if ("sig" `notElem` words l) then ((l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : addScopeVals ls ss m)
+                        else (l ++ (replicate (3 + m - (length l)) ' ') ++ " | scope = " ++ (show $ fromJust val)) : addScopeVals ls ss m       
 
     loop ShowAlloyInstance context =
         do
@@ -470,21 +470,19 @@ printConstraints' i (c:cs) =
         liftIO $ hPutStrLn stderr $ "  " ++ show i ++ ") " ++ printConstraint c
         printConstraints' (i + 1) cs
 
-editModel :: String -> String
-editModel [] = []
-editModel ['\t'] = "   "
-editModel [c] = [c]
-editModel ('\t':c2:model) = ' ' : ' ' : ' ' : (editModel $ c2 : model)
-editModel (c1:c2:model) = if (c1 /= '/') then (c1 : (editModel $ c2 : model)) else if (c2 /= '/' && c2 /='*') then (c1 : (editModel $ c2 : model))
-    else if (c2 == '/') then (editModel $ tail $ dropWhile (/='\n') model) else (removeBlock model)
+removeCommentsAndUnify :: String -> String
+removeCommentsAndUnify [] = []
+removeCommentsAndUnify ['\t'] = "   "
+removeCommentsAndUnify [c] = [c]
+removeCommentsAndUnify ('\t':c2:model) = ' ' : ' ' : ' ' : (removeCommentsAndUnify $ c2 : model)
+removeCommentsAndUnify (c1:c2:model) = if (c1 /= '/') then (c1 : (removeCommentsAndUnify $ c2 : model)) else if (c2 /= '/' && c2 /='*') then (c1 : (removeCommentsAndUnify $ c2 : model))
+    else if (c2 == '/') then (removeCommentsAndUnify $ dropWhile (/='\n') model) else (removeBlock model)
     where
         removeBlock :: String -> String
         removeBlock [] = []
         removeBlock [c] = []
-        removeBlock (c1:c2:model) = if (c1 == '*' && c2 == '/') then (editModel $ isEndLine model) else (removeBlock $ c2 : model)  
-        isEndLine :: String -> String
-        isEndLine [] = []
-        isEndLine (c:model) = if (c=='\n') then model else (c:model)
+        removeBlock ('\n':model) = '\n' : removeBlock model
+        removeBlock (c1:c2:model) = if (c1 == '*' && c2 == '/') then (removeCommentsAndUnify model) else (removeBlock $ c2 : model)  
 
 isEmptyLine :: String -> Bool
 isEmptyLine l = filter (`notElem` [' ', '\n', '\t']) l == []
