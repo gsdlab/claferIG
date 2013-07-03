@@ -22,7 +22,7 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError, findNecessaryBitwidth) where
+module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError, findNecessaryBitwidth, intToFloat) where
 
 import Language.ClaferT
 import Language.Clafer.IG.ClaferIG
@@ -44,6 +44,7 @@ import qualified Data.Map as Map
 import Data.Maybe
 import System.Console.Haskeline
 import System.IO
+import GHC.Float
 
 data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_UnsatCoreMinimization | Auto_Space | Auto_Digit | No_Auto deriving Show
 
@@ -201,14 +202,16 @@ runCommandLine =
         do
             oldScopes <- lift getScopes
             let oldScopeNames = map nameOfScope oldScopes
-            oldScopeVals <- mapM (lift . valueOfScope) oldScopes
+            oldScopeVals <- lift $ mapM valueOfScope oldScopes
             runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
             oldBw <- lift getBitwidth
             args <- lift getClaferIGArgs
             cModel <- liftIO $ strictReadFile $ claferModelFile args
-            lift $ setBitwidth $ findNecessaryBitwidth cModel oldBw
+            tempScopes <- lift getScopes
+            lift $ setScopes (zip oldScopeNames oldScopeVals) tempScopes
             newScopes <- lift getScopes
-            lift $ setScopes (zip oldScopeNames oldScopeVals) newScopes
+            newScopeVals <- lift $ mapM valueOfScope newScopes
+            lift $ setBitwidth $ findNecessaryBitwidth cModel oldBw (intToFloat $ maximum newScopeVals)
             lift $ solve
             nextLoop context
             where
@@ -491,13 +494,16 @@ numberOfDigits :: Int -> Int
 numberOfDigits 0 = 0
 numberOfDigits x = 1 + (numberOfDigits $ x `div` 10)
 
-findNecessaryBitwidth :: String -> Integer -> Integer
-findNecessaryBitwidth model oldBw = if (newBw < oldBw) then oldBw else newBw
+findNecessaryBitwidth :: String -> Integer -> Float -> Integer
+findNecessaryBitwidth model oldBw maxScope = if (newBw < oldBw) then oldBw else newBw
     where
-        newBw = ceiling $ logBase 2 $ 1 + 2 * maxInModel model []
+        newBw = ceiling $ logBase 2 $ (\x -> 1 + 2 * x) $ (max maxScope) $ maxInModel model []
         digitToFloat = toEnum . digitToInt
         maxInModel [] [] = 0
         maxInModel [] acc = maximum acc
         maxInModel (x:xs) acc = if (isNumber x) then (findFullNum xs (digitToFloat x) acc) else (maxInModel xs acc)
         findFullNum [] n acc = maximum $ n:acc
         findFullNum (x:xs) n acc = if (isNumber x) then (findFullNum xs (n * 10 + (digitToFloat x)) acc) else maxInModel xs (n:acc)
+
+intToFloat :: Integer -> Float
+intToFloat = fromInteger . toInteger 
