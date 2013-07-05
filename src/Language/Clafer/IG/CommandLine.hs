@@ -129,7 +129,15 @@ runCommandLine =
                     -- Only deleted the upper constraint
                     Nothing    -> (show info ++ " changed to " ++ show (setUpper info Nothing), rest)
 
+            printConstraint UserConstraint{constraintInfo = info} = show info
+            printConstraint constraint = show $ claferInfo constraint
 
+            printConstraints = printConstraints' 1
+            printConstraints' _ [] = return ()
+            printConstraints' i (c:cs) =
+                do
+                    liftIO $ hPutStrLn stderr $ "  " ++ show i ++ ") " ++ printConstraint c
+                    printConstraints' (i + 1) cs
 
             printTransformations cs = printTransformations' 1 cs
             printTransformations' _ [] = return ()
@@ -288,7 +296,7 @@ runCommandLine =
 
             constraints' <- lift getConstraints
             AlloyIG.UnsatCore core <- lift $ ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-            let unSATs = map printConstraint $ catMaybes $ findRemovable core constraints'
+            let unSATs = map (show . constraintInfo) $ catMaybes $ findRemovable core constraints'
 
             claferModel <- lift getClaferModel
             let commentLines = getCommentLines claferModel
@@ -462,16 +470,6 @@ printError (ClaferErrs errs) =
         "Error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
     printError (ClaferErr msg) =
         "Error:\n    " ++ msg
-
-printConstraint UserConstraint{constraintInfo = info} = show info
-printConstraint constraint = show $ claferInfo constraint
-
-printConstraints = printConstraints' 1
-printConstraints' _ [] = return ()
-printConstraints' i (c:cs) =
-    do
-        liftIO $ hPutStrLn stderr $ "  " ++ show i ++ ") " ++ printConstraint c
-        printConstraints' (i + 1) cs
 
 removeCommentsAndUnify :: String -> String
 removeCommentsAndUnify [] = []

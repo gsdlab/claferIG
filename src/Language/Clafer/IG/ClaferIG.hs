@@ -343,9 +343,7 @@ next = do
                                 counterexample' core' (remove : removed) useUids' addTypes' info' constraints' sMap
                 Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
-
-    
-    
+ 
     xmlToModel :: Bool -> Bool -> Analysis.Info -> String -> (Map Int String) -> ClaferModel
     xmlToModel  useUids' addTypes' info' xml sMap = (sugarClaferModel useUids' addTypes' (Just info') $ buildClaferModel $ parseSolution xml) sMap
 
@@ -381,4 +379,6 @@ sigToClaferName n =
         [] ->  n
         x -> tail x
 
-findRemovable core constraints' = [find ((== c). range) constraints' | c <- core]
+findRemovable :: [Span] -> [Constraint] -> [Maybe Constraint]
+findRemovable core constraints' = map (\c -> find ((== c) . range) constraints') core
+--findRemovable core constraints' = [find ((== c). range) constraints' | c <- core]
