@@ -219,7 +219,7 @@ runCommandLine =
             lift $ setScopes (zip oldScopeNames oldScopeVals) tempScopes
             newScopes <- lift getScopes
             newScopeVals <- lift $ mapM valueOfScope newScopes
-            lift $ setBitwidth $ findNecessaryBitwidth cModel oldBw (intToFloat $ maximum newScopeVals)
+            lift $ setBitwidth $ findNecessaryBitwidth (lines cModel) oldBw (intToFloat $ maximum newScopeVals)
             lift $ solve
             nextLoop context
             where
@@ -492,16 +492,20 @@ numberOfDigits :: Int -> Int
 numberOfDigits 0 = 0
 numberOfDigits x = 1 + (numberOfDigits $ x `div` 10)
 
-findNecessaryBitwidth :: String -> Integer -> Float -> Integer
-findNecessaryBitwidth model oldBw maxScope = if (newBw < oldBw) then oldBw else newBw
+findNecessaryBitwidth :: [String] -> Integer -> Float -> Integer
+findNecessaryBitwidth ls oldBw maxScope = 
+    if (newBw < oldBw) then oldBw else newBw
     where
-        newBw = ceiling $ logBase 2 $ (\x -> 1 + 2 * x) $ (max maxScope) $ maxInModel model []
-        digitToFloat = toEnum . digitToInt
-        maxInModel [] [] = 0
-        maxInModel [] acc = maximum acc
-        maxInModel (x:xs) acc = if (isNumber x) then (findFullNum xs (digitToFloat x) acc) else (maxInModel xs acc)
-        findFullNum [] n acc = maximum $ n:acc
-        findFullNum (x:xs) n acc = if (isNumber x) then (findFullNum xs (n * 10 + (digitToFloat x)) acc) else maxInModel xs (n:acc)
+        newBw = ceiling $ logBase 2 $ (\x -> 1 + 2 * x) $ maxInModel ls 0
+        maxInModel :: [String] -> Int -> Float
+        maxInModel [] acc = (max maxScope) $ intToFloat $ fromIntegral acc
+        maxInModel (l:ls) acc = 
+            let w = words l
+                int = elemIndex "int" w
+                inte = elemIndex "integer" w
+            in if (int == Nothing && inte == Nothing) then maxInModel ls acc
+                else if (inte == Nothing) then maxInModel ls $ max acc $ read $ ((w !!) $ fromJust int)
+                    else maxInModel ls $ max acc $ read $ ((w !!) $ fromJust inte)
 
 intToFloat :: Integer -> Float
 intToFloat = fromInteger . toInteger 

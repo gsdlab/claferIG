@@ -88,7 +88,7 @@ runClaferIG args =
         cModel <- liftIO $ strictReadFile $ claferModelFile args
         scopes <- getScopes
         scopeVals <- mapM valueOfScope scopes
-        setBitwidth $ findNecessaryBitwidth cModel oldBw (intToFloat $ maximum scopeVals)
+        setBitwidth $ findNecessaryBitwidth (lines cModel) oldBw (intToFloat $ maximum scopeVals)
         solve
         case all args of
             Just scope ->
