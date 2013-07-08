@@ -503,9 +503,11 @@ findNecessaryBitwidth ls oldBw maxScope =
             let w = words l
                 int = elemIndex "int" w
                 inte = elemIndex "integer" w
-            in if (int == Nothing && inte == Nothing) then maxInModel ls acc
-                else if (inte == Nothing) then maxInModel ls $ max acc $ read $ ((w !!) $ fromJust int)
-                    else maxInModel ls $ max acc $ read $ ((w !!) $ fromJust inte)
+            in if (int /= Nothing && inte == Nothing && ((fromJust' int) + 2 <= length w)) then maxInModel ls $ max acc $ read $ ((w !!) $ (+2) $ fromJust' int) 
+                else if (int == Nothing && inte /= Nothing && ((fromJust' inte) + 2 <= length w)) then maxInModel ls $ max acc $ read $ ((w !!) $ (+2) $ fromJust' inte)
+                    else maxInModel ls acc
+        fromJust' Nothing = 0
+        fromJust' (Just x) = x
 
 intToFloat :: Integer -> Float
 intToFloat = fromInteger . toInteger 
