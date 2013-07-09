@@ -84,8 +84,10 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans
 import Control.Monad.Trans.State.Strict
 import Data.List
+import Data.Monoid
 import Data.Tuple (swap)
 import Data.Map as Map hiding (map, null)
+import qualified Data.Sequence as Seq
 import Data.Maybe
 import Data.Data
 import Data.Typeable
@@ -141,7 +143,7 @@ data ClaferIGEnv = ClaferIGEnv{
     claferEnv'::ClaferEnv,
     claferIGArgs :: IGArgs,
     constraints:: [Constraint], 
-    claferModel::String, 
+    claferModel:: String, 
     claferToSigNameMap :: Map String String,
     info :: Analysis.Info,
     strMap :: Map Int String,
@@ -307,6 +309,7 @@ setScope scope Scope{nameOfScope, sigName} =
 
 next :: MonadIO m => ClaferIGT m Instance
 next = do
+    env <- getClaferEnv
     claferIGArgs' <- getClaferIGArgs
     let 
         useUids' = useUids claferIGArgs'
@@ -322,25 +325,25 @@ next = do
             -- Generating counterexample modifies the state. If we ever want to
             -- rerun the original model, we need to restore the state.
             AlloyIG.UnsatCore core <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-            c <- counterexample core useUids' addTypes' info' constraints' sMap
+            c <- counterexample env core useUids' addTypes' info' constraints' sMap
             ClaferIGT $ lift AlloyIG.sendRestoreStateCommand
             return c
     where
-    counterexample originalCore useUids' addTypes' info' constraints' sMap = counterexample' originalCore [] useUids' addTypes' info' constraints' sMap
+    counterexample env originalCore useUids' addTypes' info' constraints' sMap = counterexample' env originalCore [] useUids' addTypes' info' constraints' sMap
         where
-        counterexample' core removed useUids' addTypes' info' constraints' sMap =
-            case msum $ findRemovable core constraints' of
+        counterexample' env core removed useUids' addTypes' info' constraints' sMap =
+            case msum $ findRemovable env core constraints' of
                 Just remove -> do
                     ClaferIGT $ lift $ AlloyIG.sendRemoveConstraintCommand $ range remove
                     ClaferIGT $ lift AlloyIG.sendResolveCommand
                     xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
                     case xmlSolution of
                         Just xml -> return $
-                            UnsatCore (catMaybes $ findRemovable core constraints') (Just $ Counterexample (reverse $ remove : removed) (xmlToModel useUids' addTypes' info' xml sMap) xml)
+                            UnsatCore (catMaybes $ findRemovable env core constraints') (Just $ Counterexample (reverse $ remove : removed) (xmlToModel useUids' addTypes' info' xml sMap) xml)
                         Nothing ->
                             do
                                 AlloyIG.UnsatCore core' <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-                                counterexample' core' (remove : removed) useUids' addTypes' info' constraints' sMap
+                                counterexample' env core' (remove : removed) useUids' addTypes' info' constraints' sMap
                 Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
  
@@ -379,6 +382,15 @@ sigToClaferName n =
         [] ->  n
         x -> tail x
 
-findRemovable :: [Span] -> [Constraint] -> [Maybe Constraint]
-findRemovable core constraints' = map (\c -> find ((== c) . range) constraints') core
---findRemovable core constraints' = [find ((== c). range) constraints' | c <- core]
+findRemovable :: ClaferEnv -> [Span] -> [Constraint] -> [Maybe Constraint]
+findRemovable env core constraints' =
+    let absIDs = foldMapIR getId $ first $ fromJust $ cIr env
+    in  Data.List.filter (\x -> case x of
+        (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) -> ((Seq.elemIndexL uID absIDs)==Nothing)
+        _ -> True) $ map (\c -> find ((== c) . range) constraints') core
+    where
+        --getId :: 
+        getId (IRClafer (IClafer _ True _ _ uID _ _ _ _)) = Seq.singleton uID
+        getId _ = mempty
+        first :: (a, b, c) -> a
+        first (a,_,_) = a

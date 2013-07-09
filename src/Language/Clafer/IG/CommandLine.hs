@@ -294,13 +294,15 @@ runCommandLine =
             scopeVals <- lift $ mapM valueOfScope scopes
             globalScope' <- lift getGlobalScope
 
+            env <- lift getClaferEnv
             constraints' <- lift getConstraints
             AlloyIG.UnsatCore core <- lift $ ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-            let unSATs = map (show . constraintInfo) $ catMaybes $ findRemovable core constraints'
+            let unSATs = map getConstraintInfo $ catMaybes $ findRemovable env core constraints'
 
             claferModel <- lift getClaferModel
             let commentLines = getCommentLines claferModel
             lineMap <- lift getlineNumMap
+
 
             outputStrLn $ editModel claferModel commentLines unSATs globalScope' lineMap (zip (map nameOfScope scopes) scopeVals)
             nextLoop context
@@ -330,6 +332,10 @@ runCommandLine =
                 getCommentLines = foldr (\(s, _) acc -> case s of
                     (Span (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc
                     (PosSpan _ (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc) [] . getComments
+
+                getConstraintInfo :: Constraint -> String
+                getConstraintInfo (UserConstraint _ info) = show info
+                getConstraintInfo x = show $ claferInfo x
 
     loop ShowAlloyModel context =
         do

@@ -40,10 +40,10 @@ data Constraint =
     LowerCardinalityConstraint {range::Span, claferInfo::ClaferInfo} |
     UpperCardinalityConstraint {range::Span, claferInfo::ClaferInfo} |
     UserConstraint {range::Span, constraintInfo::ConstraintInfo}
-    deriving Show
+    deriving (Show, Eq)
 
 
-data Cardinality = Cardinality {lower::Integer, upper::Maybe Integer}
+data Cardinality = Cardinality {lower::Integer, upper::Maybe Integer} deriving Eq
 
 instance Show Cardinality where
     show (Cardinality 0 Nothing) = "*"
@@ -55,13 +55,13 @@ instance Show Cardinality where
         | otherwise      = show lower ++ ".." ++ show upper
 
 
-data ClaferInfo = ClaferInfo {uniqueId::String, cardinality::Cardinality}
+data ClaferInfo = ClaferInfo {uniqueId::String, cardinality::Cardinality} deriving Eq
 
 instance Show ClaferInfo where
     show (ClaferInfo uniqueId cardinality) = uniqueId ++ " " ++ show cardinality
 
 
-data ConstraintInfo = ConstraintInfo {pId::String, pos::Span, syntax::String}
+data ConstraintInfo = ConstraintInfo {pId::String, pos::Span, syntax::String} deriving Eq
 
 instance Show ConstraintInfo where
     show ConstraintInfo{pos = Span (Pos l c) _, syntax} = syntax ++ " (line " ++ show l ++ ", column " ++ show c ++ ")"
