@@ -294,9 +294,7 @@ increaseScope :: MonadIO m => Integer -> Scope -> ClaferIGT m (Either String ())
 increaseScope increment scope =
     do
         value <- valueOfScope scope
-        bitwidth' <- getBitwidth
-        let value' = min (value + increment) ((2 ^ (bitwidth' - 1)) - 1)
-        setScope value' scope
+        setScope (value + increment) scope
     
 
 setScope :: MonadIO m => Integer -> Scope -> ClaferIGT m (Either String ())

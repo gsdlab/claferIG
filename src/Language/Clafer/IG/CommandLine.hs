@@ -74,11 +74,6 @@ runCommandLine =
         } $ loop Next (Context Nothing [] [] autoCompleteContext)
     where 
 
-    getScopeinfo :: Integer -> Integer -> String -> (Integer, String)    
-    getScopeinfo bwcapacity requestedScope name = 
-        let a = min requestedScope bwcapacity
-            b =  if (requestedScope > bwcapacity) then "Requested scope for " ++ name ++ " is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")\n" else ""
-        in (a,b)
 
     loop :: Command -> Context -> InputT (ClaferIGT IO) ()
     
@@ -240,18 +235,27 @@ runCommandLine =
         do
             globalScope <- lift getGlobalScope
             bitwidth' <- lift getBitwidth
-            let bwcapacity = ((2 ^ (bitwidth' - 1)) - 1)
-            let (globalScope',errMsg) = getScopeinfo bwcapacity (globalScope+i) "Global Scope"
-            lift $ setGlobalScope globalScope'
-            
-            scopes <- lift getScopes
-            forM scopes (\x -> do
-                value <- lift $ valueOfScope x
-                if ((value+i) > bwcapacity) then outputStrLn $ "Requested scope for " ++ (nameOfScope x) ++ " is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")" else return ())
-            lift $ mapM (increaseScope i) scopes
-            lift solve
-            
-            outputStrLn (errMsg ++ "Global scope increased to " ++ show globalScope')
+            lift $ setGlobalScope (globalScope+i)
+            when ((globalScope+i) > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+                liftIO $ putStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (globalScope+i)
+                newBw <- lift getBitwidth
+                when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+
+            oldScopes <- lift getScopes
+            oldScopeVals <- lift $ mapM valueOfScope oldScopes
+            forM ((zip oldScopeVals) $ map nameOfScope oldScopes) (\(value, name) -> do
+                bw <- lift getBitwidth
+                when ((value+i) > ((2 ^ (bw - 1)) - 1)) $ do
+                    liftIO $ putStrLn $ "Warning! Requested scope for " ++ name ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                    lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (value+i)
+                    newBw <- lift getBitwidth
+                    when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down.")
+
+            lift $ mapM (increaseScope i) oldScopes
+
+            lift solve    
+            outputStrLn ("Global scope increased to " ++ show (globalScope+i))
             nextLoop context
             
     loop (IncreaseScope name i) context =
@@ -260,11 +264,15 @@ runCommandLine =
                 scope <- ErrorT $ lift $ getScope name
                 scopeValue <- lift $ lift $ valueOfScope scope 
                 bitwidth' <- lift $ lift getBitwidth
-                let (scopeValue', errorMsg) = getScopeinfo ((2 ^ (bitwidth' - 1)) - 1) (scopeValue+i) name
-                ErrorT $ lift $ setScope scopeValue' scope
-                
+                ErrorT $ lift $ setScope (scopeValue+i) scope
+                lift $ when ((scopeValue+i) > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+                    liftIO $ putStrLn $ "Warning! Requested scope for " ++ (nameOfScope scope) ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                    lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (scopeValue+i)
+                    newBw <- lift getBitwidth
+                    when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+     
                 lift $ lift $ solve
-                lift $ outputStrLn (errorMsg ++ "Scope of " ++ name ++ " increased to " ++ show scopeValue')
+                lift $ outputStrLn ("Scope of " ++ name ++ " increased to " ++ show (scopeValue+i))
                 
             nextLoop context
             
