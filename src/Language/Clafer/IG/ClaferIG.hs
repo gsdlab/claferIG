@@ -390,7 +390,7 @@ findRemovable env core constraints' =
         removeAbsZero absIDs (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) = ((Seq.elemIndexL uID absIDs)==Nothing)
         removeAbsZero absIDs _ = True
         getId :: Ir -> (Seq.Seq String)
-        getId (IRClafer (IClafer _ True _ _ uID _ _ _ _)) = Seq.singleton uID
+        getId (IRClafer (IClafer _ True _ uID _ _ _ _ _)) = Seq.singleton uID
         getId _ = mempty
 
 fst3 (a, _, _) = a
