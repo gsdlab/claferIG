@@ -25,6 +25,7 @@
 module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError, findNecessaryBitwidth, intToFloat) where
 
 import Language.ClaferT
+import Language.Clafer.Intermediate.Intclafer
 import Language.Clafer.IG.ClaferIG
 import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLineParser
@@ -212,14 +213,19 @@ runCommandLine =
             let oldScopeNames = map nameOfScope oldScopes
             oldScopeVals <- lift $ mapM valueOfScope oldScopes
             runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
+
             oldBw <- lift getBitwidth
             args <- lift getClaferIGArgs
-            cModel <- liftIO $ strictReadFile $ claferModelFile args
+            env <- lift getClaferEnv
+            let ir = fst3 $ fromJust $ cIr env
             tempScopes <- lift getScopes
             lift $ setScopes (zip oldScopeNames oldScopeVals) tempScopes
+
             newScopes <- lift getScopes
             newScopeVals <- lift $ mapM valueOfScope newScopes
-            lift $ setBitwidth $ findNecessaryBitwidth (lines cModel) oldBw (intToFloat $ maximum newScopeVals)
+            lift $ setBitwidth $ findNecessaryBitwidth ir oldBw newScopeVals
+            newBw <- lift getBitwidth
+            when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
             lift $ solve
             nextLoop context
             where
@@ -498,22 +504,16 @@ numberOfDigits :: Int -> Int
 numberOfDigits 0 = 0
 numberOfDigits x = 1 + (numberOfDigits $ x `div` 10)
 
-findNecessaryBitwidth :: [String] -> Integer -> Float -> Integer
-findNecessaryBitwidth ls oldBw maxScope = 
+findNecessaryBitwidth :: IModule -> Integer -> [Integer] -> Integer
+findNecessaryBitwidth ir oldBw scopes = 
     if (newBw < oldBw) then oldBw else newBw
     where
-        newBw = ceiling $ logBase 2 $ (\x -> 1 + 2 * x) $ maxInModel ls 0
-        maxInModel :: [String] -> Int -> Float
-        maxInModel [] acc = (max maxScope) $ intToFloat $ fromIntegral acc
-        maxInModel (l:ls) acc = 
-            let w = words l
-                int = elemIndex "int" w
-                inte = elemIndex "integer" w
-            in if (int /= Nothing && inte == Nothing && ((fromJust' int) + 2 <= length w)) then maxInModel ls $ max acc $ read $ ((w !!) $ (+2) $ fromJust' int) 
-                else if (int == Nothing && inte /= Nothing && ((fromJust' inte) + 2 <= length w)) then maxInModel ls $ max acc $ read $ ((w !!) $ (+2) $ fromJust' inte)
-                    else maxInModel ls acc
-        fromJust' Nothing = 0
-        fromJust' (Just x) = x
+        newBw = ceiling $ logBase 2 $ (+1) $ (*2) $ maxInModel ir
+        maxInModel :: IModule -> Float
+        maxInModel ir = intToFloat $ (max (maximum scopes)) $ foldIR getMax 0 ir
+        getMax :: Ir -> Integer -> Integer 
+        getMax (IRIExp (IInt n)) m = max m $ abs n
+        getMax _ m = m
 
 intToFloat :: Integer -> Float
 intToFloat = fromInteger . toInteger 

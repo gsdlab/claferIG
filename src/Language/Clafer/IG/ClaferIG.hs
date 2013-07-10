@@ -56,7 +56,7 @@ module Language.Clafer.IG.ClaferIG (
     quit, 
     reload,
     findRemovable,
-    strictReadFile,
+    fst3,
     getlineNumMap) where
 
 import Debug.Trace
@@ -231,7 +231,6 @@ load                 igArgs    =
     claferArgs = defaultClaferArgs{keep_unused = True, no_stats = True, flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
     claferFile' = claferModelFile igArgs
     bitwidth' = bitwidth igArgs
-    fst3 (a, _, _) = a
 
                 
 strictReadFile :: FilePath -> IO String 
@@ -384,13 +383,14 @@ sigToClaferName n =
 
 findRemovable :: ClaferEnv -> [Span] -> [Constraint] -> [Maybe Constraint]
 findRemovable env core constraints' =
-    let absIDs = foldMapIR getId $ first $ fromJust $ cIr env
-    in  Data.List.filter (\x -> case x of
-        (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) -> ((Seq.elemIndexL uID absIDs)==Nothing)
-        _ -> True) $ map (\c -> find ((== c) . range) constraints') core
+    let absIDs = foldMapIR getId $ fst3 $ fromJust $ cIr env
+    in  Data.List.filter (removeAbsZero absIDs ) $ map (\c -> find ((== c) . range) constraints') core
     where
-        --getId :: 
+        removeAbsZero :: (Seq.Seq String) -> Maybe Constraint -> Bool
+        removeAbsZero absIDs (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) = ((Seq.elemIndexL uID absIDs)==Nothing)
+        removeAbsZero absIDs _ = True
+        getId :: Ir -> (Seq.Seq String)
         getId (IRClafer (IClafer _ True _ _ uID _ _ _ _)) = Seq.singleton uID
         getId _ = mempty
-        first :: (a, b, c) -> a
-        first (a,_,_) = a
+
+fst3 (a, _, _) = a

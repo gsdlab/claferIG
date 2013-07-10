@@ -30,6 +30,7 @@ import Language.Clafer.IG.CommandLine
 import Language.Clafer.IG.Solution
 import Language.Clafer.IG.Sugarer
 import Language.Clafer.ClaferArgs
+import Language.ClaferT
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
@@ -85,10 +86,11 @@ main =
 runClaferIG args =
     runClaferIGT args $ do
         oldBw <- getBitwidth
-        cModel <- liftIO $ strictReadFile $ claferModelFile args
+        env <- getClaferEnv
+        let ir = fst3 $ fromJust $ cIr env
         scopes <- getScopes
         scopeVals <- mapM valueOfScope scopes
-        setBitwidth $ findNecessaryBitwidth (lines cModel) oldBw (intToFloat $ maximum scopeVals)
+        setBitwidth $ findNecessaryBitwidth ir oldBw scopeVals
         solve
         case all args of
             Just scope ->
