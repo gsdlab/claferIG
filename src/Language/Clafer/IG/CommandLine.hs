@@ -338,10 +338,6 @@ runCommandLine =
                 addScopeVal s l Nothing = ""
                 addScopeVal s l (Just name) = "scope = " ++ (fromJustShow $ Data.List.lookup name s) 
 
-                fromJustShow :: (Maybe Integer) -> String
-                fromJustShow (Just x) = show x
-                fromJustShow Nothing = "Nothing"
-
                 getCommentLines :: String -> [Integer]
                 getCommentLines = foldr (\(s, _) acc -> case s of
                     (Span (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc
@@ -370,10 +366,10 @@ runCommandLine =
                 addScopeVals :: [String] -> [(String, Integer)] -> Int -> [String]
                 addScopeVals [] _ _ = []
                 addScopeVals (l:ls) ss m = 
-                    let val = Data.List.lookup (tail $ dropWhile (/='_') l) ss 
+                    let val = Data.List.lookup (takeWhile (`notElem` [' ','\t','\n']) $ tail $ dropWhile (/='_') l) ss 
                     in if ("sig" `notElem` words l) then ((l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : addScopeVals ls ss m)
-                        else (l ++ (replicate (3 + m - (length l)) ' ') ++ " | scope = " ++ (show $ fromJust val)) : addScopeVals ls ss m       
-
+                        else (l ++ (replicate (3 + m - (length l)) ' ') ++ " | scope = " ++ (fromJustShow val)) : addScopeVals ls ss m  
+   
     loop ShowAlloyInstance context =
         do
             case currentAlloyInstance context of
@@ -525,3 +521,7 @@ findNecessaryBitwidth ir oldBw scopes =
 
 intToFloat :: Integer -> Float
 intToFloat = fromInteger . toInteger 
+
+fromJustShow :: (Maybe Integer) -> String
+fromJustShow (Just x) = show x
+fromJustShow Nothing = "Nothing"
