@@ -92,7 +92,8 @@ library
 
 Test-Suite test-suite
     type:           exitcode-stdio-1.0 
-    main-is:        test/test-suite.hs
+    main-is:        test-suite.hs
+    hs-source-dirs: test
     build-depends:   
                      base >= 4 && < 5, 
                      array >= 0.4.0.0, 
