@@ -57,7 +57,8 @@ module Language.Clafer.IG.ClaferIG (
     reload,
     findRemovable,
     fst3,
-    getlineNumMap) where
+    getlineNumMap,
+    strictReadFile) where
 
 import Debug.Trace
 import Language.Clafer

@@ -85,6 +85,8 @@ main =
         
 runClaferIG args =
     runClaferIGT args $ do
+        cModel <- liftIO $ strictReadFile $ claferModelFile args
+        when (cModel == "") $ error "ClaferIG cannot instantiate an empty model."
         oldBw <- getBitwidth
         env <- getClaferEnv
         let ir = fst3 $ fromJust $ cIr env
