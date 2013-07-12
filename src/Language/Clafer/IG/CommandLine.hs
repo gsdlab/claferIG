@@ -332,7 +332,9 @@ runCommandLine =
                     if (num `elem` cLines && isEmptyLine l) then editLines cLines unSATs m1 m2 s lineMap rest else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s l (Map.lookup num lineMap))) : editLines cLines unSATs m1 m2 s lineMap rest
 
                 isUnSAT :: [String] -> String -> Integer -> Bool
-                isUnSAT us l ln = getAny $ foldMap (\u -> Any ((and $ map (`elem` (words l)) (words u)) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == show ln))) us
+                isUnSAT us l ln = getAny $ foldMap (\u -> Any (((safehead $ words u) == (safehead $ words l) && (safehead $ reverse $ words u) == (safehead $ reverse $ words l)) || (u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == show ln))) us
+                safehead [] = []
+                safehead x = head x
 
                 addScopeVal :: [(String, Integer)] -> String -> (Maybe String) ->String
                 addScopeVal s l Nothing = ""
