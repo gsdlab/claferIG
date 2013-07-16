@@ -25,11 +25,13 @@
 module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError, findNecessaryBitwidth, intToFloat) where
 
 import Language.ClaferT
+import Language.Clafer.Intermediate.Intclafer
 import Language.Clafer.IG.ClaferIG
 import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLineParser
 import Language.Clafer.IG.Constraints
 import Language.Clafer.IG.JSONGenerator
+import Language.Clafer.Comments
 import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
 import Control.Monad
 import Control.Monad.Error
@@ -37,6 +39,8 @@ import Control.Monad.Trans
 import Data.Char
 import Data.IORef
 import Data.List
+import Data.Monoid
+import Data.Foldable (foldMap)
 import qualified Data.Map as Map
 import Data.Maybe
 import System.Console.Haskeline
@@ -70,11 +74,6 @@ runCommandLine =
         } $ loop Next (Context Nothing [] [] autoCompleteContext)
     where 
 
-    getScopeinfo :: Integer -> Integer -> String -> (Integer, String)    
-    getScopeinfo bwcapacity requestedScope name = 
-        let a = min requestedScope bwcapacity
-            b =  if (requestedScope > bwcapacity) then "Requested scope for " ++ name ++ " is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")\n" else ""
-        in (a,b)
 
     loop :: Command -> Context -> InputT (ClaferIGT IO) ()
     
@@ -126,7 +125,15 @@ runCommandLine =
                     -- Only deleted the upper constraint
                     Nothing    -> (show info ++ " changed to " ++ show (setUpper info Nothing), rest)
 
+            printConstraint UserConstraint{constraintInfo = info} = show info
+            printConstraint constraint = show $ claferInfo constraint
 
+            printConstraints = printConstraints' 1
+            printConstraints' _ [] = return ()
+            printConstraints' i (c:cs) =
+                do
+                    liftIO $ hPutStrLn stderr $ "  " ++ show i ++ ") " ++ printConstraint c
+                    printConstraints' (i + 1) cs
 
             printTransformations cs = printTransformations' 1 cs
             printTransformations' _ [] = return ()
@@ -201,14 +208,19 @@ runCommandLine =
             let oldScopeNames = map nameOfScope oldScopes
             oldScopeVals <- lift $ mapM valueOfScope oldScopes
             runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
+
             oldBw <- lift getBitwidth
             args <- lift getClaferIGArgs
-            cModel <- liftIO $ strictReadFile $ claferModelFile args
+            env <- lift getClaferEnv
+            let ir = fst3 $ fromJust $ cIr env
             tempScopes <- lift getScopes
             lift $ setScopes (zip oldScopeNames oldScopeVals) tempScopes
+
             newScopes <- lift getScopes
             newScopeVals <- lift $ mapM valueOfScope newScopes
-            lift $ setBitwidth $ findNecessaryBitwidth cModel oldBw (intToFloat $ maximum newScopeVals)
+            lift $ setBitwidth $ findNecessaryBitwidth ir oldBw newScopeVals
+            newBw <- lift getBitwidth
+            when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
             lift $ solve
             nextLoop context
             where
@@ -223,18 +235,27 @@ runCommandLine =
         do
             globalScope <- lift getGlobalScope
             bitwidth' <- lift getBitwidth
-            let bwcapacity = ((2 ^ (bitwidth' - 1)) - 1)
-            let (globalScope',errMsg) = getScopeinfo bwcapacity (globalScope+i) "Global Scope"
-            lift $ setGlobalScope globalScope'
-            
-            scopes <- lift getScopes
-            forM scopes (\x -> do
-                value <- lift $ valueOfScope x
-                if ((value+i) > bwcapacity) then outputStrLn $ "Requested scope for " ++ (nameOfScope x) ++ " is larger than maximum allowed by bitwidth (" ++ (show bwcapacity) ++ ")" else return ())
-            lift $ mapM (increaseScope i) scopes
-            lift solve
-            
-            outputStrLn (errMsg ++ "Global scope increased to " ++ show globalScope')
+            lift $ setGlobalScope (globalScope+i)
+            when ((globalScope+i) > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+                liftIO $ putStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (globalScope+i)
+                newBw <- lift getBitwidth
+                when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+
+            oldScopes <- lift getScopes
+            oldScopeVals <- lift $ mapM valueOfScope oldScopes
+            forM ((zip oldScopeVals) $ map nameOfScope oldScopes) (\(value, name) -> do
+                bw <- lift getBitwidth
+                when ((value+i) > ((2 ^ (bw - 1)) - 1)) $ do
+                    liftIO $ putStrLn $ "Warning! Requested scope for " ++ name ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                    lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (value+i)
+                    newBw <- lift getBitwidth
+                    when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down.")
+
+            lift $ mapM (increaseScope i) oldScopes
+
+            lift solve    
+            outputStrLn ("Global scope increased to " ++ show (globalScope+i))
             nextLoop context
             
     loop (IncreaseScope name i) context =
@@ -243,11 +264,15 @@ runCommandLine =
                 scope <- ErrorT $ lift $ getScope name
                 scopeValue <- lift $ lift $ valueOfScope scope 
                 bitwidth' <- lift $ lift getBitwidth
-                let (scopeValue', errorMsg) = getScopeinfo ((2 ^ (bitwidth' - 1)) - 1) (scopeValue+i) name
-                ErrorT $ lift $ setScope scopeValue' scope
-                
+                ErrorT $ lift $ setScope (scopeValue+i) scope
+                lift $ when ((scopeValue+i) > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+                    liftIO $ putStrLn $ "Warning! Requested scope for " ++ (nameOfScope scope) ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                    lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (scopeValue+i)
+                    newBw <- lift getBitwidth
+                    when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+     
                 lift $ lift $ solve
-                lift $ outputStrLn (errorMsg ++ "Scope of " ++ name ++ " increased to " ++ show scopeValue')
+                lift $ outputStrLn ("Scope of " ++ name ++ " increased to " ++ show (scopeValue+i))
                 
             nextLoop context
             
@@ -279,73 +304,74 @@ runCommandLine =
 
     loop ShowClaferModel context =
         do
-            claferModel <- lift getClaferModel
             scopes <- lift getScopes
-            globalScope' <- lift getGlobalScope
             scopeVals <- lift $ mapM valueOfScope scopes
+            globalScope' <- lift getGlobalScope
+
+            env <- lift getClaferEnv
             constraints' <- lift getConstraints
             AlloyIG.UnsatCore core <- lift $ ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-            let unSats = map printConstraint $ catMaybes $ findRemovable core constraints'
-            let claferLines = lines $ editModel claferModel
-            outputStrLn $ addUnSat unSats $ (("global scope = " ++ show globalScope' ++ "\n") :) $ map (\(num, line) -> (show num) ++ ('.' : (replicate (1 + (numberOfDigits $ length claferLines) - (numberOfDigits num)) ' ') ++ ('|' : ' ' : line))) $ zip [1..(length claferLines)] $ addScopeVals claferLines (zip (map nameOfScope scopes) scopeVals) (maximum $ map length claferLines) 
+            let unSATs = map getConstraintInfo $ catMaybes $ findRemovable env core constraints'
+
+            claferModel <- lift getClaferModel
+            let commentLines = getCommentLines claferModel
+            lineMap <- lift getlineNumMap
+
+
+            outputStrLn $ editModel claferModel commentLines unSATs globalScope' lineMap (zip (map nameOfScope scopes) scopeVals)
             nextLoop context
             where
-                addScopeVals :: [String] -> [(String, Integer)] -> Int -> [String]
-                addScopeVals [] _ _ = []
-                addScopeVals (l:ls) ss m = if (isEmptyLine l) then ((l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : (addScopeVals ls ss m)) else    -- Empty line
-                    if ('[' `elem` l && ']' `notElem` l) then ((l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : (findConstraintEnd ls ss m)) else  -- Multiple line constraint
-                        if ('[' `elem` l && ']' `elem` l) then (l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : addScopeVals ls ss m else          -- Single line constraint
-                            addScopeVal (l:ls) ss m 
-                addScopeVal :: [String] -> [(String, Integer)] -> Int -> [String]    
-                addScopeVal (l:ls) ss m = let name = (takeWhile (`notElem` [' ', '\n']) $ dropWhile (not . isLetter) l)
-                                        in if (name=="abstract") then 
-                                                (l ++ (replicate (3 + m - (length l)) ' ') ++ " |      scope = " ++ (show $ fromJust $ Data.List.lookup (takeWhile (`notElem` [' ', '\n']) $ dropWhile (not . isLetter) $ tail $ tail $ dropWhile (/='c') l) ss)) : addScopeVals ls ss m
-                                                    else if (Data.List.lookup name ss == Nothing) then  (l ++ (replicate (3 + m - (length l)) ' ') ++ " |      scope = Nothing") : addScopeVals ls ss m else 
-                                                        (l ++ (replicate (3 + m - (length l)) ' ') ++ " |      scope = " ++ (show $ fromJust $ Data.List.lookup name ss)) : addScopeVals ls ss m           
-                findConstraintEnd :: [String] -> [(String, Integer)] -> Int -> [String]                                                                   
-                findConstraintEnd (l:ls) ss  m = if (']' `elem` l) then (l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : addScopeVals ls ss m else (l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : findConstraintEnd ls ss m
-                addUnSat :: [String] -> [String] -> String
-                addUnSat us ls = unlines $ addUnSatHelp us us ls
-                addUnSatHelp uss _ [] = []
-                addUnSatHelp uss [] (l:ls) = l : addUnSatHelp uss uss ls
-                addUnSatHelp uss (u:us) (l:ls) = if ((u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == (takeWhile isNumber l))) then 
-                    (replaceLine l) : addUnSatHelp uss uss ls else addUnSatHelp uss us (l:ls)
-                    where
-                        replaceLine :: String -> String
-                        replaceLine = reverse . replaceLine2 . reverse . replaceLine1
-                            where
-                                replaceLine1 :: String -> String
-                                replaceLine1 [] = []
-                                replaceLine1 ('|':xs) = '>' : xs
-                                replaceLine1 (x:xs) = x : replaceLine1 xs
-                                replaceLine2 :: String -> String
-                                replaceLine2 [] = []
-                                replaceLine2 ('|':xs) = " taSnU<" ++ xs
-                                replaceLine2 ('s' : xs) = 's' : replaceLine3 xs
-                                replaceLine2 (x:xs) = x : replaceLine2 xs
-                                replaceLine3 :: String -> String
-                                replaceLine3 ('|':xs) = " taSnU<" ++ xs
-                                replaceLine3 (' ' : xs) = replaceLine3 xs
-                                replaceLine3 (x:xs) = x : replaceLine3 xs
+                editModel :: String -> [Integer] -> [String] -> Integer -> (Map.Map Integer String) -> [(String, Integer)] -> String
+                editModel model cLines unSATs globalScope' lineMap s = 
+                    let claferLines = lines $ removeCommentsAndUnify model
+                    in unlines $ (("global scope = " ++ show globalScope' ++ "\n") :) $ editLines cLines unSATs (numberOfDigits $ length claferLines) (maximum $ map length claferLines) s lineMap (zip [1..] claferLines)
+
+                editLines :: [Integer] -> [String] -> Int -> Int -> [(String, Integer)] -> (Map.Map Integer String) -> [(Integer, String)] -> [String]
+                editLines _ _ _ _ _ _ [] = []
+                editLines cLines unSATs m1 m2 s lineMap ((num, l):rest) = 
+                    if (num `elem` cLines && isEmptyLine l) then editLines cLines unSATs m1 m2 s lineMap rest else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s l (Map.lookup num lineMap))) : editLines cLines unSATs m1 m2 s lineMap rest
+
+                isUnSAT :: [String] -> String -> Integer -> Bool
+                isUnSAT us l ln = getAny $ foldMap (\u -> Any (((safehead $ words u) == (safehead $ words l) && (safehead $ reverse $ words u) == (safehead $ reverse $ words l)) || (u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == show ln))) us
+                safehead [] = []
+                safehead x = head x
+
+                addScopeVal :: [(String, Integer)] -> String -> (Maybe String) ->String
+                addScopeVal s l Nothing = ""
+                addScopeVal s l (Just name) = "scope = " ++ (fromJustShow $ Data.List.lookup name s) 
+
+                getCommentLines :: String -> [Integer]
+                getCommentLines = foldr (\(s, _) acc -> case s of
+                    (Span (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc
+                    (PosSpan _ (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc) [] . getComments
+
+                getConstraintInfo :: Constraint -> String
+                getConstraintInfo (UserConstraint _ info) = show info
+                getConstraintInfo x = show $ claferInfo x
 
     loop ShowAlloyModel context =
         do
-            globalScope <- lift getGlobalScope
+            globalScope' <- lift getGlobalScope
             alloyModel <- lift getAlloyModel
             scopes <- lift getScopes
-            scopeValues <- mapM (lift . valueOfScope) scopes
-            let alloyLines = lines $ editModel alloyModel
-            let splitNum = length $ takeWhile (("sig" `notElem`) . words) alloyLines
-            let (alloyInfo, alloyLines') = splitAt splitNum $ alloyLines
-            outputStrLn $ unlines $ (("global scope = " ++ show globalScope ++ "\n") :) $ alloyInfo ++ map (\(num, line) -> show num ++ ('.' : (replicate (1 + (numberOfDigits $ length alloyLines) - (numberOfDigits num)) ' ') ++ ('|' : ' ' : line))) (zip [(1 + splitNum)..(splitNum + (length $ lines alloyModel))] (addScopeValsA alloyLines' (zip (map nameOfScope scopes) scopeValues) (maximum $ map length alloyLines')))
+            scopeValues <- lift $ mapM valueOfScope scopes
+
+            outputStrLn $ editAlloyModel alloyModel (zip (map nameOfScope scopes) scopeValues) globalScope'
             nextLoop context    
             where
-                addScopeValsA [] _ _ = []
-                addScopeValsA (l:ls) ss m = 
-                    let val = Data.List.lookup (tail $ dropWhile (/='_') l) ss 
-                    in if ("sig" `notElem` words l) then ((l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : addScopeValsA ls ss m)
-                        else (l ++ (replicate (3 + m - (length l)) ' ') ++ " | scope = " ++ (show $ fromJust val)) : addScopeValsA ls ss m       
-
+                editAlloyModel :: String -> [(String, Integer)] -> Integer -> String
+                editAlloyModel model s globalScope' = 
+                    let alloyLines = lines $ removeCommentsAndUnify model
+                        splitNum = 1 + (length $ takeWhile (not . isEmptyLine) alloyLines)
+                        (alloyInfo, alloyLines') = splitAt splitNum $ alloyLines
+                    in unlines $ (("global scope = " ++ show globalScope' ++ "\n") :) $ alloyInfo ++ map (\(num, line) -> show num ++ ('.' : (replicate (1 + (numberOfDigits $ length alloyLines) - (numberOfDigits num)) ' ') ++ ('|' : ' ' : line))) (zip [(1 + splitNum)..] (addScopeVals alloyLines' s (maximum $ map length alloyLines')))
+                addScopeVals :: [String] -> [(String, Integer)] -> Int -> [String]
+                addScopeVals [] _ _ = []
+                addScopeVals (l:ls) ss m = 
+                    let val = Data.List.lookup (takeWhile (`notElem` [' ','\t','\n']) $ tail $ dropWhile (/='_') l) ss 
+                    in if ("sig" `notElem` words l) then ((l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : addScopeVals ls ss m)
+                        else (l ++ (replicate (3 + m - (length l)) ' ') ++ " | scope = " ++ (fromJustShow val)) : addScopeVals ls ss m  
+   
     loop ShowAlloyInstance context =
         do
             case currentAlloyInstance context of
@@ -463,31 +489,19 @@ printError (ClaferErrs errs) =
     printError (ClaferErr msg) =
         "Error:\n    " ++ msg
 
-printConstraint UserConstraint{constraintInfo = info} = show info
-printConstraint constraint = show $ claferInfo constraint
-
-printConstraints = printConstraints' 1
-printConstraints' _ [] = return ()
-printConstraints' i (c:cs) =
-    do
-        liftIO $ hPutStrLn stderr $ "  " ++ show i ++ ") " ++ printConstraint c
-        printConstraints' (i + 1) cs
-
-editModel :: String -> String
-editModel [] = []
-editModel ['\t'] = "   "
-editModel [c] = [c]
-editModel ('\t':c2:model) = ' ' : ' ' : ' ' : (editModel $ c2 : model)
-editModel (c1:c2:model) = if (c1 /= '/') then (c1 : (editModel $ c2 : model)) else if (c2 /= '/' && c2 /='*') then (c1 : (editModel $ c2 : model))
-    else if (c2 == '/') then (editModel $ tail $ dropWhile (/='\n') model) else (removeBlock model)
+removeCommentsAndUnify :: String -> String
+removeCommentsAndUnify [] = []
+removeCommentsAndUnify ['\t'] = "   "
+removeCommentsAndUnify [c] = [c]
+removeCommentsAndUnify ('\t':c2:model) = ' ' : ' ' : ' ' : (removeCommentsAndUnify $ c2 : model)
+removeCommentsAndUnify (c1:c2:model) = if (c1 /= '/') then (c1 : (removeCommentsAndUnify $ c2 : model)) else if (c2 /= '/' && c2 /='*') then (c1 : (removeCommentsAndUnify $ c2 : model))
+    else if (c2 == '/') then (removeCommentsAndUnify $ dropWhile (/='\n') model) else (removeBlock model)
     where
         removeBlock :: String -> String
         removeBlock [] = []
         removeBlock [c] = []
-        removeBlock (c1:c2:model) = if (c1 == '*' && c2 == '/') then (editModel $ isEndLine model) else (removeBlock $ c2 : model)  
-        isEndLine :: String -> String
-        isEndLine [] = []
-        isEndLine (c:model) = if (c=='\n') then model else (c:model)
+        removeBlock ('\n':model) = '\n' : removeBlock model
+        removeBlock (c1:c2:model) = if (c1 == '*' && c2 == '/') then (removeCommentsAndUnify model) else (removeBlock $ c2 : model)  
 
 isEmptyLine :: String -> Bool
 isEmptyLine l = filter (`notElem` [' ', '\n', '\t']) l == []
@@ -496,16 +510,20 @@ numberOfDigits :: Int -> Int
 numberOfDigits 0 = 0
 numberOfDigits x = 1 + (numberOfDigits $ x `div` 10)
 
-findNecessaryBitwidth :: String -> Integer -> Float -> Integer
-findNecessaryBitwidth model oldBw maxScope = if (newBw < oldBw) then oldBw else newBw
+findNecessaryBitwidth :: IModule -> Integer -> [Integer] -> Integer
+findNecessaryBitwidth ir oldBw scopes = 
+    if (newBw < oldBw) then oldBw else newBw
     where
-        newBw = ceiling $ logBase 2 $ (\x -> 1 + 2 * x) $ (max maxScope) $ maxInModel model []
-        digitToFloat = toEnum . digitToInt
-        maxInModel [] [] = 0
-        maxInModel [] acc = maximum acc
-        maxInModel (x:xs) acc = if (isNumber x) then (findFullNum xs (digitToFloat x) acc) else (maxInModel xs acc)
-        findFullNum [] n acc = maximum $ n:acc
-        findFullNum (x:xs) n acc = if (isNumber x) then (findFullNum xs (n * 10 + (digitToFloat x)) acc) else maxInModel xs (n:acc)
+        newBw = ceiling $ logBase 2 $ (+1) $ (*2) $ maxInModel ir
+        maxInModel :: IModule -> Float
+        maxInModel ir = intToFloat $ (max (maximum scopes)) $ foldIR getMax 0 ir
+        getMax :: Ir -> Integer -> Integer 
+        getMax (IRIExp (IInt n)) m = max m $ abs n
+        getMax _ m = m
 
 intToFloat :: Integer -> Float
 intToFloat = fromInteger . toInteger 
+
+fromJustShow :: (Maybe Integer) -> String
+fromJustShow (Just x) = show x
+fromJustShow Nothing = "Nothing"

@@ -1,0 +1,6 @@
+// http://gsd.uwaterloo.ca:8888/question/338/problem-with-translation-of-abstract-clafers-in
+// both `b 0..0` and `some b` should appear in UnSAT core for scope 2
+
+b 0..0
+
+[ some b ]

@@ -1,0 +1,7 @@
+abstract Person
+    leader ?
+
+Member : Person 5
+
+Committee
+    Member : string 5
