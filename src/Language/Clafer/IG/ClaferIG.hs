@@ -56,6 +56,8 @@ module Language.Clafer.IG.ClaferIG (
     quit, 
     reload,
     findRemovable,
+    fst3,
+    getlineNumMap,
     strictReadFile) where
 
 import Debug.Trace
@@ -64,6 +66,8 @@ import Language.ClaferT
 import Language.Clafer.ClaferArgs
 import Language.Clafer.Front.Absclafer (Span(..))
 import Language.Clafer.Generator.Xml
+import Language.Clafer.Intermediate.Tracing
+import Language.Clafer.Intermediate.Intclafer
 import qualified Language.Clafer.Intermediate.Analysis as Analysis
 import Language.Clafer.IG.AlloyIGInterface (AlloyIGT)
 import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
@@ -81,7 +85,10 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans
 import Control.Monad.Trans.State.Strict
 import Data.List
+import Data.Monoid
+import Data.Tuple (swap)
 import Data.Map as Map hiding (map, null)
+import qualified Data.Sequence as Seq
 import Data.Maybe
 import Data.Data
 import Data.Typeable
@@ -137,10 +144,11 @@ data ClaferIGEnv = ClaferIGEnv{
     claferEnv'::ClaferEnv,
     claferIGArgs :: IGArgs,
     constraints:: [Constraint], 
-    claferModel::String, 
-    claferToSigNameMap:: Map String String,
+    claferModel:: String, 
+    claferToSigNameMap :: Map String String,
     info :: Analysis.Info,
-    strMap :: (Map Int String)
+    strMap :: Map Int String,
+    lineNumMap :: Map Integer String
 }
 
 data Scope = Scope {nameOfScope::String, sigName::String}
@@ -158,6 +166,9 @@ claferIGVersion =
     
 getClaferEnv :: Monad m => ClaferIGT m ClaferEnv
 getClaferEnv = fetches claferEnv'
+
+getlineNumMap :: Monad m => ClaferIGT m (Map Integer String)
+getlineNumMap = fetches lineNumMap
 
 getClaferIGArgs :: Monad m => ClaferIGT m IGArgs
 getClaferIGArgs = fetches claferIGArgs
@@ -191,9 +202,24 @@ load                 igArgs    =
         let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
         
         let info = Analysis.gatherInfo ir 
+        let irTrace = editMap $ irModuleTrace claferEnv'
 
-        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel claferToSigNameMap info sMap
+        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel claferToSigNameMap info sMap irTrace
     where
+    editMap :: (Map.Map Span [Ir]) -> (Map.Map Integer String) -- Map Line Number to Clafer Name
+    editMap = 
+        fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case (getIClafer ir) of 
+            Just (IClafer _ _ _ i _ _ _ _ _) -> (num, i) : acc
+            _ -> acc) [] . tail . (Data.List.foldr (\x acc -> case x of
+                ((Span (Pos l1 _) (Pos l2 _)), irs) -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
+                ((PosSpan _ (Pos l1 _) (Pos l2 _)), irs) -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs) ++ acc)) []) . toList
+    getIClafer :: [Ir] -> Maybe IClafer
+    getIClafer [] = Nothing
+    getIClafer ((IRClafer c):rs) = Just c 
+    getIClafer (r:rs) = getIClafer rs
+    removeConstraints :: [(Integer, String)] -> [(Integer, String)]
+    removeConstraints = map swap . reverse . toList . fromList . reverse . map swap
+
     callClaferTranslator code =
         mapLeft ClaferErrs $ runClafer claferArgs $ do
             addModuleFragment code
@@ -206,7 +232,6 @@ load                 igArgs    =
     claferArgs = defaultClaferArgs{keep_unused = True, no_stats = True, flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
     claferFile' = claferModelFile igArgs
     bitwidth' = bitwidth igArgs
-    fst3 (a, _, _) = a
 
                 
 strictReadFile :: FilePath -> IO String 
@@ -270,9 +295,7 @@ increaseScope :: MonadIO m => Integer -> Scope -> ClaferIGT m (Either String ())
 increaseScope increment scope =
     do
         value <- valueOfScope scope
-        bitwidth' <- getBitwidth
-        let value' = min (value + increment) ((2 ^ (bitwidth' - 1)) - 1)
-        setScope value' scope
+        setScope (value + increment) scope
     
 
 setScope :: MonadIO m => Integer -> Scope -> ClaferIGT m (Either String ())
@@ -284,6 +307,7 @@ setScope scope Scope{nameOfScope, sigName} =
 
 next :: MonadIO m => ClaferIGT m Instance
 next = do
+    env <- getClaferEnv
     claferIGArgs' <- getClaferIGArgs
     let 
         useUids' = useUids claferIGArgs'
@@ -299,30 +323,28 @@ next = do
             -- Generating counterexample modifies the state. If we ever want to
             -- rerun the original model, we need to restore the state.
             AlloyIG.UnsatCore core <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-            c <- counterexample core useUids' addTypes' info' constraints' sMap
+            c <- counterexample env core useUids' addTypes' info' constraints' sMap
             ClaferIGT $ lift AlloyIG.sendRestoreStateCommand
             return c
     where
-    counterexample originalCore useUids' addTypes' info' constraints' sMap = counterexample' originalCore [] useUids' addTypes' info' constraints' sMap
+    counterexample env originalCore useUids' addTypes' info' constraints' sMap = counterexample' env originalCore [] useUids' addTypes' info' constraints' sMap
         where
-        counterexample' core removed useUids' addTypes' info' constraints' sMap =
-            case msum $ findRemovable core constraints' of
+        counterexample' env core removed useUids' addTypes' info' constraints' sMap =
+            case msum $ findRemovable env core constraints' of
                 Just remove -> do
                     ClaferIGT $ lift $ AlloyIG.sendRemoveConstraintCommand $ range remove
                     ClaferIGT $ lift AlloyIG.sendResolveCommand
                     xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
                     case xmlSolution of
                         Just xml -> return $
-                            UnsatCore (catMaybes $ findRemovable core constraints') (Just $ Counterexample (reverse $ remove : removed) (xmlToModel useUids' addTypes' info' xml sMap) xml)
+                            UnsatCore (catMaybes $ findRemovable env core constraints') (Just $ Counterexample (reverse $ remove : removed) (xmlToModel useUids' addTypes' info' xml sMap) xml)
                         Nothing ->
                             do
                                 AlloyIG.UnsatCore core' <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-                                counterexample' core' (remove : removed) useUids' addTypes' info' constraints' sMap
+                                counterexample' env core' (remove : removed) useUids' addTypes' info' constraints' sMap
                 Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
-
-    
-    
+ 
     xmlToModel :: Bool -> Bool -> Analysis.Info -> String -> (Map Int String) -> ClaferModel
     xmlToModel  useUids' addTypes' info' xml sMap = (sugarClaferModel useUids' addTypes' (Just info') $ buildClaferModel $ parseSolution xml) sMap
 
@@ -358,4 +380,16 @@ sigToClaferName n =
         [] ->  n
         x -> tail x
 
-findRemovable core constraints' = [find ((== c). range) constraints' | c <- core]
+findRemovable :: ClaferEnv -> [Span] -> [Constraint] -> [Maybe Constraint]
+findRemovable env core constraints' =
+    let absIDs = foldMapIR getId $ fst3 $ fromJust $ cIr env
+    in  Data.List.filter (removeAbsZero absIDs ) $ map (\c -> find ((== c) . range) constraints') core
+    where
+        removeAbsZero :: (Seq.Seq String) -> Maybe Constraint -> Bool
+        removeAbsZero absIDs (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) = ((Seq.elemIndexL uID absIDs)==Nothing)
+        removeAbsZero absIDs _ = True
+        getId :: Ir -> (Seq.Seq String)
+        getId (IRClafer (IClafer _ True _ uID _ _ _ _ _)) = Seq.singleton uID
+        getId _ = mempty
+
+fst3 (a, _, _) = a

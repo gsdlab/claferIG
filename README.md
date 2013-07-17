@@ -1,7 +1,7 @@
 Clafer Instance Generator
 =========================
 
-v0.3.2.11-4-2013
+v0.3.3.10-7-2013
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
 overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
@@ -51,7 +51,7 @@ Building & Installation From Source Code
 On Windows 
 
 * [MinGW+MSYS](http://mingw.org) 
-  * since the Haskell Platform already contains MinGW, you may choose to install MinGW+MSYS to the same location, e.g., `c:\...\Haskell Platform\2012.2.0.0`
+  * since the Haskell Platform already contains MinGW, you may choose to install MinGW+MSYS to the same location, e.g., `c:\...\Haskell Platform\2012.4.0.0`
   * add the `bin` folders of MinGW (`MinGW\bin`) and MSYS (`MinGW\MSYS\1.0\bin`) to your system path
   * `unzip` will be automatically installed 
 
@@ -90,20 +90,39 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG v0.3.2.11-4-2013
+ClaferIG v0.3.3.10-7-2013
 
 igargs [OPTIONS] FILE
 
 Common flags:
-     --all=INT           Saves all instances up to the provided scope or a
-                         counterexample.
-  -s --savedir=FILE      Specify the directory for storing saved files.
-     --alloysolution     Convert Alloy solution to a Clafer solution.
-  -b --bitwidth=INTEGER  Set the bitwidth for integers.
-     --adduidsandtypes   Preserve unique clafer names and add super/reference
-                         types in Clafer solution.
-  -? --help              Display help message
-  -V --version           Print version information
+     --all=INT                                 Saves all instances up to the
+                                               provided scope or a
+                                               counterexample.
+     --savedir=FILE                            Specify the directory for
+                                               storing saved files.
+     --alloysolution                           Convert Alloy solution to a
+                                               Clafer solution.
+  -b --bitwidth=INTEGER                        Set the bitwidth for integers.
+  -u --useuids                                 Use unique clafer names in the
+                                               Clafer solution.
+     --addtypes                                Add colon/reference types to
+                                               the Clafer solution.
+  -j --json                                    Render solution as JSON
+                                               (forces 'addUids').
+  -i --flatten-inheritance-comp                Flatten inheritance during
+                                               compiling ('alloy' and 'alloy42'
+                                               modes only)
+  -l --no-layout-comp                          Don't resolve off-side rule
+                                               layout during compiling
+  -c --check-duplicates-comp                   Check duplicated clafer names
+                                               during compiling
+  -f --skip-resolver-comp                      Skip name resolution during
+                                               compiling
+     --ss=SCOPESTRATEGY --scope-strategy-comp  Use scope computation strategy
+                                               during compiling: none, simple
+                                               (default), or full.
+  -? --help                                    Display help message
+  -V --version                                 Print version information
 ```
 
 `claferIG <model file name>.cfr`
@@ -117,7 +136,7 @@ Common flags:
 ### Interactive Session Usage
 In the interactive mode, the users can invoke the following commands by pressing the first letter of the command name or the whole command as marked by boldface:
 
-ClaferIG v0.3.2.11-4-2013
+ClaferIG v0.3.3.10-7-2013
 
 * [tab] - print the available commands or auto-complete command name, a clafer name, or clafer instance name in a given context
 * **n**ext or **[enter]** - to produce the next instance if available, a counterexample, or to output a message that no more instances exist within the given scope
