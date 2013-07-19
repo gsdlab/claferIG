@@ -35,7 +35,6 @@ import Language.Clafer.Comments
 import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
 import Control.Monad
 import Control.Monad.Error
-import Control.Monad.Trans
 import Data.Char
 import Data.IORef
 import Data.List
@@ -46,6 +45,8 @@ import Data.Maybe
 import System.Console.Haskeline
 import System.IO
 import GHC.Float
+import Prelude hiding (id)
+import qualified Text.Parsec.Error as E
 
 data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_UnsatCoreMinimization | Auto_Space | Auto_Digit | No_Auto deriving Show
 
@@ -98,7 +99,7 @@ runCommandLine =
                     liftIO $ hPutStrLn stderr "(Hint: use the setUnsatCoreMinimization command to minimize the set of constraints below)"
                     printConstraints core
                     case counterexample of
-                        Just (Counterexample removed claferModel xml) -> do
+                        Just (Counterexample removed claferModel _) -> do
                             liftIO $ hPutStrLn stderr "Altering the following constraints produced the following near-miss example:"
                             printTransformations removed
                             outputStrLn $ show claferModel
@@ -128,19 +129,19 @@ runCommandLine =
             printConstraint UserConstraint{constraintInfo = info} = show info
             printConstraint constraint = show $ claferInfo constraint
 
-            printConstraints = printConstraints' 1
+            printConstraints = printConstraints' (1::Integer)
             printConstraints' _ [] = return ()
             printConstraints' i (c:cs) =
                 do
                     liftIO $ hPutStrLn stderr $ "  " ++ show i ++ ") " ++ printConstraint c
                     printConstraints' (i + 1) cs
 
-            printTransformations cs = printTransformations' 1 cs
+            printTransformations cs = printTransformations' (1::Integer) cs
             printTransformations' _ [] = return ()
             printTransformations' i (c:cs) =
                 do
-                    let (print, rest) = printTransformation c cs
-                    liftIO $ hPutStrLn stderr $ "  " ++ show i ++ ") " ++ print
+                    let (prnt, rest) = printTransformation c cs
+                    liftIO $ hPutStrLn stderr $ "  " ++ show i ++ ") " ++ prnt
                     printTransformations' (i + 1) rest
                     
             setLower info@ClaferInfo{cardinality = c} lower = info{cardinality = c{lower = lower}}
@@ -210,7 +211,6 @@ runCommandLine =
             runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
 
             oldBw <- lift getBitwidth
-            args <- lift getClaferIGArgs
             env <- lift getClaferEnv
             let ir = fst3 $ fromJust $ cIr env
             tempScopes <- lift getScopes
@@ -329,21 +329,27 @@ runCommandLine =
                 editLines :: [Integer] -> [String] -> Int -> Int -> [(String, Integer)] -> (Map.Map Integer String) -> [(Integer, String)] -> [String]
                 editLines _ _ _ _ _ _ [] = []
                 editLines cLines unSATs m1 m2 s lineMap ((num, l):rest) = 
-                    if (num `elem` cLines && isEmptyLine l) then editLines cLines unSATs m1 m2 s lineMap rest else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s l (Map.lookup num lineMap))) : editLines cLines unSATs m1 m2 s lineMap rest
+                    if (num `elem` cLines && isEmptyLine l) then editLines cLines unSATs m1 m2 s lineMap rest else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s (Map.lookup num lineMap))) : editLines cLines unSATs m1 m2 s lineMap rest
 
                 isUnSAT :: [String] -> String -> Integer -> Bool
                 isUnSAT us l ln = getAny $ foldMap (\u -> Any (((safehead $ words u) == (safehead $ words l) && (safehead $ reverse $ words u) == (safehead $ reverse $ words l)) || (u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == show ln))) us
                 safehead [] = []
                 safehead x = head x
 
-                addScopeVal :: [(String, Integer)] -> String -> (Maybe String) ->String
-                addScopeVal s l Nothing = ""
-                addScopeVal s l (Just name) = "scope = " ++ (fromJustShow $ Data.List.lookup name s) 
+                addScopeVal :: [(String, Integer)] -> (Maybe String) ->String
+                addScopeVal _ Nothing = ""
+                addScopeVal s (Just name) = "scope = " ++ (fromJustShow $ Data.List.lookup name s) 
 
                 getCommentLines :: String -> [Integer]
                 getCommentLines = foldr (\(s, _) acc -> case s of
                     (Span (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc
-                    (PosSpan _ (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc) [] . getComments
+                    (PosSpan _ (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc
+                    (Span (PosPos _ l1 _) (Pos l2 _)) -> [l1..l2] ++ acc --This one and bellow should not happen
+                    (Span (Pos l1 _) (PosPos _ l2 _)) -> [l1..l2] ++ acc
+                    (Span (PosPos _ l1 _) (PosPos _ l2 _)) -> [l1..l2] ++ acc
+                    (PosSpan _ (PosPos _ l1 _) (Pos l2 _)) -> [l1..l2] ++ acc
+                    (PosSpan _ (Pos l1 _) (PosPos _ l2 _)) ->  [l1..l2] ++ acc
+                    (PosSpan _ (PosPos _ l1 _) (PosPos _ l2 _)) -> [l1..l2] ++ acc) [] . getComments
 
                 getConstraintInfo :: Constraint -> String
                 getConstraintInfo (UserConstraint _ info) = show info
@@ -397,7 +403,7 @@ runCommandLine =
                 Nothing -> loop Quit context
                 Just input ->
                     case parseCommandLine input of
-                        Left error    -> outputStrLn (show error) >> nextLoop context
+                        Left msg    -> outputStrLn (show msg) >> nextLoop context
                         Right command -> loop command context
     
     save :: MonadIO m => [ClaferModel] -> Integer -> ClaferIGT m ()
@@ -419,23 +425,25 @@ try e = either outputStrLn (void . return) =<< runErrorT e
 --     If the cursor is at | then not open. The "ce" prevents autocomplete.
 -- i Ali| ce
 --     Is open, and autocomplete will kick in.
-isOpen prev [] = True
-isOpen prev (x:_) = isSpace x
+isOpen :: String -> [Char] -> Bool
+isOpen _ [] = True
+isOpen _ (x:_) = isSpace x
 
 
 completeFunc :: MonadIO m => AutoCompleteContext -> CompletionFunc m
-completeFunc context (prev, next) = 
-    if isOpen prev next then
-        liftIO $ evalComplete context prev next
+completeFunc context (prev, nxt) = 
+    if isOpen prev nxt then
+        liftIO $ evalComplete context prev
     else
         return (prev, [])
 
 
+completePrefix :: String -> [String] -> [Completion]
 completePrefix prefix choices = map simpleCompletion $ filter (prefix `isPrefixOf`) choices
 
 
-evalComplete :: AutoCompleteContext -> String -> String -> IO (String, [Completion])
-evalComplete context prev next = 
+evalComplete :: AutoCompleteContext -> String -> IO (String, [Completion])
+evalComplete context prev = 
     do
         completion <- autoComplete context word auto
         return (reverseRest, completion)
@@ -447,7 +455,7 @@ evalComplete context prev next =
         
 
 autoComplete :: AutoCompleteContext -> String -> AutoComplete -> IO [Completion]
-autoComplete context word Auto_Command = return $ completePrefix word commandStrings
+autoComplete _ word Auto_Command = return $ completePrefix word commandStrings
 autoComplete context word Auto_Clafer =
     do
         c <- readIORef $ clafers context
@@ -456,13 +464,13 @@ autoComplete context word Auto_ClaferInstance =
     do
         ci <- readIORef $ claferInstances context
         return $ completePrefix word ci
-autoComplete context word Auto_UnsatCoreMinimization = return $ completePrefix word ["fastest", "medium", "best"]
-autoComplete context word Auto_Digit = return [] -- Don't auto complete numbers.
-autoComplete context word Auto_Space = return [simpleCompletion $ word]
-autoComplete context word No_Auto = return []
+autoComplete _ word Auto_UnsatCoreMinimization = return $ completePrefix word ["fastest", "medium", "best"]
+autoComplete _ _ Auto_Digit = return [] -- Don't auto complete numbers.
+autoComplete _ word Auto_Space = return [simpleCompletion $ word]
+autoComplete _ _ No_Auto = return []
 
-
-autoCompleteDetect error
+autoCompleteDetect :: E.ParseError -> AutoComplete
+autoCompleteDetect error'
     -- An unexpected message means that parsing failed before eof
     | any (not . null) unexpectedMessages = No_Auto
     | any (== "command") expectedMessages = Auto_Command
@@ -473,20 +481,24 @@ autoCompleteDetect error
     | any (== "space") expectedMessages = Auto_Space
     | otherwise = No_Auto
     where
-    messages = errorMessages error
+    messages = errorMessages error'
     unexpectedMessages = mapMaybe unexpectedMessage messages
     expectedMessages   = mapMaybe expectedMessage messages
     
 
 printError :: ClaferErrs -> [String]    
 printError (ClaferErrs errs) =
-    map printError errs
+    map printErr errs
     where
-    printError (ParseErr ErrPos{modelPos = Pos l c} msg) =
+    printErr (ParseErr (ErrPos _ _ (Pos l c)) msg) =
         "Parse error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
-    printError (SemanticErr ErrPos{modelPos = Pos l c} msg) =
+    printErr (SemanticErr (ErrPos _ _ (Pos l c)) msg) =
         "Error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
-    printError (ClaferErr msg) =
+    printErr (ParseErr (ErrPos _ _ (PosPos _ l c)) msg) =
+        "Parse error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg   --This should never happen
+    printErr (SemanticErr (ErrPos _ _ (PosPos _ l c)) msg) =
+        "Error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg         --This should never happen
+    printErr (ClaferErr msg) =
         "Error:\n    " ++ msg
 
 removeCommentsAndUnify :: String -> String
@@ -499,9 +511,9 @@ removeCommentsAndUnify (c1:c2:model) = if (c1 /= '/') then (c1 : (removeComments
     where
         removeBlock :: String -> String
         removeBlock [] = []
-        removeBlock [c] = []
-        removeBlock ('\n':model) = '\n' : removeBlock model
-        removeBlock (c1:c2:model) = if (c1 == '*' && c2 == '/') then (removeCommentsAndUnify model) else (removeBlock $ c2 : model)  
+        removeBlock [_] = []
+        removeBlock ('\n':model') = '\n' : removeBlock model'
+        removeBlock (c1':c2':model') = if (c1' == '*' && c2' == '/') then (removeCommentsAndUnify model') else (removeBlock $ c2' : model)  
 
 isEmptyLine :: String -> Bool
 isEmptyLine l = filter (`notElem` [' ', '\n', '\t']) l == []
@@ -516,7 +528,7 @@ findNecessaryBitwidth ir oldBw scopes =
     where
         newBw = ceiling $ logBase 2 $ (+1) $ (*2) $ maxInModel ir
         maxInModel :: IModule -> Float
-        maxInModel ir = intToFloat $ (max (maximum scopes)) $ foldIR getMax 0 ir
+        maxInModel ir' = intToFloat $ (max (maximum scopes)) $ foldIR getMax 0 ir'
         getMax :: Ir -> Integer -> Integer 
         getMax (IRIExp (IInt n)) m = max m $ abs n
         getMax _ m = m

@@ -26,6 +26,7 @@ import Data.List
 import Paths_claferIG (version)
 import Data.Version (showVersion)
 
+header :: String
 header = unlines
  [ "{-"
  , "Copyright (C) 2012-2013 Kacper Bak <http://gsd.uwaterloo.ca>"
@@ -51,6 +52,7 @@ header = unlines
  , ""
  , "module Language.Clafer.IG.Version where"]
 
+main :: IO ()
 main = do
   timeZone <- getCurrentTimeZone
   curTime  <- getCurrentTime
