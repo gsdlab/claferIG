@@ -32,10 +32,10 @@ import Prelude hiding (id)
 
 -- Sample: maps the id to the its simple name and the number of times its simple name appeared in the census before it
 -- Count: maps the simple name to the total count of the simple name
-data Census = Census {
-    sample::Map Id (Int, String), 
-    counts::Map String Int
-} deriving Show
+data Census = Census 
+    (Map Id (Int, String))  -- Sample 
+    (Map String Int)        -- Counts
+ deriving Show
 
 
 -- Adds the full name to the census

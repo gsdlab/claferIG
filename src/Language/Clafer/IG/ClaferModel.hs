@@ -40,8 +40,19 @@ c_name = i_name . c_id
 -- The tuple of name and ordinal must be globally unique
 data Id = Id {i_name::String, i_ordinal::Int} deriving (Eq, Ord, Show)
 
-data FamilyTree = FamilyTree {roots::Map Id Node, descendants::Map Id [Node]} deriving Show
-data Node = ClaferNode  {n_id::Id, n_type::Int} | ValueNode {n_value::Id, n_type::Int} deriving (Eq, Ord, Show)
+data FamilyTree = FamilyTree (Map Id Node) (Map Id [Node]) deriving Show
+data Node = ClaferNode Id Int | ValueNode Id Int deriving (Eq, Ord, Show)
+
+roots :: FamilyTree -> (Map Id Node)
+roots (FamilyTree r _) = r
+
+n_id :: Node -> Id
+n_id (ClaferNode i _) = i
+n_id (ValueNode i _) = i
+
+{-n_type :: Node -> Int
+n_type (ClaferNode _ t) = t
+n_type (ValueNode _ t) = t-}
 
 instance Show ClaferModel where
     show (ClaferModel clafers) = concatMap show clafers
@@ -74,7 +85,7 @@ addChild parent child (FamilyTree roots' descens) =
     where
     roots'' =
         case child of
-            ClaferNode{n_id = id} -> Map.delete id roots'
+            (ClaferNode id _) -> Map.delete id roots'
             _ -> roots'
     descens' = (insertWith (++) parent [child] descens)
 
