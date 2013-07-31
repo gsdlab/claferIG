@@ -50,7 +50,8 @@ header = unlines
  , "SOFTWARE."
  , "-}"
  , ""
- , "module Language.Clafer.IG.Version where"]
+ , "module Language.Clafer.IG.Version where"
+ , "version :: String"]
 
 main :: IO ()
 main = do
