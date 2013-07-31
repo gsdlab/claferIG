@@ -72,6 +72,13 @@ install:
 	cp -f -R IDEs $(to)
 	cabal install --bindir=$(to) --ghc-option="-O"
 
+# Removes current build and makes a clean new one (Don't use if starting from scratch!)
+new:
+	make clean
+	ghc-pkg unregister claferIG
+	rm `which claferIG`
+	make 
+
 # this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs 
 newVersion:
 	ghc -isrc src/dateVer.hs dist/build/autogen/Paths_claferIG.hs -outputdir dist/build --make -o dateVer
