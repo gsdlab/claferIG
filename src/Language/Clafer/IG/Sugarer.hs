@@ -50,10 +50,9 @@ poll id (Census sample' counts') =
     sample'' = insertWith (error $ "Polled " ++ fullName ++ " twice in the census.") id (ordinal', name) sample'
     -- Transforms c2_name -> name
     makeSimpleName :: String -> String
-    makeSimpleName name' =
-        case snd $ break ('_' ==) name' of
-            [] ->  error "Unexpected Clafer name " ++ name'
-            x -> tail x
+    makeSimpleName name' = case dropWhile (/='_') name' of
+        "" ->  error "Unexpected Clafer name " ++ name'
+        x -> tail x
 
 -- Count the number of each clafer
 claferModelCensus :: ClaferModel -> Census
