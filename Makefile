@@ -73,7 +73,7 @@ install:
 	cabal install --bindir=$(to) --ghc-option="-O"
 
 # Removes current build and makes a clean new one (Don't use if starting from scratch!)
-new:
+cleanEnv:
 	make clean
 	ghc-pkg unregister claferIG
 	rm `which claferIG`
