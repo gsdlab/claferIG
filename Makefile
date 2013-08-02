@@ -70,7 +70,14 @@ install:
 	cp -f CHANGES.md $(to)/claferIG-CHANGES.md
 	cp -f README.md $(to)/claferIG-README.md
 	cp -f -R IDEs $(to)
-	cabal install --bindir=$(to)
+	cabal install --bindir=$(to) --ghc-option="-O"
+
+# Removes current build and makes a clean new one (Don't use if starting from scratch!)
+cleanEnv:
+	make clean
+	ghc-pkg unregister claferIG
+	rm `which claferIG`
+	make 
 
 # this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs 
 newVersion:

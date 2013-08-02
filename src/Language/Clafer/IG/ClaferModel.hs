@@ -24,23 +24,35 @@ module Language.Clafer.IG.ClaferModel (ClaferModel(..), Clafer(..), Id(..), Valu
 
 import Data.List 
 import Data.Either
-import Data.Map as Map hiding (filter, map, foldr)
+import Data.Map as Map hiding (filter, map, foldr, singleton)
 import Data.Maybe
 import Language.Clafer.IG.Solution
-import Debug.Trace
+import Prelude hiding (id)
 
 
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
 data Clafer = Clafer {c_id::Id, c_value::Maybe Value, c_children::[Clafer]}
 data Value = AliasValue {c_alias::Id} | IntValue {v_value::Int} | StringValue {v_str ::String} deriving Show
 
+c_name :: Clafer -> String
 c_name = i_name . c_id
 
 -- The tuple of name and ordinal must be globally unique
 data Id = Id {i_name::String, i_ordinal::Int} deriving (Eq, Ord, Show)
 
-data FamilyTree = FamilyTree {roots::Map Id Node, descendants::Map Id [Node]} deriving Show
-data Node = ClaferNode  {n_id::Id, n_type::Int} | ValueNode {n_value::Id, n_type::Int} deriving (Eq, Ord, Show)
+data FamilyTree = FamilyTree (Map Id Node) (Map Id [Node]) deriving Show
+data Node = ClaferNode Id Int | ValueNode Id Int deriving (Eq, Ord, Show)
+
+roots :: FamilyTree -> (Map Id Node)
+roots (FamilyTree r _) = r
+
+n_id :: Node -> Id
+n_id (ClaferNode i _) = i
+n_id (ValueNode i _) = i
+
+{-n_type :: Node -> Int
+n_type (ClaferNode _ t) = t
+n_type (ValueNode _ t) = t-}
 
 instance Show ClaferModel where
     show (ClaferModel clafers) = concatMap show clafers
@@ -62,30 +74,30 @@ traverse (ClaferModel clafers) =
     traverseClafers clafers
     where
     traverseClafers :: [Clafer] -> [Clafer]
-    traverseClafers clafers = concatMap traverseClafer clafers
+    traverseClafers clafs = concatMap traverseClafer clafs
     traverseClafer :: Clafer -> [Clafer]
     traverseClafer clafer = clafer : traverseClafers (c_children clafer)
 
 
 addChild :: Id -> Node -> FamilyTree -> FamilyTree
-addChild parent child (FamilyTree roots descendants) =
-    FamilyTree roots' descendants'
+addChild parent child (FamilyTree roots' descens) =
+    FamilyTree roots'' descens'
     where
-    roots' =
+    roots'' =
         case child of
-            ClaferNode{n_id = id} -> Map.delete id roots
-            _ -> roots
-    descendants' = (insertWith (++) parent [child] descendants)
+            (ClaferNode id _) -> Map.delete id roots'
+            _ -> roots'
+    descens' = (insertWith (++) parent [child] descens)
 
 
 getChildren :: Id -> FamilyTree -> [Node]
-getChildren parent (FamilyTree _ descendants) = findWithDefault [] parent descendants
+getChildren parent (FamilyTree _ descens) = findWithDefault [] parent descens
 
 
 getRoots :: FamilyTree -> [Node]
 getRoots = elems . roots
 
-
+{-
 -- Renames the items in the solution so they are easier to work with
 -- <sig label="this/c2_Age">  ->  <sig label="c2_Age">
 -- <field label="r_c2_Age">   ->  <field label="c2_Age">
@@ -107,7 +119,7 @@ renameSolution (Solution sigs fields) =
         case snd $ break (== char) string of
             [] -> Nothing
             x  -> Just $ tail x
-            
+-}            
 
 buildFamilyTree :: Solution -> FamilyTree
 buildFamilyTree (Solution sigs fields) =
@@ -118,8 +130,8 @@ buildFamilyTree (Solution sigs fields) =
     rootNodes :: [(Id, Node)]
     rootNodes = [(n_id rootNode, rootNode) | rootNode <- concatMap asNodes sigs]
     
-    buildFields fields = foldr buildField (FamilyTree (fromList rootNodes) Map.empty) fields
-    buildField field tree = foldr (uncurry buildTuple) tree (zip [0,1..] $ f_tuples field)
+    buildFields fields' = foldr buildField (FamilyTree (fromList rootNodes) Map.empty) fields'
+    buildField field tree = foldr (uncurry buildTuple) tree (zip ([0,1..]::[Integer]) $ f_tuples field)
         where
         label = f_label field
         {-
@@ -137,8 +149,8 @@ buildFamilyTree (Solution sigs fields) =
          -     addChild (Id "Alice" 0) (ClaferNode $ Id "Bob" 0)
          -     addChild (Id "Bob" 0) (ClaferNode $ Id "Alice" 0)
          -}
-        buildTuple ordinal Tuple{t_from = from, t_to = to, t_toType = toType} tree =
-            addChild (labelAsId $ a_label from) (buildNode (labelAsId $ a_label to) toType) tree
+        buildTuple _ Tuple{t_from = from, t_to = to, t_toType = toType} tree' =
+            addChild (labelAsId $ a_label from) (buildNode (labelAsId $ a_label to) toType) tree'
             where
             buildNode = if label == "ref" then ValueNode else ClaferNode
             
@@ -146,7 +158,7 @@ buildFamilyTree (Solution sigs fields) =
     labelAsId label =
         case e of
             [] -> Id label 0
-            x  -> Id s (read $ tail e)
+            _  -> Id s (read $ tail e)
         where
         (s, e) = break (== '$') label
 
@@ -170,13 +182,13 @@ buildClaferModel solution =
     singleton xs = error $ "Received more than one value " ++ show xs
     
     buildClafer :: Node -> Either Clafer Value
-    buildClafer (ClaferNode id ntype) =
+    buildClafer (ClaferNode id _) =
         Left $ Clafer id (singleton valueChildren) claferChildren
         where
         (claferChildren, valueChildren) = partitionEithers $ map buildClafer children
         children = getChildren id ftree
-    buildClafer (ValueNode value ntype) =
-        if ntype == intType then
+    buildClafer (ValueNode value ntype') =
+        if ntype' == intType then
             Right $ IntValue (read name)
         else
             Right $ AliasValue value

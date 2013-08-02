@@ -24,12 +24,11 @@
 
 module Language.Clafer.IG.Constraints (Constraint(..), Cardinality(..), ClaferInfo(..), ConstraintInfo(..), isLowerCardinalityConstraint, isUpperCardinalityConstraint, lookupConstraint, parseConstraints)  where
 
-import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
 import Data.List
 import Data.Maybe
 import Data.Ord
 import Language.Clafer
-import Language.Clafer.Front.Absclafer (Span(..), Pos(..))
+import Language.Clafer.Front.Absclafer (Span(..))
 import Language.Clafer.Intermediate.Intclafer
 import qualified Language.Clafer.Intermediate.Intclafer as I
 
@@ -65,6 +64,9 @@ data ConstraintInfo = ConstraintInfo {pId::String, pos::Span, syntax::String} de
 
 instance Show ConstraintInfo where
     show ConstraintInfo{pos = Span (Pos l c) _, syntax} = syntax ++ " (line " ++ show l ++ ", column " ++ show c ++ ")"
+    show ConstraintInfo{pos = PosSpan _ (Pos l c) _, syntax} = syntax ++ " (line " ++ show l ++ ", column " ++ show c ++ ")" -- Should never happen
+    show ConstraintInfo{pos = Span (PosPos _ l c) _, syntax} = syntax ++ " (line " ++ show l ++ ", column " ++ show c ++ ")"      -- Should never happen
+    show ConstraintInfo{pos = PosSpan _ (PosPos _ l c) _, syntax} = syntax ++ " (line " ++ show l ++ ", column " ++ show c ++ ")" -- Should never happen
     
 
 
@@ -80,14 +82,16 @@ isUpperCardinalityConstraint _ = False
 
 to :: Span -> Pos
 to (Span _ t) = t
-from :: Span -> Pos
+to (PosSpan _ _ t) = t -- Should never happen
+{-from :: Span -> Pos
 from (Span f _) = f
+from (PosSpan _ f _) = f -- Should never happen-}
 
 
 lookupConstraint :: Span -> [Constraint] -> Constraint
-lookupConstraint constraint constraints =
-    case [x | x <- constraints, constraint == range x] of
-        [] -> error $ show constraint ++ " not equal to known constraints " ++ show constraints
+lookupConstraint constraint' constraints =
+    case [x | x <- constraints, constraint' == range x] of
+        [] -> error $ show constraint' ++ " not equal to known constraints " ++ show constraints
         cs -> minimumBy (comparing $ to . range) cs
 
 
@@ -97,20 +101,69 @@ parseConstraints claferModel imodule mapping =
     where
     clafers = mDecls imodule >>= subclafers
     pexps = (mapMaybe constraint $ mDecls imodule ++ concatMap elements clafers) >>= subexpressions
-    convert span IrPExp{pUid} =
-        Just $ UserConstraint span $ ConstraintInfo pUid (inPos $ findPExp pUid) $ extract $ inPos $ findPExp pUid
-    convert span LowerCard{pUid, isGroup = False} =
-        Just $ LowerCardinalityConstraint span $ claferInfo pUid 
-    convert span UpperCard{pUid, isGroup = False} =
-        Just $ UpperCardinalityConstraint span $ claferInfo pUid
-    convert span ExactCard{pUid, isGroup = False} =
-        Just $ ExactCardinalityConstraint span $ claferInfo pUid
+    convert s IrPExp{pUid} =
+        Just $ UserConstraint s $ ConstraintInfo pUid (inPos $ findPExp pUid) $ extract $ inPos $ findPExp pUid
+    convert s LowerCard{pUid, isGroup = False} =
+        Just $ LowerCardinalityConstraint s $ claferInfo pUid 
+    convert s UpperCard{pUid, isGroup = False} =
+        Just $ UpperCardinalityConstraint s $ claferInfo pUid
+    convert s ExactCard{pUid, isGroup = False} =
+        Just $ ExactCardinalityConstraint s $ claferInfo pUid
     convert _ _ = Nothing
     
     findPExp pUid   = fromMaybe (error $ "Unknown constraint " ++ pUid) $ find ((== pUid) . pid) pexps
     findClafer pUid = fromMaybe (error $ "Unknown clafer " ++ pUid) $ find ((== pUid) . uid) clafers
     text = lines claferModel
-    extract s@(Span (Pos l1 c1) (Pos l2 c2))
+    extract (Span (Pos l1 c1) (Pos l2 c2)) -- This one should occur the rest should not happen
+        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
+        | otherwise = unlines $ f1 : fs ++ [fn]
+        where
+        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
+        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
+        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
+    extract (Span (PosPos _ l1 c1) (Pos l2 c2))
+        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
+        | otherwise = unlines $ f1 : fs ++ [fn]
+        where
+        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
+        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
+        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
+    extract (Span (Pos l1 c1) (PosPos _ l2 c2))
+        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
+        | otherwise = unlines $ f1 : fs ++ [fn]
+        where
+        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
+        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
+        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
+    extract (Span (PosPos _ l1 c1) (PosPos _ l2 c2))
+        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
+        | otherwise = unlines $ f1 : fs ++ [fn]
+        where
+        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
+        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
+        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
+    extract (PosSpan _ (Pos l1 c1) (Pos l2 c2))
+        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
+        | otherwise = unlines $ f1 : fs ++ [fn]
+        where
+        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
+        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
+        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
+    extract (PosSpan _ (PosPos _ l1 c1) (Pos l2 c2))
+        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
+        | otherwise = unlines $ f1 : fs ++ [fn]
+        where
+        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
+        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
+        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
+    extract (PosSpan _ (Pos l1 c1) (PosPos _ l2 c2))
+        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
+        | otherwise = unlines $ f1 : fs ++ [fn]
+        where
+        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
+        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
+        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
+    extract (PosSpan _ (PosPos _ l1 c1) (PosPos _ l2 c2))
         | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
         | otherwise = unlines $ f1 : fs ++ [fn]
         where
@@ -120,13 +173,13 @@ parseConstraints claferModel imodule mapping =
     convertCard (l, -1) = Cardinality l Nothing
     convertCard (l, h)  = Cardinality l $ Just h
     claferInfo pUid =
-        ClaferInfo (ident clafer) $ convertCard $ fromJust $ card clafer
+        ClaferInfo (ident claf) $ convertCard $ fromJust $ card claf
         where
-        clafer = findClafer pUid
+        claf = findClafer pUid
 
 
 subclafers :: IElement -> [IClafer]
-subclafers (IEClafer clafer) = clafer : (elements clafer >>= subclafers)
+subclafers (IEClafer claf) = claf : (elements claf >>= subclafers)
 subclafers _ = []
 
 constraint :: IElement -> Maybe PExp
@@ -134,8 +187,8 @@ constraint (IEConstraint _ pexp) = Just pexp
 constraint _ = Nothing
 
 subexpressions :: PExp -> [PExp]
-subexpressions p@PExp{I.exp} =
-    p : subexpressions' exp
+subexpressions p@PExp{I.exp = exp'} =
+    p : subexpressions' exp'
     where
     subexpressions' IDeclPExp{oDecls, bpexp} =
         concatMap (subexpressions . body) oDecls ++ subexpressions bpexp

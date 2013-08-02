@@ -37,12 +37,12 @@ import Data.Either
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.IORef
-import Data.Char
 import Prelude hiding (all)
 import System.Console.CmdArgs
 import System.Directory
 import System.FilePath
 
+claferIGArgsDef :: IGArgs
 claferIGArgsDef = IGArgs {
     all                         = def &= help "Saves all instances up to the provided scope or a counterexample.",
     saveDir                     = def &= help "Specify the directory for storing saved files." &= typ "FILE",
@@ -60,32 +60,34 @@ claferIGArgsDef = IGArgs {
 } &= summary claferIGVersion
 
 
+main :: IO ()
 main =
     do
-        args <- cmdArgs claferIGArgsDef
-        if (alloySolution args)
+        args' <- cmdArgs claferIGArgsDef
+        if (alloySolution args')
             then
-                runAlloySolution args
-            else if (json args)
+                runAlloySolution args'
+            else if (json args')
                 then 
-                    tryClaferIG (args { useUids = True })
+                    tryClaferIG (args' { useUids = True })
                 else
-                    tryClaferIG args
+                    tryClaferIG args'
     where
-    tryClaferIG args =
+    tryClaferIG args' =
         do
-            try <- runClaferIG args
+            try <- runClaferIG args'
             case try of
                 Right r -> return r
                 Left l  -> do
                     mapM putStrLn $ printError l
                     putStrLn "Press enter to retry."
                     void getLine
-                    tryClaferIG args
-        
-runClaferIG args =
-    runClaferIGT args $ do
-        cModel <- liftIO $ strictReadFile $ claferModelFile args
+                    tryClaferIG args'
+
+runClaferIG :: IGArgs -> IO (Either ClaferErrs ())    
+runClaferIG args' =
+    runClaferIGT args' $ do
+        cModel <- liftIO $ strictReadFile $ claferModelFile args'
         when (cModel == "") $ error "Cannot instantiate an empty model."
         oldBw <- getBitwidth
         env <- getClaferEnv
@@ -94,52 +96,52 @@ runClaferIG args =
         scopeVals <- mapM valueOfScope scopes
         setBitwidth $ findNecessaryBitwidth ir oldBw scopeVals
         solve
-        case all args of
+        case all args' of
             Just scope ->
                 do
                     setGlobalScope scope
                     solve
    
-                    let file = claferModelFile args
+                    let file' = claferModelFile args'
                     counterRef <- liftIO $ newIORef 1
                     
-                    let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir args
-                    saveAll (savePath file counterRef >>= saveDirectory)
+                    let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir args'
+                    saveAll (savePath file' counterRef >>= saveDirectory)
                     return ()
             Nothing    -> runCommandLine
             
         quit
             
-        
-runAlloySolution args =
+runAlloySolution :: IGArgs -> IO () 
+runAlloySolution args' =
     do
-        content <- readFile $ claferModelFile args -- It's an Alloy XML file in this case
+        content <- readFile $ claferModelFile args' -- It's an Alloy XML file in this case
         let sMap = Map.empty
-        putStrLn $ show $ (sugarClaferModel (useUids args) (addTypes args) Nothing $ buildClaferModel $ parseSolution content) $ sMap
+        putStrLn $ show $ (sugarClaferModel (useUids args') (addTypes args') Nothing $ buildClaferModel $ parseSolution content) $ sMap
 
 savePath :: FilePath -> IORef Int -> IO FilePath
-savePath file counterRef =
+savePath file' counterRef =
     do
         counter <- readIORef counterRef
         writeIORef counterRef (counter + 1)
-        return $ file ++ "." ++ (show counter) ++ ".data"
+        return $ file' ++ "." ++ (show counter) ++ ".data"
         
 
 underDirectory :: FilePath -> FilePath -> IO FilePath
-underDirectory dir file =
+underDirectory dir file' =
     do
         createDirectoryIfMissing True dir
-        return $ joinPath [dir, file]
+        return $ joinPath [dir, file']
 
 
 saveAll :: IO FilePath -> ClaferIGT IO ()
 saveAll nextFile =
     do
-        file <- liftIO nextFile
-        liftIO $ createDirectoryIfMissing True $ takeDirectory file
+        file' <- liftIO nextFile
+        liftIO $ createDirectoryIfMissing True $ takeDirectory file'
         solution <- next
         case solution of
-            Instance{modelInstance = modelInstance} -> do
-                liftIO $ writeFile file (show modelInstance)
+            Instance{modelInstance = modelInstance'} -> do
+                liftIO $ writeFile file' (show modelInstance')
                 saveAll nextFile
             _ -> return ()  
