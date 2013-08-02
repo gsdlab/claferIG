@@ -169,11 +169,16 @@ buildSigMap (Solution sigs _) = Map.fromList $ zip (map s_label sigs) sigs
 
 
 buildClaferModel :: Solution -> ClaferModel
-buildClaferModel solution =
+buildClaferModel solution = 
     ClaferModel $ lefts $ map buildClafer (getRoots ftree)
     where
-    sigMap = buildSigMap solution
-    ftree = buildFamilyTree solution
+    solution' = removeRelation $ solution
+    sigMap = buildSigMap solution'
+    ftree = buildFamilyTree solution'
+
+    removeRelation :: Solution -> Solution
+    removeRelation (Solution ss fs) = 
+        Solution ss $ filter (\f -> not $ ((1 < (length $ f_tuples f)) && (isPrefixOf "r_" $  f_label f))) fs
     
     intType = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
     
@@ -183,6 +188,8 @@ buildClaferModel solution =
     
     buildClafer :: Node -> Either Clafer Value
     buildClafer (ClaferNode id _) =
+        --if (True) then error $ show $ map (\c -> getChildren (n_id c) ftree) children else
+        --if (True) then error $ show ftree else
         Left $ Clafer id (singleton valueChildren) claferChildren
         where
         (claferChildren, valueChildren) = partitionEithers $ map buildClafer children
