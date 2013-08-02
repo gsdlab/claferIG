@@ -531,6 +531,7 @@ findNecessaryBitwidth ir oldBw scopes =
         maxInModel ir' = intToFloat $ (max (maximum scopes)) $ foldIR getMax 0 ir'
         getMax :: Ir -> Integer -> Integer 
         getMax (IRIExp (IInt n)) m = max m $ abs n
+        getMax (IRClafer IClafer{card = Just (_, n)}) m = max m n
         getMax _ m = m
 
 intToFloat :: Integer -> Float
