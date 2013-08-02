@@ -177,9 +177,16 @@ buildClaferModel solution =
     ftree = buildFamilyTree solution'
 
     removeRelation :: Solution -> Solution
-    removeRelation (Solution ss fs) = 
-        Solution ss $ filter (\f -> not $ ((1 < (length $ f_tuples f)) && (isPrefixOf "r_" $  f_label f))) fs
-    
+    removeRelation (Solution ss fs) = Solution ss $ removeDup fs [] []
+        where
+            removeDup :: [Field] -> [(Atom, Atom)] -> [Field] -> [Field]
+            removeDup [] _ acc = acc
+            removeDup (f':fs') tups acc = 
+                let tup = map (\t -> (t_from t, t_to t)) $ f_tuples f'
+                in if (not $ isPrefixOf "r_" $ f_label f') then removeDup fs' tups acc else
+                    if (or $ map (\t -> t `elem` tup)  tups) then removeDup fs' tups acc
+                        else removeDup fs' (tup ++ tups) $ f' : acc
+
     intType = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
     
     singleton [] = Nothing
