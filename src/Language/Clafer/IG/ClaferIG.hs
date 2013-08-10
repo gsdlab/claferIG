@@ -220,7 +220,7 @@ load                 igArgs    =
             return (claferEnv result, outputCode result, mappingToAlloy result, stringMap result)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
-    claferArgs = defaultClaferArgs{keep_unused = True, no_stats = True, flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
+    claferArgs = defaultClaferArgs{keep_unused = True, no_stats = True, skip_goals = True ,flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
     claferFile' = claferModelFile igArgs
     bitwidth' = bitwidth igArgs
 
