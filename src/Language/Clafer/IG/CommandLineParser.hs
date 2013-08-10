@@ -26,6 +26,8 @@ import Control.Monad
 import Data.List
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Error
+import Text.Parsec.Prim hiding (try)
+import Data.Functor.Identity
 
 
 
@@ -35,12 +37,12 @@ data Command = Next | IncreaseGlobalScope Integer | IncreaseScope String Integer
 data UnsatCoreMinimization = Fastest | Medium | Best deriving Show
 
 
-
+unexpectedMessage :: Message -> Maybe String
 unexpectedMessage (SysUnExpect x) = Just x
 unexpectedMessage (UnExpect x) = Just x
 unexpectedMessage _ = Nothing
 
-
+expectedMessage :: Message -> Maybe String
 expectedMessage (Expect x) = Just x
 expectedMessage _ = Nothing
 
@@ -87,7 +89,7 @@ commandLine =
                 quote x = '"' : x ++ "\""
                 didYouMean = filter (name `isPrefixOf`) commandStrings
                 hint [] = ""
-                hint hints = ", did you mean " ++ intercalate " or " (map quote didYouMean) ++ "?"
+                hint _ = ", did you mean " ++ intercalate " or " (map quote didYouMean) ++ "?"
             
 
 command :: Parser String
@@ -116,20 +118,32 @@ commandMap =
     []
 
 
+helpCommand :: ParsecT String () Identity Command
 helpCommand              = return Help
+increaseCommand :: Parser Command
 increaseCommand          = increaseGlobalScope
+nextCommand :: ParsecT String () Identity Command
 nextCommand              = return Next
+quitCommand :: ParsecT String () Identity Command
 quitCommand              = return Quit
+saveCommand :: ParsecT String () Identity Command
 saveCommand              = return Save
+reloadCommand :: ParsecT String () Identity Command
 reloadCommand            = return Reload
+findCommand :: ParsecT String () Identity Command
 findCommand              = Find `liftM` (gap >> claferInstance)
+scopeCommand :: ParsecT String () Identity Command
 scopeCommand             = return ShowScope
+claferModelCommand :: ParsecT String () Identity Command
 claferModelCommand       = return ShowClaferModel
+alloyModelCommand :: ParsecT String () Identity Command
 alloyModelCommand        = return ShowAlloyModel
+alloyInstanceCommand :: ParsecT String () Identity Command
 alloyInstanceCommand     = return ShowAlloyInstance
+setUnsatCoreMinimization :: ParsecT String () Identity Command
 setUnsatCoreMinimization = SetUnsatCoreMinimization `liftM` (gap >> unsatCoreMinimization)
 
-
+gap :: ParsecT String () Identity ()
 gap = skipMany1 space
 
 

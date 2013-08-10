@@ -24,36 +24,35 @@ module Language.Clafer.IG.Sugarer (sugarClaferModel) where
 
 import Language.Clafer.IG.ClaferModel
 import qualified Language.Clafer.Intermediate.Analysis as Analysis
-import Control.Monad
 import Data.Maybe (fromJust)
 import Data.List as List hiding (map)
 import Data.Map as Map hiding (map, foldr, foldl)
+import Prelude hiding (id)
 
 
 -- Sample: maps the id to the its simple name and the number of times its simple name appeared in the census before it
 -- Count: maps the simple name to the total count of the simple name
-data Census = Census {
-    sample::Map Id (Int, String), 
-    counts::Map String Int
-} deriving Show
+data Census = Census 
+    (Map Id (Int, String))  -- Sample 
+    (Map String Int)        -- Counts
+ deriving Show
 
 
 -- Adds the full name to the census
 poll :: Id -> Census -> Census
-poll id (Census sample counts) =
-    Census sample' counts'
+poll id (Census sample' counts') =
+    Census sample'' counts''
     where
     fullName = i_name id
     name = makeSimpleName fullName
-    counts' = insertWith (+) name 1 counts
-    ordinal' = findWithDefault (error $ "Did not find " ++ name ++ " in counts.") name counts'
-    sample' = insertWith (error $ "Polled " ++ fullName ++ " twice in the census.") id (ordinal', name) sample
+    counts'' = insertWith (+) name 1 counts'
+    ordinal' = findWithDefault (error $ "Did not find " ++ name ++ " in counts.") name counts''
+    sample'' = insertWith (error $ "Polled " ++ fullName ++ " twice in the census.") id (ordinal', name) sample'
     -- Transforms c2_name -> name
     makeSimpleName :: String -> String
-    makeSimpleName name =
-        case snd $ break ('_' ==) name of
-            [] ->  error "Unexpected Clafer name " ++ name
-            x -> tail x
+    makeSimpleName name' = case dropWhile (/='_') name' of
+        "" ->  error "Unexpected Clafer name " ++ name'
+        x -> tail x
 
 -- Count the number of each clafer
 claferModelCensus :: ClaferModel -> Census
@@ -76,7 +75,7 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
     sugarValue (Clafer _ Nothing _) = Nothing
     sugarValue c  = if (cType c) == "string" then (Just ((StringValue) (getString c))) else (c_value c)
 
-    cType (Clafer id value children) = 
+    cType (Clafer id _ _) = 
         case (fromJust (Analysis.super (Analysis.runAnalysis (Analysis.claferWithUid (i_name id)) (fromJust info)))) of
             (Analysis.Ref s) -> cTypeSolve s
             (Analysis.Colon s) -> cTypeSolve s
@@ -93,23 +92,23 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
         where strNumber = v_value  $ fromJust  $ c_value c
     
 
-    Census sample counts = claferModelCensus model
+    Census sample' counts' = claferModelCensus model
     
     sugarId :: Bool -> Bool  -> Bool    -> Id -> Id
-    sugarId    useUids addTypes addRefDecl id  =
+    sugarId    useUids' addTypes' addRefDecl id  =
         if count == 1 
-            then Id (finalName ++ (refDecl addTypes addRefDecl info)) 0
-            else Id (finalName ++ "$" ++ show ordinal ++ (refDecl addTypes addRefDecl info)) 0  
+            then Id (finalName ++ (refDecl addTypes' addRefDecl info)) 0
+            else Id (finalName ++ "$" ++ show ordinal ++ (refDecl addTypes' addRefDecl info)) 0  
         where
         fullName = i_name id
 
         refDecl :: Bool -> Bool -> Maybe Analysis.Info -> String
-        refDecl    True    True    (Just info)          = retrieveSuper info $ i_name id
+        refDecl    True    True    (Just info')          = retrieveSuper info' $ i_name id
         refDecl    _       _       _                    = ""
         
-        (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample
-        count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts
-        finalName = if useUids then fullName else simpleName
+        (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample'
+        count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts'
+        finalName = if useUids' then fullName else simpleName
 
 retrieveSuper :: Analysis.Info -> String -> String
 retrieveSuper info uid = 

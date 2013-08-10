@@ -27,6 +27,7 @@ import Control.Monad.IO.Class
 import System.Environment.Executable
 import System.IO
 import System.Process
+import GHC.IO.Exception
 
 data Process = Process{stdIn::Handle, stdOut::Handle, procHandle::ProcessHandle}
 
@@ -41,19 +42,21 @@ pipeProcess :: FilePath -> [String] -> IO Process
 pipeProcess exec args =
     do
         let process = (proc exec args) { std_in = CreatePipe, std_out = CreatePipe }
-        (Just stdIn, Just stdOut, _, procHandle) <- createProcess process
-        hSetNewlineMode stdIn noNewlineTranslation
-        return $ Process stdIn stdOut procHandle -- Pipe always has a handle according to docs
+        (Just stdIn', Just stdOut', _, proceHandle) <- createProcess process
+        hSetNewlineMode stdIn' noNewlineTranslation
+        return $ Process stdIn' stdOut' proceHandle -- Pipe always has a handle according to docs
     
     
 -- Wait until the process terminates
-waitFor proc = waitForProcess (procHandle proc)
+waitFor :: Process -> IO ExitCode
+waitFor proce = waitForProcess (procHandle proce)
 
 
 -- Reads the entire output verbatim
-getContentsVerbatim proc =
+getContentsVerbatim :: Process -> IO String
+getContentsVerbatim proce =
     do
-        contents <- hGetContents $ stdOut proc
+        contents <- hGetContents $ stdOut proce
         -- hGetContents is lazy. Force it to evaluate by mapping over everything doing nothing
         mapM_ return contents
         return contents
@@ -61,18 +64,19 @@ getContentsVerbatim proc =
     
 -- Read the message
 getMessage :: MonadIO m => Process -> m String
-getMessage proc =
+getMessage proce =
     liftIO $ do
-        length <- read `liftM` hGetLine (stdOut proc)
-        mapM hGetChar $ replicate length (stdOut proc)
-       
-readMessage proc = read `liftM` getMessage proc
+        len <- read `liftM` hGetLine (stdOut proce)
+        mapM hGetChar $ replicate len (stdOut proce)
+
+readMessage :: (Read r, MonadIO m) => Process -> m r   
+readMessage proce = read `liftM` getMessage proce
 
 -- Put the message
 putMessage :: MonadIO m => Process -> String -> m ()
-putMessage proc message =
+putMessage proce message =
     liftIO $ do
-        hPutStrLn (stdIn proc) (show $ length message)
-        hPutStr (stdIn proc) message
-        hFlush (stdIn proc)
+        hPutStrLn (stdIn proce) (show $ length message)
+        hPutStr (stdIn proce) message
+        hFlush (stdIn proce)
        

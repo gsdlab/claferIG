@@ -23,15 +23,10 @@
 module Language.Clafer.IG.Solution (Solution(..), Sig(..), Atom(..), Field(..), Tuple(..), parseSolution) where
 
 import Control.Monad
-import Data.Either
-import Data.List
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.Maybe
 import Text.XML.HaXml
-import Text.XML.HaXml.Namespaces
 import Text.XML.HaXml.Posn
-
+import Prelude hiding (id)
 
 
 data Solution = Solution{s_sigs::[Sig], s_fields::[Field]} deriving Show
@@ -61,13 +56,13 @@ parseSolution xml =
 
 
 parseSig :: Content i -> Sig
-parseSig content =
+parseSig content' =
     Sig label id parentId atoms
     where
-    parentId = read `liftM` findOptAttr "parentID" content
-    label = findAttr "label" content
-    id = read $ findAttr "ID" content
-    atoms = map parseAtom $ (keep /> tag "atom") content
+    parentId = read `liftM` findOptAttr "parentID" content'
+    label = findAttr "label" content'
+    id = read $ findAttr "ID" content'
+    atoms = map parseAtom $ (keep /> tag "atom") content'
     
 
 parseAtom :: Content i -> Atom
@@ -75,35 +70,35 @@ parseAtom = Atom . findAttr "label"
 
 
 parseField :: Content i -> Field
-parseField content =
+parseField content' =
     Field
-        (findAttr "label" content)
-        (read $ findAttr "ID" content)
-        (read $ findAttr "parentID" content)
-        (map parseTuple $ (keep /> tag "tuple") content)
+        (findAttr "label" content')
+        (read $ findAttr "ID" content')
+        (read $ findAttr "parentID" content')
+        (map parseTuple $ (keep /> tag "tuple") content')
     where
     
     parseType :: Content i -> (Int, Int)
-    parseType content = 
+    parseType content'' = 
         (toFromType !! 0, toFromType !! 1)
-        where toFromType = map (read . findAttr "ID") $ (keep /> tag "types" /> tag "type") content
+        where toFromType = map (read . findAttr "ID") $ (keep /> tag "types" /> tag "type") content''
 
-    (fromType, toType) = parseType content
+    (fromType, toType) = parseType content'
 
     parseTuple :: Content i -> Tuple
-    parseTuple content =
+    parseTuple content''' =
         Tuple (toFrom !! 0) fromType (toFrom !! 1) toType
-        where toFrom = map parseAtom $ (keep /> tag "atom") content
+        where toFrom = map parseAtom $ (keep /> tag "atom") content'''
 
 
 findOptAttr :: String -> Content i -> Maybe String
-findOptAttr name elem = show `liftM` lookup (N name) (getAttrs elem)
+findOptAttr name ele = show `liftM` lookup (N name) (getAttrs ele)
 
 
 findAttr :: String -> Content i -> String
-findAttr name elem = fromJust $ show `fmap` lookup (N name) (getAttrs elem)
+findAttr name ele = fromJust $ show `fmap` lookup (N name) (getAttrs ele)
 
 
 getAttrs :: Content i -> [Attribute]
 getAttrs (CElem (Elem _ attributes _) _) = attributes
-
+getAttrs _ = error "Function getAttrs from Solution was given an invliad argument expected of type (CElem (Elem _ attributes _) _)" -- This should never happen

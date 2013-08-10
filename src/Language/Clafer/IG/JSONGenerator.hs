@@ -23,17 +23,17 @@
 module Language.Clafer.IG.JSONGenerator (generateJSON) where
 
 import qualified Language.Clafer.IG.ClaferModel as M
-import Language.Clafer.IG.Sugarer
 import qualified Language.Clafer.Intermediate.Analysis as A
 import Data.Json.Builder
 import Data.String.Conversions
+import Prelude hiding (id)
 
 generateJSON :: A.Info -> M.ClaferModel                        -> String
-generateJSON    info      model@(M.ClaferModel topLevelClafers) = 
+generateJSON    info      (M.ClaferModel topLevelClafers) = 
 	convertString $ toJsonBS $ constructElements $ map (printClafer info) topLevelClafers 
 
 printClafer :: A.Info -> M.Clafer                           -> Object
-printClafer    info      clafer@(M.Clafer id value children) = 
+printClafer    info      (M.Clafer id value children) = 
 	(map (printClafer info) children) `addElements` completeClaferObject
 	where
 		uid = M.i_name id
@@ -50,11 +50,12 @@ printClafer    info      clafer@(M.Clafer id value children) =
 		cardMax = A.high sclafer
 		basicClaferObject = makeBasicClaferObject ident uid super isOverlapping cardMin cardMax
 
-		addValue :: Maybe M.Value        -> Object -> Object
-		addValue    Nothing                 object = object
-		addValue 	(Just (M.IntValue i))   object = addIntValue i object
-		addValue 	(Just (M.AliasValue a)) object = addStringValue (M.i_name a) object
-
+		addValue :: Maybe M.Value         -> Object -> Object
+		addValue    Nothing                  object = object
+		addValue 	(Just (M.IntValue i))    object = addIntValue i object
+		addValue 	(Just (M.AliasValue a))  object = addStringValue (M.i_name a) object
+		addValue    (Just (M.StringValue _)) _      = error "Function addValue from JSONGenerator does not accept StringValues" -- Should never happen, string values are not generated yet
+	
 		completeClaferObject = addValue value basicClaferObject
 
 		removeOrdinal :: String -> String 

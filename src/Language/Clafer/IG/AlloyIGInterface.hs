@@ -28,7 +28,6 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Reader
-import Control.Monad.Trans
 import Control.Monad.Trans.State.Strict
 import Data.Map as Map hiding (null)
 import Data.Maybe
@@ -74,16 +73,16 @@ withinRange :: Integer -> Multiplicity -> Bool
 withinRange scope One = scope == 1
 withinRange scope Lone = scope == 0 || scope == 1
 withinRange scope Some = scope >= 1
-withinRange scope Any = True
+withinRange _ Any = True
 
 
 runAlloyIGT :: MonadIO m => AlloyIGT m a -> m a
 runAlloyIGT run =
     do
         execPath <- liftIO $ executableDirectory
-        proc     <- liftIO $ pipeProcess "java" ["-Djava.library.path=" ++ execPath ++ "lib" , "-jar", execPath ++ "alloyIG.jar"]
+        proce     <- liftIO $ pipeProcess "java" ["-Djava.library.path=" ++ execPath ++ "lib" , "-jar", execPath ++ "alloyIG.jar"]
         
-        runReaderT (evalStateT (unwrap run) Nothing) proc
+        runReaderT (evalStateT (unwrap run) Nothing) proce
     where
     unwrap (AlloyIGT a) = a
             
@@ -97,27 +96,27 @@ getSigs = keys `liftM` fetches sigMap
 
 
 load :: Process -> String -> IO AlloyIGEnv
-load proc alloyModel' =
+load proce alloyModel' =
     do
-        putMessage proc "load"
-        putMessage proc alloyModel'
-        numberOfSigs <- readMessage proc
+        putMessage proce "load"
+        putMessage proce alloyModel'
+        numberOfSigs <- readMessage proce
         sigs <- replicateM numberOfSigs readSig
 
         let sigMap' = fromList [(s_name sig, sig) | sig <- sigs]
         let scopes' = Map.empty
-        globalScope' <- readMessage proc
+        globalScope' <- readMessage proce
      
         return $ AlloyIGEnv alloyModel' sigMap' scopes' globalScope'
     where
     readSig =
         do
-            sig <- getMessage proc
-            multiplicity <- readMessage proc
-            subset <- getMessage proc
-            hasStartingScope <- readMessage proc
+            sig <- getMessage proce
+            multiplicity <- readMessage proce
+            subset <- getMessage proce
+            hasStartingScope <- readMessage proce
             startingScope <-
-                if hasStartingScope then Just <$> readMessage proc else return Nothing
+                if hasStartingScope then Just <$> readMessage proce else return Nothing
             return $ Sig sig multiplicity (if null subset then Nothing else Just subset) startingScope
 
 
@@ -220,13 +219,20 @@ sendRestoreStateCommand = putMsg "restoreState"
 
 -- Tell alloyIG to remove the constraint
 sendRemoveConstraintCommand :: MonadIO m => Span -> AlloyIGT m ()
-sendRemoveConstraintCommand (Span from to) =
-    do
-        putMsg "removeConstraint"
-        sendPosition from >> sendPosition to
+sendRemoveConstraintCommand s = case s of
+    (Span from to) -> 
+        do
+            putMsg "removeConstraint"
+            sendPosition from >> sendPosition to
+    (PosSpan _ from to) ->                          -- Should never happen
+        do
+            putMsg "removeConstraint"
+            sendPosition from >> sendPosition to
     where
     sendPosition (Pos line column) =
         putMsg (show line) >> putMsg (show column)
+    sendPosition (PosPos _ line column) =
+        putMsg (show line) >> putMsg (show column)  -- Should never happen
         
 
 -- Tell alloyIG to return the unsat core of the previous operation        
@@ -235,8 +241,8 @@ sendUnsatCoreCommand =
     do
         putMsg "unsatCore"
         coreLength <- readMsg
-        core       <- replicateM coreLength readConstraint
-        return $ UnsatCore core
+        core'       <- replicateM coreLength readConstraint
+        return $ UnsatCore core'
     where
     readPosition   = liftM2 Pos readMsg readMsg
     readConstraint = liftM2 Span readPosition readPosition
