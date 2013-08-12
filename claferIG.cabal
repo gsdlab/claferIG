@@ -15,107 +15,114 @@ Extra-Source-Files:
                     CHANGES.md,
                     LICENSE,
                     tools/alloy4.jar
-
+source-repository head
+    type:           git
+    location:       git://github.com/gsdlab/claferIG.git
 Executable claferIG
-    build-tools:    ghc >= 7.4.2
+    build-tools:    ghc >= 7.6.3
     default-language:
                     Haskell2010
     default-extensions:
                     DeriveDataTypeable
     Main-is:        Main.hs
-    Build-depends:  base >= 4 && < 5, 
+    Build-depends:  
+                    base >= 4.6.0.1 && < 5,
                     clafer == 0.3.3, 
                     claferIG == 0.3.3,
-                    cmdargs >= 0.10.2, 
+                    cmdargs >= 0.10.5, 
                     containers >= 0.4.2.1,  
-                    directory >= 1.1.0.2, 
+                    directory >= 1.2.0.1, 
                     executable-path >= 0.0.3, 
-                    filepath >= 1.3.0.0, 
-                    haskeline >= 0.7.0, 
-                    HaXml >= 1.23.3, 
-                    mtl >= 2.1.1, 
-                    parsec >= 3.1.2, 
-                    process >= 1.1.0.1, 
+                    filepath >= 1.3.0.1, 
+                    haskeline >= 0.7.0.3, 
+                    HaXml >= 1.24, 
+                    mtl >= 2.1.2, 
+                    parsec >= 3.1.3, 
+                    process >= 1.1.0.2, 
                     transformers >= 0.3.0.0,
                     json-builder >= 0.3,
                     string-conversions >= 0.3,
                     test-framework >= 0.8, 
                     test-framework-hunit >= 0.3.0, 
                     test-framework-quickcheck2 >= 0.3.0.1,
-                    test-framework-th >= 0.2.3,
+                    test-framework-th >= 0.2.4,
                     QuickCheck >= 2.5.1.1, 
-                    HUnit >= 1.2.5.1
-    Hs-Source-Dirs:  src
+                    HUnit >= 1.2.5.2
+    Hs-Source-Dirs: src
 
 library 
-    build-tools:    ghc >= 7.4.2
+    build-tools:    ghc >= 7.6.3
     default-language:
                     Haskell2010
     default-extensions:
                     DeriveDataTypeable
     build-depends:   
-                    base >= 4 && < 5, 
+                    base >= 4.6.0.1 && < 5,
                     clafer == 0.3.3, 
-                    cmdargs >= 0.10.2, 
+                    cmdargs >= 0.10.5, 
                     containers >= 0.4.2.1,  
-                    directory >= 1.1.0.2, 
+                    directory >= 1.2.0.1, 
                     executable-path >= 0.0.3, 
-                    filepath >= 1.3.0.0, 
-                    haskeline >= 0.7.0, 
-                    HaXml >= 1.23.3, 
-                    mtl >= 2.1.1, 
-                    parsec >= 3.1.2, 
-                    process >= 1.1.0.1, 
+                    filepath >= 1.3.0.1, 
+                    haskeline >= 0.7.0.3, 
+                    HaXml >= 1.24, 
+                    mtl >= 2.1.2, 
+                    parsec >= 3.1.3, 
+                    process >= 1.1.0.2, 
                     transformers >= 0.3.0.0,
                     json-builder >= 0.3,
                     string-conversions >= 0.3,
                     test-framework >= 0.8, 
                     test-framework-hunit >= 0.3.0, 
                     test-framework-quickcheck2 >= 0.3.0.1,
-                    test-framework-th >= 0.2.3,
+                    test-framework-th >= 0.2.4,
                     QuickCheck >= 2.5.1.1, 
-                    HUnit >= 1.2.5.1
-    hs-source-dirs:  src
+                    HUnit >= 1.2.5.2
+    hs-source-dirs: src
     ghc-options:     -Wall -fno-warn-unused-do-bind -fno-warn-orphans
     exposed-modules: Language.Clafer.IG.AlloyIGInterface, 
-                     Language.Clafer.IG.ClaferIG,
-                     Language.Clafer.IG.ClaferModel,
-                     Language.Clafer.IG.CommandLine,
-                     Language.Clafer.IG.CommandLineParser,
-                     Language.Clafer.IG.Constraints,
-                     Language.Clafer.IG.JSONGenerator,
-                     Language.Clafer.IG.Process,
-                     Language.Clafer.IG.Solution,
-                     Language.Clafer.IG.Sugarer,
-                     Language.Clafer.IG.Version
-
+                    Language.Clafer.IG.ClaferIG,
+                    Language.Clafer.IG.ClaferModel,
+                    Language.Clafer.IG.CommandLine,
+                    Language.Clafer.IG.CommandLineParser,
+                    Language.Clafer.IG.Constraints,
+                    Language.Clafer.IG.JSONGenerator,
+                    Language.Clafer.IG.Process,
+                    Language.Clafer.IG.Solution,
+                    Language.Clafer.IG.Sugarer,
+                    Language.Clafer.IG.Version
 
 Test-Suite test-suite
     type:           exitcode-stdio-1.0 
     main-is:        test-suite.hs
     hs-source-dirs: test
     build-depends:   
-                     base >= 4 && < 5, 
-                     array >= 0.4.0.0, 
-                     process >= 1.1.0.1, 
-                     mtl >= 2.1.1, 
-                     containers >= 0.4.2.1, 
-                     cmdargs >= 0.10.2, 
-                     executable-path >= 0.0.3, 
-                     filepath >= 1.3.0.0,
-                     HaXml >= 1.23.3,
-                     MaybeT >= 0.1.2,
-                     glpk-hs >= 0.3.4,
-                     parsec >= 3.1.2,
-                     clafer == 0.3.3,
-                     claferIG == 0.3.3
+                    base >= 4.6.0.1 && < 5,
+                    clafer == 0.3.3,
+                    claferIG == 0.3.3,
+                    array >= 0.4.0.1,
+                    cmdargs >= 0.10.5, 
+                    containers >= 0.4.2.1,  
+                    directory >= 1.2.0.1, 
+                    executable-path >= 0.0.3, 
+                    filepath >= 1.3.0.1, 
+                    haskeline >= 0.7.0.3, 
+                    HaXml >= 1.24, 
+                    mtl >= 2.1.2, 
+                    parsec >= 3.1.3, 
+                    process >= 1.1.0.2, 
+                    transformers >= 0.3.0.0,
+                    json-builder >= 0.3,
+                    string-conversions >= 0.3,
+                    MaybeT >= 0.1.2,
+                    glpk-hs >= 0.3.4,
+                    parsec >= 3.1.3
+                     
     ghc-options      -Wall -fno-warn-unused-do-bind -fno-warn-orphans
     build-depends:  
                     test-framework >= 0.8, 
                     test-framework-hunit >= 0.3.0, 
                     test-framework-quickcheck2 >= 0.3.0.1,
-                    test-framework-th >= 0.2.3,
+                    test-framework-th >= 0.2.4,
                     QuickCheck >= 2.5.1.1, 
-                    HUnit >= 1.2.5.1,
-                    directory,
-                    transformers
+                    HUnit >= 1.2.5.2
