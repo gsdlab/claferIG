@@ -194,7 +194,7 @@ load                 igArgs    =
     editMap :: (Map.Map Span [Ir]) -> (Map.Map Integer String) -- Map Line Number to Clafer Name
     editMap = 
         fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case (getIClafer ir) of 
-            Just (IClafer _ _ _ i _ _ _ _ _) -> (num, i) : acc
+            Just (IClafer _ _ _ i _ _ _ _ _ _) -> (num, i) : acc
             _ -> acc) [] . tail . (Data.List.foldr (\x acc -> case x of
                 ((Span (Pos l1 _) (Pos l2 _)), irs)                 -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
                 ((PosSpan _ (Pos l1 _) (Pos l2 _)), irs)            -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
@@ -380,7 +380,7 @@ findRemovable env core constraints' =
         removeAbsZero absIDs (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) = ((Seq.elemIndexL uID absIDs)==Nothing)
         removeAbsZero _ _ = True
         getId :: Ir -> (Seq.Seq String)
-        getId (IRClafer (IClafer _ True _ uID _ _ _ _ _)) = Seq.singleton uID
+        getId (IRClafer (IClafer _ True _ uID _ _ _ _ _ _)) = Seq.singleton uID
         getId _ = mempty
 
 fst3 :: (IModule, GEnv, Bool) -> IModule
