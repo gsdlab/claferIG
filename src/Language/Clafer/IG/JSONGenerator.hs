@@ -40,15 +40,16 @@ printClafer    info      (M.Clafer id value children) =
 		sclafer = A.runAnalysis (A.claferWithUid $ removeOrdinal uid) info
 		ident = A.uid sclafer
 
-		getSuper :: Maybe A.SSuper    -> (Bool, String)
-		getSuper    Nothing            = (False, "")
-		getSuper    (Just (A.Ref s))   = (True, s)
-		getSuper    (Just (A.Colon s)) = (False, s)
+		getSuperAndRef :: Maybe A.SSuper    -> (String, String)
+		getSuperAndRef (Just (A.SSuper (Just s) Nothing))    = (s, "None")
+		getSuperAndRef (Just (A.SSuper Nothing (Just s)))    = ("None", s)
+		getSuperAndRef (Just (A.SSuper (Just s1) (Just s2))) = (s1, s2)
+		getSuperAndRef _                                     = ("None", "None")
 
-		(isOverlapping, super) = getSuper $ A.super sclafer
+		(super, ref) = getSuperAndRef $ A.super sclafer
 		cardMin = A.low sclafer
 		cardMax = A.high sclafer
-		basicClaferObject = makeBasicClaferObject ident uid super isOverlapping cardMin cardMax
+		basicClaferObject = makeBasicClaferObject ident uid super ref cardMin cardMax
 
 		addValue :: Maybe M.Value         -> Object -> Object
 		addValue    Nothing                  object = object
@@ -61,12 +62,12 @@ printClafer    info      (M.Clafer id value children) =
 		removeOrdinal :: String -> String 
 		removeOrdinal = takeWhile (/= '$')
 
-makeBasicClaferObject :: String -> String -> String -> Bool       -> Integer -> Integer    -> Object
-makeBasicClaferObject    ident     uid       super     isOverlapping cardMin    cardMax =
+makeBasicClaferObject :: String -> String -> String -> String       -> Integer -> Integer    -> Object
+makeBasicClaferObject    ident     uid       super     ref cardMin    cardMax =
 	mconcat [ row "ident" ident, 
 			  row "uid" uid,
 			  row "super" super,
-			  row "isOverlapping" isOverlapping,
+			  row "refrence" ref,
 			  row "cardMin" cardMin,
 			  row "cardMax" cardMax ]
 

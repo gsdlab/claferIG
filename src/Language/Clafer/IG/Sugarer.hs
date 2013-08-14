@@ -77,8 +77,10 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
 
     cType (Clafer id _ _) = 
         case (fromJust (Analysis.super (Analysis.runAnalysis (Analysis.claferWithUid (i_name id)) (fromJust info)))) of
-            (Analysis.Ref s) -> cTypeSolve s
-            (Analysis.Colon s) -> cTypeSolve s
+            Analysis.SSuper Nothing (Just s) -> cTypeSolve s
+            Analysis.SSuper (Just s) _ -> cTypeSolve s
+            _ -> ""
+
     
     cTypeSolve "string" = "string"
     cTypeSolve "integer" = "integer"
@@ -119,5 +121,7 @@ retrieveSuper info uid =
         sclafer = Analysis.runAnalysis (Analysis.claferWithUid uid) info
 
         sugarSuper :: Analysis.SSuper -> String
-        sugarSuper (Analysis.Ref s) = " -> " ++ s
-        sugarSuper (Analysis.Colon s) = " : " ++ s    
+        sugarSuper (Analysis.SSuper Nothing (Just s)) = " -> " ++ s
+        sugarSuper (Analysis.SSuper (Just s) Nothing) = " : " ++ s  
+        sugarSuper (Analysis.SSuper (Just s1) (Just s2)) = " : " ++ s1 ++ " -> " ++ s2   
+        sugarSuper _ = ""
