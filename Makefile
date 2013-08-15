@@ -27,7 +27,7 @@ ifeq ($(UNAME), windows)
 		LIB := x86-windows/minisatprover*
 	endif
 endif
-ifeq ($(UNAME), mingw32_nt-6.2)
+ifeq ($(basename $(UNAME)), mingw32_nt-6)
 	ifeq ($(MNAME), i686)
 		LIB := x86-windows/minisatprover*
 	endif
@@ -70,12 +70,19 @@ install:
 	cp -f CHANGES.md $(to)/claferIG-CHANGES.md
 	cp -f README.md $(to)/claferIG-README.md
 	cp -f -R IDEs $(to)
-	cabal install --bindir=$(to)
+	cabal install --bindir=$(to) --ghc-option="-O"
+
+# Removes current build and makes a clean new one (Don't use if starting from scratch!)
+cleanEnv:
+	make clean
+	ghc-pkg unregister claferIG
+	rm `which claferIG`
+	make 
 
 # this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs 
 newVersion:
 	ghc -isrc src/dateVer.hs dist/build/autogen/Paths_claferIG.hs -outputdir dist/build --make -o dateVer
-	./dateVer > src/Version.hs
+	./dateVer > src/Language/Clafer/IG/Version.hs
 
 
 # Build takes less time. For ease of development.
@@ -92,7 +99,7 @@ alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/cl
 
 lib:
 
-	@if [[ "$(UNAME)"=="mingw32_nt-6.1" && -z "$(shell which unzip)" ]] ; then \
+	@if [[ "$(basename $(UNAME))"=="mingw32_nt-6" && -z "$(shell which unzip)" ]] ; then \
 		mingw-get install msys-unzip-bin; \
 	fi 	
 	
@@ -106,6 +113,9 @@ lib:
 	
 runTests:
 	# Only test a subset of the suite. The other cases do not work yet.
+	cabal configure --enable-tests
+	cabal build
+	cabal test
 	./claferIG --all=4 -s dist/run test/suite/backquoted.cfr
 	./claferIG --all=4 -s dist/run test/suite/BobsTeam.cfr
 	./claferIG --all=4 -s dist/run test/suite/inconsistent.cfr
