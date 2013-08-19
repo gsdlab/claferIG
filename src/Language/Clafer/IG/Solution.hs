@@ -29,16 +29,16 @@ import Text.XML.HaXml.Posn
 import Prelude hiding (id)
 
 
-data Solution = Solution{s_sigs::[Sig], s_fields::[Field]} deriving Show
+data Solution = Solution{s_sigs::[Sig], s_fields::[Field]} deriving (Show, Eq)
 
 -- The univ sig does not have a parent
-data Sig = Sig {s_label::String, s_id::Int, s_parentId::Maybe Int, s_atoms::[Atom]} deriving Show
+data Sig = Sig {s_label::String, s_id::Int, s_parentId::Maybe Int, s_atoms::[Atom]} deriving (Show, Eq)
 
-data Atom = Atom {a_label::String} deriving Show
+data Atom = Atom {a_label::String} deriving (Show, Eq)
 
-data Field = Field {f_label::String, f_id::Int, f_parentId::Int, f_tuples::[Tuple]} deriving Show
+data Field = Field {f_label::String, f_id::Int, f_parentId::Int, f_tuples::[Tuple]} deriving (Show, Eq)
 
-data Tuple = Tuple {t_from::Atom, t_fromType::Int, t_to::Atom, t_toType::Int} deriving Show
+data Tuple = Tuple {t_from::Atom, t_fromType::Int, t_to::Atom, t_toType::Int} deriving (Show, Eq)
 
 
 

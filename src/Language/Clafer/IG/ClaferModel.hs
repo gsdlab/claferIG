@@ -30,9 +30,9 @@ import Language.Clafer.IG.Solution
 import Prelude hiding (id)
 
 
-data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
-data Clafer = Clafer {c_id::Id, c_value::Maybe Value, c_children::[Clafer]}
-data Value = AliasValue {c_alias::Id} | IntValue {v_value::Int} | StringValue {v_str ::String} deriving Show
+data ClaferModel = ClaferModel {c_topLevel::[Clafer]} deriving Eq
+data Clafer = Clafer {c_id::Id, c_value::Maybe Value, c_children::[Clafer]} deriving Eq
+data Value = AliasValue {c_alias::Id} | IntValue {v_value::Int} | StringValue {v_str ::String} deriving (Show, Eq)
 
 c_name :: Clafer -> String
 c_name = i_name . c_id
@@ -169,12 +169,17 @@ buildSigMap (Solution sigs _) = Map.fromList $ zip (map s_label sigs) sigs
 
 
 buildClaferModel :: Solution -> ClaferModel
-buildClaferModel solution =
-    ClaferModel $ lefts $ map buildClafer (getRoots ftree)
+buildClaferModel solution = 
+    ClaferModel $ removeDups [] $ lefts $ map buildClafer (getRoots ftree)
     where
     sigMap = buildSigMap solution
     ftree = buildFamilyTree solution
-    
+
+    removeDups :: [Clafer] -> [Clafer] -> [Clafer]
+    removeDups acc [] = acc
+    removeDups acc (m:ms) = if (m `elem` ms) then removeDups acc ms
+        else removeDups (m{c_children = (removeDups [] $ c_children m)} : acc) ms
+
     intType = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
     
     singleton [] = Nothing
@@ -183,6 +188,8 @@ buildClaferModel solution =
     
     buildClafer :: Node -> Either Clafer Value
     buildClafer (ClaferNode id _) =
+        --if (True) then error $ show $ map (\c -> getChildren (n_id c) ftree) children else
+        --if (True) then error $ show ftree else
         Left $ Clafer id (singleton valueChildren) claferChildren
         where
         (claferChildren, valueChildren) = partitionEithers $ map buildClafer children
