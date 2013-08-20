@@ -183,7 +183,7 @@ subclafers (IEClafer claf) = claf : (elements claf >>= subclafers)
 subclafers _ = []
 
 constraint :: IElement -> Maybe PExp
-constraint (IEConstraint _ pexp) = Just pexp
+constraint (IEConstraint _ _ pexp) = Just pexp
 constraint _ = Nothing
 
 subexpressions :: PExp -> [PExp]
