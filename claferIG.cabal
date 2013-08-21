@@ -27,7 +27,7 @@ Executable claferIG
     Main-is:        Main.hs
     Build-depends:  
                     base >= 4.6.0.1 && < 5,
-                    clafer == 0.3.3, 
+                    clafer >= 0.3.3, 
                     claferIG == 0.3.3,
                     cmdargs >= 0.10.5, 
                     containers >= 0.4.2.1,  
@@ -46,7 +46,7 @@ Executable claferIG
                     test-framework-hunit >= 0.3.0, 
                     test-framework-quickcheck2 >= 0.3.0.1,
                     test-framework-th >= 0.2.4,
-                    QuickCheck >= 2.5.1.1, 
+                    QuickCheck == 2.5.1.1, 
                     HUnit >= 1.2.5.2
     Hs-Source-Dirs: src
 
@@ -58,7 +58,7 @@ library
                     DeriveDataTypeable
     build-depends:   
                     base >= 4.6.0.1 && < 5,
-                    clafer == 0.3.3, 
+                    clafer >= 0.3.3, 
                     cmdargs >= 0.10.5, 
                     containers >= 0.4.2.1,  
                     directory >= 1.2.0.1, 
@@ -76,7 +76,7 @@ library
                     test-framework-hunit >= 0.3.0, 
                     test-framework-quickcheck2 >= 0.3.0.1,
                     test-framework-th >= 0.2.4,
-                    QuickCheck >= 2.5.1.1, 
+                    QuickCheck == 2.5.1.1, 
                     HUnit >= 1.2.5.2
     hs-source-dirs: src
     ghc-options:     -Wall -fno-warn-unused-do-bind -fno-warn-orphans
@@ -124,5 +124,5 @@ Test-Suite test-suite
                     test-framework-hunit >= 0.3.0, 
                     test-framework-quickcheck2 >= 0.3.0.1,
                     test-framework-th >= 0.2.4,
-                    QuickCheck >= 2.5.1.1, 
+                    QuickCheck == 2.5.1.1, 
                     HUnit >= 1.2.5.2
