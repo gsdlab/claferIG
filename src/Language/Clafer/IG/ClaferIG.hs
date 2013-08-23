@@ -130,7 +130,7 @@ data ClaferIGEnv = ClaferIGEnv{
     claferIGArgs :: IGArgs,
     constraints:: [Constraint], 
     claferModel:: String, 
-    claferToSigNameMap :: Map String String,
+    claferToSigNameMap :: Map String [String],
     info :: Analysis.Info,
     strMap :: Map Int String,
     lineNumMap :: Map Integer String
@@ -184,17 +184,17 @@ load                 igArgs    =
         lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
 
         sigs <- lift $ AlloyIG.getSigs
-        let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
+        let claferToSigNameMap = fromListWith (++) [(sigToClaferName x, [x]) | x <- sigs]
         
         let info = Analysis.gatherInfo ir 
-        let irTrace = editMap $ irModuleTrace claferEnv'
+        let lMap = editMap $ irModuleTrace claferEnv'
 
-        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel claferToSigNameMap info sMap irTrace
+        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel claferToSigNameMap info sMap lMap
     where
     editMap :: (Map.Map Span [Ir]) -> (Map.Map Integer String) -- Map Line Number to Clafer Name
     editMap = 
         fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case (getIClafer ir) of 
-            Just (IClafer _ _ _ _ i _ _ _ _ _ _) -> (num, i) : acc
+            Just (IClafer _ _ _ _ _ i _ _ _ _ _) -> (num, i) : acc
             _ -> acc) [] . tail . (Data.List.foldr (\x acc -> case x of
                 ((Span (Pos l1 _) (Pos l2 _)), irs)                 -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
                 ((PosSpan _ (Pos l1 _) (Pos l2 _)), irs)            -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
@@ -269,12 +269,12 @@ getScopes =
         return $ [Scope (sigToClaferName sig) sig | (sig, _) <- scopes]
         
         
-getScope :: MonadIO m => String -> ClaferIGT m (Either String Scope)
+getScope :: MonadIO m => String -> ClaferIGT m (Either String [Scope])
 getScope name =
     do
         claferToSigNameMap' <- fetches claferToSigNameMap
         runErrorT $ case name `Map.lookup` claferToSigNameMap' of
-            Just sigName -> return $ Scope name sigName
+            Just sigNames -> return $ map (Scope name) sigNames
             Nothing      -> throwError $ "Unknown clafer " ++ name
         
 
