@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 {-
- Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2013 Jimmy Liang, Luke Brown <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -218,7 +218,8 @@ runCommandLine =
 
             newScopes <- lift getScopes
             newScopeVals <- lift $ mapM valueOfScope newScopes
-            lift $ setBitwidth $ findNecessaryBitwidth ir oldBw newScopeVals
+            strMap <- lift getStrMap
+            lift $ setBitwidth $ findNecessaryBitwidth ir (fromIntegral $ Map.size strMap) oldBw newScopeVals
             newBw <- lift getBitwidth
             when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
             lift $ solve
@@ -261,18 +262,20 @@ runCommandLine =
     loop (IncreaseScope name i) context =
         do
             try $ do
-                scope <- ErrorT $ lift $ getScope name
-                scopeValue <- lift $ lift $ valueOfScope scope 
+                scopes <- ErrorT $ lift $ getScope name
+                scopeValues <- lift $ lift $ mapM valueOfScope scopes
+                let maxValue = (maximum scopeValues)+i
+                let scopeInfo = zip scopes scopeValues
                 bitwidth' <- lift $ lift getBitwidth
-                ErrorT $ lift $ setScope (scopeValue+i) scope
-                lift $ when ((scopeValue+i) > ((2 ^ (bitwidth' - 1)) - 1)) $ do
-                    liftIO $ putStrLn $ "Warning! Requested scope for " ++ (nameOfScope scope) ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
-                    lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (scopeValue+i)
+                mapM (\(scope, scopeValue) -> ErrorT $ lift $ setScope (scopeValue+i) scope) scopeInfo
+                lift $ when (maxValue > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+                    liftIO $ putStrLn $ "Warning! Requested scope for " ++ name ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                    lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ maxValue
                     newBw <- lift getBitwidth
                     when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
      
                 lift $ lift $ solve
-                lift $ outputStrLn ("Scope of " ++ name ++ " increased to " ++ show (scopeValue+i))
+                lift $ outputStrLn ("Scope of " ++ name ++ " increased by " ++ show i)
                 
             nextLoop context
             
@@ -317,7 +320,6 @@ runCommandLine =
             let commentLines = getCommentLines claferModel
             lineMap <- lift getlineNumMap
 
-
             outputStrLn $ editModel claferModel commentLines unSATs globalScope' lineMap (zip (map nameOfScope scopes) scopeVals)
             nextLoop context
             where
@@ -329,7 +331,7 @@ runCommandLine =
                 editLines :: [Integer] -> [String] -> Int -> Int -> [(String, Integer)] -> (Map.Map Integer String) -> [(Integer, String)] -> [String]
                 editLines _ _ _ _ _ _ [] = []
                 editLines cLines unSATs m1 m2 s lineMap ((num, l):rest) = 
-                    if (num `elem` cLines && isEmptyLine l) then editLines cLines unSATs m1 m2 s lineMap rest else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s (Map.lookup num lineMap))) : editLines cLines unSATs m1 m2 s lineMap rest
+                    if (num `elem` cLines && isEmptyLine l) then editLines cLines unSATs m1 m2 s lineMap rest else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s $ Map.lookup num lineMap)) : editLines cLines unSATs m1 m2 s lineMap rest
 
                 isUnSAT :: [String] -> String -> Integer -> Bool
                 isUnSAT us l ln = getAny $ foldMap (\u -> Any (((safehead $ words u) == (safehead $ words l) && (safehead $ reverse $ words u) == (safehead $ reverse $ words l)) || (u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == show ln))) us
@@ -338,7 +340,7 @@ runCommandLine =
 
                 addScopeVal :: [(String, Integer)] -> (Maybe String) ->String
                 addScopeVal _ Nothing = ""
-                addScopeVal s (Just name) = "scope = " ++ (fromJustShow $ Data.List.lookup name s) 
+                addScopeVal s (Just name) = "scope = " ++ (fromJustShow $ flip Data.List.lookup s $ tail $ dropWhile (/='_') $ name) 
 
                 getCommentLines :: String -> [Integer]
                 getCommentLines = foldr (\(s, _) acc -> case s of
@@ -522,13 +524,13 @@ numberOfDigits :: Int -> Int
 numberOfDigits 0 = 0
 numberOfDigits x = 1 + (numberOfDigits $ x `div` 10)
 
-findNecessaryBitwidth :: IModule -> Integer -> [Integer] -> Integer
-findNecessaryBitwidth ir oldBw scopes = 
+findNecessaryBitwidth :: IModule -> Integer -> Integer -> [Integer] -> Integer
+findNecessaryBitwidth ir strNum oldBw scopes = 
     if (newBw < oldBw) then oldBw else newBw
     where
         newBw = ceiling $ logBase 2 $ (+1) $ (*2) $ maxInModel ir
         maxInModel :: IModule -> Float
-        maxInModel ir' = intToFloat $ (max (maximum scopes)) $ foldIR getMax 0 ir'
+        maxInModel ir' = intToFloat $ max strNum $ max (maximum scopes) $ foldIR getMax 0 ir'
         getMax :: Ir -> Integer -> Integer 
         getMax (IRIExp (IInt n)) m = max m $ abs n
         getMax (IRClafer IClafer{card = Just (_, n)}) m = max m n
