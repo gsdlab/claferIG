@@ -218,7 +218,8 @@ runCommandLine =
 
             newScopes <- lift getScopes
             newScopeVals <- lift $ mapM valueOfScope newScopes
-            lift $ setBitwidth $ findNecessaryBitwidth ir oldBw newScopeVals
+            strMap <- lift getStrMap
+            lift $ setBitwidth $ findNecessaryBitwidth ir (fromIntegral $ Map.size strMap) oldBw newScopeVals
             newBw <- lift getBitwidth
             when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
             lift $ solve
@@ -523,13 +524,13 @@ numberOfDigits :: Int -> Int
 numberOfDigits 0 = 0
 numberOfDigits x = 1 + (numberOfDigits $ x `div` 10)
 
-findNecessaryBitwidth :: IModule -> Integer -> [Integer] -> Integer
-findNecessaryBitwidth ir oldBw scopes = 
+findNecessaryBitwidth :: IModule -> Integer -> Integer -> [Integer] -> Integer
+findNecessaryBitwidth ir strNum oldBw scopes = 
     if (newBw < oldBw) then oldBw else newBw
     where
         newBw = ceiling $ logBase 2 $ (+1) $ (*2) $ maxInModel ir
         maxInModel :: IModule -> Float
-        maxInModel ir' = intToFloat $ (max (maximum scopes)) $ foldIR getMax 0 ir'
+        maxInModel ir' = intToFloat $ max strNum $ max (maximum scopes) $ foldIR getMax 0 ir'
         getMax :: Ir -> Integer -> Integer 
         getMax (IRIExp (IInt n)) m = max m $ abs n
         getMax (IRClafer IClafer{card = Just (_, n)}) m = max m n
