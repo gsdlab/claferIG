@@ -15,7 +15,7 @@
                  "args": {
                     "type": "subprocess",
                     "encoding": "utf8",
-                    "cmd": ["claferIG", "$file", "--bitwidth=7"],
+                    "cmd": ["claferIG", "$file", "--ss=full"],
                     "cwd": "$file_path",
                     "external_id": "claferIG"
                     }
