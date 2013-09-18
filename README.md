@@ -1,7 +1,7 @@
 Clafer Instance Generator
 =========================
 
-v0.3.3.14-8-2013
+v0.3.4.20-9-2013
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
 overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
@@ -90,7 +90,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG v0.3.3.14-8-2013
+ClaferIG v0.3.4.20-9-2013
 
 igargs [OPTIONS] FILE
 
@@ -136,7 +136,7 @@ Common flags:
 ### Interactive Session Usage
 In the interactive mode, the users can invoke the following commands by pressing the first letter of the command name or the whole command as marked by boldface:
 
-ClaferIG v0.3.3.14-8-2013
+ClaferIG v0.3.4.20-9-2013
 
 * [tab] - print the available commands or auto-complete command name, a clafer name, or clafer instance name in a given context
 * **n**ext or **[enter]** - to produce the next instance if available, a counterexample, or to output a message that no more instances exist within the given scope
