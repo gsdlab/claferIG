@@ -8,19 +8,28 @@ overconstraining of the model. The instance generator can also be used programma
 
 For more information, see [technical report](http://gsd.uwaterloo.ca/node/462).
 
+Contributors
+------------
+
+* [Jimmy Liang](http://gsd.uwaterloo.ca/jliang), MSc. Candidate. Main developer.
+* [Michał Antkiewicz](http://gsd.uwaterloo.ca/mantkiew), Research Engineer. Requirements, development, architecture, testing, technology transfer.
+* Luke Michael Brown, co-op student May-Aug 2013. Many improvements.
+
 Getting Clafer Tools
 --------------------
 
-Binary distributions of Clafer and ClaferIG for Windows, Mac, and Linux, can be downloaded from [Clafer Tools - Binary Distributions](http://gsd.uwaterloo.ca/node/516). 
-Clafer Wiki requires Haskell Platform and MinGW to run on Windows.
+Binary distributions of release 0.3.4 of 
+Clafer, 
+ClaferIG, 
+ClaferWiki, 
+ClaferMoo, 
+ClaferMooVisualizer, 
+and ClaferConfigurator 
+for Windows, Mac, and Linux, 
+can be downloaded from [Clafer Tools - Binary Distributions](http://gsd.uwaterloo.ca/node/516). 
+Clafer Wiki requires Haskell Platform and MinGW to run on Windows. 
 
 In case these binaries do not work on your particular machine configuration, the tools can be easily built from source code, as described below.
-
-The following tools are not part of the binary distribution and they have to be downloaded separately:
-
-* [ClaferMOO](https://github.com/gsdlab/ClaferMooStandalone) is a set of scripts in Python (cross-platform). 
-* [ClaferMooVisualizer](https://github.com/gsdlab/ClaferMooVisualizer) is a client/server web application written JavaScript.
-* [ClaferConfigurator](https://github.com/gsdlab/ClaferConfigurator) is a client/server web application written JavaScript.
 
 ### Dependencies for running
 
@@ -57,7 +66,7 @@ On Windows
 
 ### Important: Branches must correspond
 
-Clafer, ClaferIG, ClaferWiki, ClaferMoo, and ClaferMooVisualizer are following the *simultaneous release model*. 
+Clafer, ClaferIG, ClaferWiki, ClaferMoo,  ClaferMooVisualizer, and ClaferConfigurator are following the *simultaneous release model*. 
 The branch `master` contains releases, whereas the branch `develop` contains code under development. 
 When building the tools, the branches should match:
 Releases `clafer/master` and `claferIG/master` are guaranteed to work well together.
@@ -272,7 +281,10 @@ The Clafer instance generator:
 
 Need help?
 ==========
-
 * See [Project's website](http://gsd.uwaterloo.ca/clafer) for news, technical reports and more
-* Try live instance of [ClaferWiki](http://gsd.uwaterloo.ca:5001) - it contains many example models.
-* Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `clafer` (so that we know what they are related to) and with `kacper-bak`, `jimmy-liang`, or `michal` (so that Kacper, Jimmy, or Michał gets a notification).
+  * Check out a [Clafer tutorial](http://gsd.uwaterloo.ca/node/310)
+  * Try live instance of [ClaferWiki](http://t3-necsis.cs.uwaterloo.ca:8091)
+  * Try [Online translator](http://gsd.uwaterloo.ca/clafer/translator)
+* Take a look at incomplete [Clafer wiki](https://github.com/gsdlab/clafer/wiki)
+* Browse example models in the [test suite](https://github.com/gsdlab/clafer/tree/master/test/positive) and [MOO examples](https://github.com/gsdlab/clafer/tree/master/spl_configurator/dataset)
+* Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `claferig` (so that we know what they are related to) and with `kacper-bak`, `jimmy-liang`, or `michal` (so that Kacper, Jimmy, or Michał gets a notification).
