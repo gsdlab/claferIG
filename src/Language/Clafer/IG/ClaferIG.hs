@@ -182,9 +182,6 @@ load                 igArgs    =
         lift $ AlloyIG.sendLoadCommand alloyModel
         lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
 
-        -- sigs <- lift $ AlloyIG.getSigs
-        -- let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
-
         let fQNameUIDMap = deriveFQNameUIDMap ir
 
         let info = Analysis.gatherInfo ir 
@@ -195,7 +192,7 @@ load                 igArgs    =
     editMap :: (Map.Map Span [Ir]) -> (Map.Map Integer String) -- Map Line Number to Clafer Name
     editMap = 
         fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case (getIClafer ir) of 
-            Just (IClafer _ _ _ i _ _ _ _ _) -> (num, i) : acc
+            Just (IClafer _ _ _ _ uid' _ _ _ _) -> (num, uid') : acc
             _ -> acc) [] . tail . (Data.List.foldr (\x acc -> case x of
                 ((Span (Pos l1 _) (Pos l2 _)), irs)                 -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
                 ((PosSpan _ (Pos l1 _) (Pos l2 _)), irs)            -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc

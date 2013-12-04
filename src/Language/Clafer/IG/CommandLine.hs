@@ -266,13 +266,15 @@ runCommandLine =
         do
             globalScope <- lift getGlobalScope
             outputStrLn $ "Global scope = " ++ show globalScope
-            scopes <- lift getScopes
+            originalScopes <- lift getScopes
+            -- remove the "this/" prefix
+            let scopes = map ( \ (uid', val') -> (drop 5 uid', val') ) originalScopes
             mapM_ printScope scopes
             nextLoop context
             
             where
             printScope (sigName, value)  =
-                outputStrLn $ "  " ++ (drop 5 sigName) ++ " scope = " ++ show value
+                outputStrLn $ "  " ++ sigName ++ " scope = " ++ show value
                     
 
     loop (Find name) context =
@@ -287,10 +289,12 @@ runCommandLine =
 
     loop ShowClaferModel context =
         do
-            scopes <- lift getScopes
+            originalScopes <- lift getScopes
+            -- remove the "this/" prefix
+            let scopes = map ( \ (uid', val') -> (drop 5 uid', val') ) originalScopes
             globalScope' <- lift getGlobalScope
 
-            env <- lift getClaferEnv
+            env <- lift getClaferEnv 
             constraints' <- lift getConstraints
             AlloyIG.UnsatCore core <- lift $ ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
             let unSATs = map getConstraintInfo $ catMaybes $ findRemovable env core constraints'
@@ -311,7 +315,9 @@ runCommandLine =
                 editLines :: [Integer] -> [String] -> Int -> Int -> [(String, Integer)] -> (Map.Map Integer String) -> [(Integer, String)] -> [String]
                 editLines _ _ _ _ _ _ [] = []
                 editLines cLines unSATs m1 m2 s lineMap ((num, l):rest) = 
-                    if (num `elem` cLines && isEmptyLine l) then editLines cLines unSATs m1 m2 s lineMap rest else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s (Map.lookup num lineMap))) : editLines cLines unSATs m1 m2 s lineMap rest
+                    if (num `elem` cLines && isEmptyLine l) 
+                        then editLines cLines unSATs m1 m2 s lineMap rest 
+                        else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s (Map.lookup num lineMap))) : editLines cLines unSATs m1 m2 s lineMap rest
 
                 isUnSAT :: [String] -> String -> Integer -> Bool
                 isUnSAT us l ln = getAny $ foldMap (\u -> Any (((safehead $ words u) == (safehead $ words l) && (safehead $ reverse $ words u) == (safehead $ reverse $ words l)) || (u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == show ln))) us
