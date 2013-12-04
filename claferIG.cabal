@@ -20,8 +20,7 @@ source-repository head
     location:       git://github.com/gsdlab/claferIG.git
 Executable claferIG
     build-tools:    ghc >= 7.6.3
-    default-language:
-                    Haskell2010
+    default-language: Haskell2010
     default-extensions:
                     DeriveDataTypeable
     Main-is:        Main.hs
@@ -29,6 +28,7 @@ Executable claferIG
                     base >= 4.6.0.1 && < 5,
                     clafer == 0.3.5, 
                     claferIG == 0.3.5,
+                    data-stringmap >= 0.9.1,                    
                     cmdargs >= 0.10.5, 
                     containers >= 0.4.2.1,  
                     directory >= 1.2.0.1, 
@@ -52,10 +52,8 @@ Executable claferIG
 
 library 
     build-tools:    ghc >= 7.6.3
-    default-language:
-                    Haskell2010
-    default-extensions:
-                    DeriveDataTypeable
+    default-language: Haskell2010
+    default-extensions: DeriveDataTypeable
     build-depends:  array >= 0.4.0.1,
                     base >= 4.6.0.1 && < 5,
                     containers >= 0.4.2.1,
@@ -69,6 +67,7 @@ library
                     QuickCheck >= 2.5.1.1, 
                     transformers >= 0.3.0.0,
 
+                    data-stringmap >= 0.9.1,
                     cmdargs >= 0.10.5, 
                     executable-path >= 0.0.3, 
                     haskeline >= 0.7.0.3,
@@ -97,6 +96,7 @@ library
 
 Test-Suite test-suite
     type:           exitcode-stdio-1.0 
+    default-language: Haskell2010
     main-is:        test-suite.hs
     hs-source-dirs: test
     build-depends:  array >= 0.4.0.1,
@@ -112,6 +112,7 @@ Test-Suite test-suite
                     QuickCheck >= 2.5.1.1, 
                     transformers >= 0.3.0.0,
 
+                    data-stringmap >= 0.9.1,
                     cmdargs >= 0.10.5, 
                     executable-path >= 0.0.3, 
                     haskeline >= 0.7.0.3,
