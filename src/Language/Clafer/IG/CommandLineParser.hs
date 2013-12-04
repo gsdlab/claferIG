@@ -186,7 +186,7 @@ number = read `liftM` many1 digit
 
 
 clafer :: Parser String        
-clafer = many1 (letter <?> "clafer")
+clafer = many1 ((alphaNum <|> char ':' <|> char '_') <?> "clafer")
 
 
 claferInstance :: Parser String
