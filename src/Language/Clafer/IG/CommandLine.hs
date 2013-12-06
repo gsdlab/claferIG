@@ -227,34 +227,34 @@ runCommandLine =
             lift $ solve
             nextLoop context
 
-    loop (IncreaseGlobalScope i) context =
+    loop (IncreaseGlobalScope inc') context =
         do
             globalScope <- lift getGlobalScope
             bitwidth' <- lift getBitwidth
-            lift $ setGlobalScope (globalScope+i)
-            when ((globalScope+i) > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+            let newGlobalScope = globalScope+inc'
+            lift $ setGlobalScope newGlobalScope
+            when (newGlobalScope > ((2 ^ (bitwidth' - 1)) - 1)) $ do
                 liftIO $ putStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
-                lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (globalScope+i)
+                lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat newGlobalScope
                 newBw <- lift getBitwidth
                 when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
 
             oldScopes <- lift getScopes
-            forM oldScopes (\(sigName, value) -> do
-                bw <- lift getBitwidth
-                when ((value+i) > ((2 ^ (bw - 1)) - 1)) $ do
-                    liftIO $ putStrLn $ "Warning! Requested scope for " ++ sigName ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
-                    lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (value+i)
-                    newBw <- lift getBitwidth
-                    when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down.")
-
-            lift $ mapM (increaseScope i) oldScopes
-
+            lift $ mapM ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (val'+inc') (sigToClaferName sigName') sigName') oldScopes
             lift solve    
-            outputStrLn ("Global scope increased to " ++ show (globalScope+i))
+            outputStrLn ("Global scope increased to " ++ show newGlobalScope)
             nextLoop context
-    loop (SetGlobalScope i) context =
+    loop (SetGlobalScope newGlobalScope) context =
         do
-            liftIO $ putStrLn $ "SetGlobalScope: " ++ show i
+            bitwidth' <- lift getBitwidth
+            lift $ setGlobalScope newGlobalScope
+            when (newGlobalScope > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+                liftIO $ putStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat newGlobalScope
+                newBw <- lift getBitwidth
+                when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+            lift solve    
+            outputStrLn ("Global scope set to " ++ show newGlobalScope)
             nextLoop context
 
     loop (IncreaseScope fqName inc') context =
@@ -262,16 +262,25 @@ runCommandLine =
             try $ do
                 fQNameUIDMap' <- lift $ lift $ getFQNameUIDMap
                 let uids = findUIDsByFQName fQNameUIDMap' fqName
+                let sigs = map ((++) "this/") uids
                 bitwidth' <- lift $ lift getBitwidth
 
-                lift $ lift $ mapM_ (incAlloyScope bitwidth' inc' fqName) uids
+                lift $ lift $ mapM_ (incAlloyScopeAndBitwidth bitwidth' inc' fqName) sigs
                 
                 lift $ lift $ solve
             nextLoop context
 
-    loop (SetScope fqName i) context =
+    loop (SetScope fqName val') context =
         do
-            liftIO $ putStrLn $ "SetScope: " ++ fqName ++ "=" ++ show i
+            try $ do
+                fQNameUIDMap' <- lift $ lift $ getFQNameUIDMap
+                let uids = findUIDsByFQName fQNameUIDMap' fqName
+                let sigs = map ((++) "this/") uids
+                bitwidth' <- lift $ lift getBitwidth
+
+                lift $ lift $ mapM_ (setAlloyScopeAndBitwidth bitwidth' val' fqName) sigs
+                
+                lift $ lift $ solve
             nextLoop context
 
     loop ShowScope context =
@@ -280,13 +289,12 @@ runCommandLine =
             outputStrLn $ "Global scope = " ++ show globalScope
             originalScopes <- lift getScopes
             -- remove the "this/" prefix
-            let scopes = map ( \ (uid', val') -> (drop 5 uid', val') ) originalScopes
-            mapM_ printScope scopes
+            mapM_ printScope originalScopes
             nextLoop context
             
             where
             printScope (sigName, value)  =
-                outputStrLn $ "  " ++ sigName ++ " scope = " ++ show value
+                outputStrLn $ "  " ++ (drop 5 sigName) ++ " scope = " ++ show value
                     
 
     loop (Find name) context =
@@ -418,18 +426,21 @@ runCommandLine =
 
 try :: MonadIO m => ErrorT String (InputT m) a -> InputT m ()
 try e = either outputStrLn (void . return) =<< runErrorT e
-        
-incAlloyScope :: MonadIO m => Integer -> Integer -> String -> UID -> ClaferIGT m ()
-incAlloyScope                 bitwidth'  inc'       fqName'   sigName' = do
+
+incAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> ClaferIGT m ()
+incAlloyScopeAndBitwidth                 bitwidth'  inc'       fqName'   sigName' = do
     scopeValue <- valueOfScope sigName' 
-    let newValue = scopeValue+inc'
-    {-when (newValue > ((2 ^ (bitwidth' - 1)) - 1)) $ do
-        setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ newValue
-        newBw <- lift getBitwidth
+    setAlloyScopeAndBitwidth bitwidth' (scopeValue+inc') fqName' sigName'
+
+setAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> ClaferIGT m ()
+setAlloyScopeAndBitwidth                 bitwidth'  newValue'   fqName'   sigName' = do
+    when (newValue' > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+        setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ newValue'
+        newBw <- getBitwidth
         liftIO $ putStrLn $ "Warning! Requested scope for " ++ fqName' ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
-        when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."-}
-    setAlloyScope newValue sigName'
-    liftIO $ putStrLn $ "Scope of " ++ sigName' ++ " increased to " ++ show newValue
+        when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, Alloy may be using a large amount of memory. This may cause slow down."
+    setAlloyScope newValue' sigName'
+    liftIO $ putStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") increased to " ++ show newValue'    
 
 mergeScopes :: MonadIO m => [(UID, Integer)] -> [(UID, Integer)] -> ClaferIGT m ()
 mergeScopes _ [] = return()

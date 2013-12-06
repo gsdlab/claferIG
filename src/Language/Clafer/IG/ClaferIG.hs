@@ -57,7 +57,8 @@ module Language.Clafer.IG.ClaferIG (
     findRemovable,
     fst3,
     getlineNumMap,
-    strictReadFile) where
+    strictReadFile,
+    sigToClaferName) where
 
 import Language.Clafer
 import Language.ClaferT
@@ -285,7 +286,7 @@ setScope value (sigName, _) = setAlloyScope value sigName
 setAlloyScope :: MonadIO m => Integer -> String -> ClaferIGT m (Either String ())
 setAlloyScope value sigName =
     do
-        subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand ("this/" ++ sigName) value
+        subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName value
         runErrorT $ maybe (return ()) throwError $ sigToClaferName <$> subset
 
 
