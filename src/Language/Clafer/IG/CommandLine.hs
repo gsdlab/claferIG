@@ -172,26 +172,29 @@ runCommandLine =
                 "| " ++ claferIGVersion ++ " |\n" ++
                 "---------------------------\n\n" ++
                 "You can invoke the following commands as indicated by single quotes:\n" ++
-                "[tab]           - print the available commands\n" ++ 
-                "                - auto-complete command name, a clafer name, or clafer instance name in a given context\n" ++
-                "'n'ext, [enter] - to produce the next instance if available or to output a message that no more \n" ++
-                "                  instances exist within the given scope\n" ++
-                "'i'ncrease      - to increase the maximum number of instances of a given clafer or all clafers (scope)\n" ++
-                "'s'ave          - to save all instances displayed so far or a counterexample to files named \n" ++
-                "                  <model file name>.cfr.<instance number>.data, one instance per file\n" ++
-                "'q'uit          - to quit the interactive session\n" ++
-                "'r'eload        - to reload your clafer model\n" ++
-                "'h'elp          - to display this menu options summary\n" ++
-                "'scope'         - to print out the values of the global scope and individual Clafer scopes\n" ++
+                "[tab]              - print the available commands\n" ++ 
+                "                   - auto-complete command name, a clafer name, or clafer instance name in a given context\n" ++
+                "'n'ext, [enter]    - to produce the next instance if available or to output a message that no more \n" ++
+                "                     instances exist within the given scope\n" ++
+                "'i'ncrease         - to increase the maximum number of instances of a given clafer or all clafers (scope)\n" ++
+                "'s'et              - to set the maximum number of instances of a given clafer or all clafers (scope)\n" ++                
+                "sa'v'e             - to save all instances displayed so far or a counterexample to files named \n" ++
+                "                     <model file name>.cfr.<instance number>.data, one instance per file\n" ++
+                "'q'uit             - to quit the interactive session\n" ++
+                "'r'eload           - to reload your clafer model\n" ++
+                "'h'elp             - to display this menu options summary\n" ++
+                "'scope'            - to print out the values of the global scope and individual Clafer scopes\n" ++
                 "'setUnsatCoreMinimization' - to choose UnSAT core minimization strategy [fastest | medium | best]. Default: fastest\n" ++ 
-                "'claferModel'   - to print out the original Clafer model verbatim\n" ++
-                "'alloyModel'    - to print out the output of Clafer translator verbatim\n" ++
-                "'alloyInstance' - to print out the Alloy xml document of the most recent solution\n" ++
-                "'f'ind          - to print a Clafer with given name found in the most recent solution\n\n" ++
+                "'c', 'claferModel' - to print out the original Clafer model verbatim\n" ++
+                "'a', 'alloyModel'  - to print out the output of Clafer translator verbatim\n" ++
+                "'alloyInstance'    - to print out the Alloy xml document of the most recent solution\n" ++
+                "'f'ind             - to print a Clafer with given name found in the most recent solution\n\n" ++
                 "Parameterized command usage:\n" ++
                 "'i [enter]'         - to increase for all clafers by 1\n" ++
                 "'i <name> [enter]'  - to increase for the clafer <name> by 1\n" ++
                 "'i <name> <number>' - to increase for the clafer <name> by <number>\n" ++
+                "'s <number> [enter]'- to set for the clafers to <number>\n" ++
+                "'s <name> <number>' - to set for the clafer <name> to <number>\n" ++
                 "'f <name>'          - to display a clafer <name>\n" ++
                 "'setUnsatCoreMinimization fastest' - fastest but the worst\n" ++ 
                 "'setUnsatCoreMinimization medium'\n" ++ 
@@ -249,7 +252,11 @@ runCommandLine =
             lift solve    
             outputStrLn ("Global scope increased to " ++ show (globalScope+i))
             nextLoop context
-            
+    loop (SetGlobalScope i) context =
+        do
+            liftIO $ putStrLn $ "SetGlobalScope: " ++ show i
+            nextLoop context
+
     loop (IncreaseScope fqName inc') context =
         do
             try $ do
@@ -260,6 +267,11 @@ runCommandLine =
                 lift $ lift $ mapM_ (incAlloyScope bitwidth' inc' fqName) uids
                 
                 lift $ lift $ solve
+            nextLoop context
+
+    loop (SetScope fqName i) context =
+        do
+            liftIO $ putStrLn $ "SetScope: " ++ fqName ++ "=" ++ show i
             nextLoop context
 
     loop ShowScope context =
