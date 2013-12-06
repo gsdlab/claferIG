@@ -31,7 +31,22 @@ import Data.Functor.Identity
 
 
 
-data Command = Next | IncreaseGlobalScope Integer | IncreaseScope String Integer | SetGlobalScope Integer | SetScope String Integer | Save | Quit | Reload | Help | Find String | ShowScope | ShowClaferModel | ShowAlloyModel | ShowAlloyInstance | SetUnsatCoreMinimization UnsatCoreMinimization deriving Show
+data Command = Next | 
+               IncreaseGlobalScope Integer | 
+               IncreaseScope String Integer | 
+               SetGlobalScope Integer | 
+               SetScope String Integer | 
+               SetBitwidth Integer | 
+               Save | 
+               Quit | 
+               Reload | 
+               Help | 
+               Find String | 
+               ShowScope | 
+               ShowClaferModel | 
+               ShowAlloyModel | 
+               ShowAlloyInstance | 
+               SetUnsatCoreMinimization UnsatCoreMinimization deriving Show
 
 
 data UnsatCoreMinimization = Fastest | Medium | Best deriving Show
@@ -106,6 +121,7 @@ commandMap =
     ("h", helpCommand):
     ("i", increaseCommand):
     ("s", setCommand):
+    ("b", setBitwidthCommand):
     ("n", nextCommand):
     ("f", findCommand):
     ("q", quitCommand):
@@ -127,6 +143,8 @@ increaseCommand :: Parser Command
 increaseCommand          = increaseGlobalScope
 setCommand :: Parser Command
 setCommand               = setGlobalScope
+setBitwidthCommand :: Parser Command
+setBitwidthCommand       = setBitwidth
 nextCommand :: ParsecT String () Identity Command
 nextCommand              = return Next
 quitCommand :: ParsecT String () Identity Command
@@ -203,6 +221,13 @@ explicitSetScope =
         gap
         i <- number
         return (SetScope name i)
+
+setBitwidth :: Parser Command
+setBitwidth =
+    do
+        gap
+        b <- number
+        return $ SetBitwidth b
 
 number :: Parser Integer
 number = read `liftM` many1 digit

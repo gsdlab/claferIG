@@ -178,6 +178,7 @@ runCommandLine =
                 "                     instances exist within the given scope\n" ++
                 "'i'ncrease         - to increase the maximum number of instances of a given clafer or all clafers (scope)\n" ++
                 "'s'et              - to set the maximum number of instances of a given clafer or all clafers (scope)\n" ++                
+                "'b'itwidth         - to set the bitwidth\n" ++                
                 "sa'v'e             - to save all instances displayed so far or a counterexample to files named \n" ++
                 "                     <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                 "'q'uit             - to quit the interactive session\n" ++
@@ -283,6 +284,15 @@ runCommandLine =
                 lift $ lift $ solve
             nextLoop context
 
+    loop (SetBitwidth newBitwidth) context =
+        do 
+            when (newBitwidth >=4) $ do
+                lift $ setBitwidth newBitwidth
+                when (newBitwidth > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBitwidth ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+                lift solve    
+                outputStrLn ("Bitwidth set to " ++ show newBitwidth)
+            nextLoop context
+
     loop ShowScope context =
         do
             globalScope <- lift getGlobalScope
@@ -309,6 +319,8 @@ runCommandLine =
 
     loop ShowClaferModel context =
         do
+            bitwidth' <- lift getBitwidth
+            outputStrLn $ "bitwidth = " ++ show bitwidth'
             originalScopes <- lift getScopes
             -- remove the "this/" prefix
             let scopes = map ( \ (uid', val') -> (drop 5 uid', val') ) originalScopes
