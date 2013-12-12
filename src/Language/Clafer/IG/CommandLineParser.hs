@@ -187,17 +187,12 @@ setGlobalScope =
 
 explicitIncreaseGlobalScope :: Parser Command
 explicitIncreaseGlobalScope =
-    do
-        i <- number
-        return $ IncreaseGlobalScope i
+    fmap IncreaseGlobalScope number
     <|>
     increaseScope
 
 explicitSetGlobalScope :: Parser Command
-explicitSetGlobalScope =
-    do
-        i <- number
-        return $ SetGlobalScope i
+explicitSetGlobalScope = fmap SetGlobalScope number
     
 increaseScope :: Parser Command
 increaseScope = 
@@ -209,10 +204,7 @@ increaseScope =
             return (IncreaseScope name 1)
             
 explicitIncreaseScope :: String -> Parser Command
-explicitIncreaseScope name =
-    do
-        i <- number
-        return $ IncreaseScope name i
+explicitIncreaseScope name = fmap (IncreaseScope name) number
 
 explicitSetScope :: Parser Command
 explicitSetScope =

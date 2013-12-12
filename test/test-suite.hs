@@ -22,6 +22,7 @@
  -}
 import Language.Clafer.IG.ClaferIG
 import Language.Clafer.IG.ClaferModel
+import Language.Clafer.IG.CommandLine
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Maybe

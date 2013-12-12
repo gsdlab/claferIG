@@ -206,7 +206,7 @@ runCommandLine =
             
     loop Save context@Context{saved=saved, unsaved=unsaved} =
         do
-            lift $ save unsaved (toInteger $ length saved)
+            save unsaved (toInteger $ length saved)
             nextLoop context{saved=unsaved ++ saved, unsaved=[]}
 
     loop Reload context =
@@ -224,7 +224,7 @@ runCommandLine =
             newScopes <- lift getScopes
             lift $ setBitwidth $ findNecessaryBitwidth ir oldBw $ snd $ unzip newScopes
             newBw <- lift getBitwidth
-            when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+            when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
             lift $ solve
             nextLoop context
 
@@ -235,13 +235,13 @@ runCommandLine =
             let newGlobalScope = globalScope+inc'
             lift $ setGlobalScope newGlobalScope
             when (newGlobalScope > ((2 ^ (bitwidth' - 1)) - 1)) $ do
-                liftIO $ putStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                outputStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
                 lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat newGlobalScope
                 newBw <- lift getBitwidth
-                when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+                when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
 
             oldScopes <- lift getScopes
-            lift $ mapM ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (val'+inc') (sigToClaferName sigName') sigName') oldScopes
+            mapM ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (val'+inc') (sigToClaferName sigName') sigName') oldScopes
             lift solve    
             outputStrLn ("Global scope increased to " ++ show newGlobalScope)
             nextLoop context
@@ -250,10 +250,10 @@ runCommandLine =
             bitwidth' <- lift getBitwidth
             lift $ setGlobalScope newGlobalScope
             when (newGlobalScope > ((2 ^ (bitwidth' - 1)) - 1)) $ do
-                liftIO $ putStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                outputStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
                 lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat newGlobalScope
                 newBw <- lift getBitwidth
-                when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+                when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
             lift solve    
             outputStrLn ("Global scope set to " ++ show newGlobalScope)
             nextLoop context
@@ -263,10 +263,10 @@ runCommandLine =
             try $ do
                 fQNameUIDMap' <- lift $ lift $ getFQNameUIDMap
                 let uids = findUIDsByFQName fQNameUIDMap' fqName
-                let sigs = map ((++) "this/") uids
+                let sigs = map ("this/" ++) uids
                 bitwidth' <- lift $ lift getBitwidth
 
-                lift $ lift $ mapM_ (incAlloyScopeAndBitwidth bitwidth' inc' fqName) sigs
+                lift $ mapM_ (incAlloyScopeAndBitwidth bitwidth' inc' fqName) sigs
                 
                 lift $ lift $ solve
             nextLoop context
@@ -279,7 +279,7 @@ runCommandLine =
                 let sigs = map ((++) "this/") uids
                 bitwidth' <- lift $ lift getBitwidth
 
-                lift $ lift $ mapM_ (setAlloyScopeAndBitwidth bitwidth' val' fqName) sigs
+                lift $ mapM_ (setAlloyScopeAndBitwidth bitwidth' val' fqName) sigs
                 
                 lift $ lift $ solve
             nextLoop context
@@ -288,7 +288,7 @@ runCommandLine =
         do 
             when (newBitwidth >=4) $ do
                 lift $ setBitwidth newBitwidth
-                when (newBitwidth > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBitwidth ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+                when (newBitwidth > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBitwidth ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
                 lift solve    
                 outputStrLn ("Bitwidth set to " ++ show newBitwidth)
             nextLoop context
@@ -425,34 +425,34 @@ runCommandLine =
                         Left msg    -> outputStrLn (show msg) >> nextLoop context
                         Right command -> loop command context
     
-    save :: MonadIO m => [ClaferModel] -> Integer -> ClaferIGT m ()
+    save :: MonadIO m => [ClaferModel] -> Integer -> InputT (ClaferIGT m) ()
     save [] _ = return ()
     save (c:cs) counter = do
-        claferIGArgs' <- getClaferIGArgs
+        claferIGArgs' <- lift $ getClaferIGArgs
         let 
             claferModelFile' = claferModelFile claferIGArgs'
             saveName = claferModelFile' ++ "." ++ (show counter) ++ ".data"
         liftIO $ writeFile saveName (show c)
-        liftIO $ putStrLn $ "Saved to " ++ saveName
+        outputStrLn $ "Saved to " ++ saveName
         save cs (counter + 1)
 
 try :: MonadIO m => ErrorT String (InputT m) a -> InputT m ()
 try e = either outputStrLn (void . return) =<< runErrorT e
 
-incAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> ClaferIGT m ()
+incAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
 incAlloyScopeAndBitwidth                 bitwidth'  inc'       fqName'   sigName' = do
-    scopeValue <- valueOfScope sigName' 
+    scopeValue <- lift $ valueOfScope sigName' 
     setAlloyScopeAndBitwidth bitwidth' (scopeValue+inc') fqName' sigName'
 
-setAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> ClaferIGT m ()
+setAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
 setAlloyScopeAndBitwidth                 bitwidth'  newValue'   fqName'   sigName' = do
     when (newValue' > ((2 ^ (bitwidth' - 1)) - 1)) $ do
-        setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ newValue'
-        newBw <- getBitwidth
-        liftIO $ putStrLn $ "Warning! Requested scope for " ++ fqName' ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
-        when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, Alloy may be using a large amount of memory. This may cause slow down."
-    setAlloyScope newValue' sigName'
-    liftIO $ putStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") increased to " ++ show newValue'    
+        lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ newValue'
+        newBw <- lift $ getBitwidth
+        outputStrLn $ "Warning! Requested scope for " ++ fqName' ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
+        when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, Alloy may be using a large amount of memory. This may cause slow down."
+    lift $ setAlloyScope newValue' sigName'
+    outputStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") increased to " ++ show newValue'    
 
 mergeScopes :: MonadIO m => [(UID, Integer)] -> [(UID, Integer)] -> ClaferIGT m ()
 mergeScopes _ [] = return()
