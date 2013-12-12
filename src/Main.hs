@@ -93,8 +93,7 @@ runClaferIG args' =
         env <- getClaferEnv
         let ir = fst3 $ fromJust $ cIr env
         scopes <- getScopes
-        scopeVals <- mapM valueOfScope scopes
-        setBitwidth $ findNecessaryBitwidth ir oldBw scopeVals
+        setBitwidth $ findNecessaryBitwidth ir oldBw $ map snd scopes
         solve
         case all args' of
             Just scope ->

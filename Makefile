@@ -111,7 +111,7 @@ lib:
 		cp lib/$(LIB) lib; \
 	fi
 	
-runTests:
+test:
 	# Only test a subset of the suite. The other cases do not work yet.
 	cabal configure --enable-tests
 	cabal build

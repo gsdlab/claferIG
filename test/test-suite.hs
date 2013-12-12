@@ -23,8 +23,6 @@
 import Language.Clafer.IG.ClaferIG
 import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLine
-import Language.Clafer.IG.Solution
-import Language.Clafer.IG.Sugarer
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Maybe
@@ -36,25 +34,35 @@ import Prelude hiding (all)
 import Test.Framework
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2
 import Test.HUnit
-import Test.QuickCheck
-import System.Console.Haskeline
 
+tg_testsuite :: Test.Framework.Test
 tg_testsuite = $(testGroupGenerator)
 
+main :: IO ()
 main = defaultMain[tg_testsuite]
 
+claferIGArgsDef :: IGArgs
 claferIGArgsDef = IGArgs {
     all             = def,
     saveDir         = def,
-    bitwidth        = 4,
-    alloySolution   = False,
     claferModelFile = def,
+    alloySolution   = False,
+    bitwidth        = 4,
+
+
     useUids         = False,
     addTypes        = False,
-    json            = False 
+    json            = False,
+    flatten_inheritance_comp = False,
+    no_layout_comp = False,
+    check_duplicates_comp = False,
+    skip_resolver_comp = False,
+    scope_strategy_comp = def
 } &= summary claferIGVersion
+
+
+
 
 defaultIGArgs :: FilePath -> IGArgs
 --defaultIGArgs fPath = IGArgs Nothing Nothing fPath False 4 False False False
@@ -72,11 +80,11 @@ getModel fPath = runClaferIGT (defaultIGArgs fPath) $ do
 	next
 	where
 		savePath :: FilePath -> IORef Int -> IO FilePath
-		savePath fPath counterRef =
+		savePath fPath' counterRef =
 		    do
 		        counter <- readIORef counterRef
 		        writeIORef counterRef (counter + 1)
-		        return $ fPath ++ "." ++ (show counter) ++ ".data"
+		        return $ fPath' ++ "." ++ (show counter) ++ ".data"
 		underDirectory :: FilePath -> FilePath -> IO FilePath
 		underDirectory dir file =
 		    do
@@ -98,6 +106,13 @@ case_strMapCheck = do
 			valueCheck (Just (IntValue _)) = False
 			valueCheck (Just (StringValue _)) = True
 			
-
+case_pickLargerScope :: Assertion
+case_pickLargerScope = do
+    let
+        oldScopes = [ ("c0_1", 1), ("c1_b", 2), ("c0_x", 5) ]
+        newScopes = [ ("c0_1", 2), ("c0_b", 2), ("c1_b", 1)]
+        mergedScopes = map (pickLargerScope oldScopes) newScopes
+    
+    mergedScopes @?= [ ("c0_1", 2), ("c0_b", 2), ("c1_b", 2)]
 
 

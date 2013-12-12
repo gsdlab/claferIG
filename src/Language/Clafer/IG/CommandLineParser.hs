@@ -31,7 +31,22 @@ import Data.Functor.Identity
 
 
 
-data Command = Next | IncreaseGlobalScope Integer | IncreaseScope String Integer | Save | Quit | Reload | Help | Find String | ShowScope | ShowClaferModel | ShowAlloyModel | ShowAlloyInstance | SetUnsatCoreMinimization UnsatCoreMinimization deriving Show
+data Command = Next | 
+               IncreaseGlobalScope Integer | 
+               IncreaseScope String Integer | 
+               SetGlobalScope Integer | 
+               SetScope String Integer | 
+               SetBitwidth Integer | 
+               Save | 
+               Quit | 
+               Reload | 
+               Help | 
+               Find String | 
+               ShowScope | 
+               ShowClaferModel | 
+               ShowAlloyModel | 
+               ShowAlloyInstance | 
+               SetUnsatCoreMinimization UnsatCoreMinimization deriving Show
 
 
 data UnsatCoreMinimization = Fastest | Medium | Best deriving Show
@@ -105,14 +120,18 @@ commandMap :: [(String, Parser Command)]
 commandMap =
     ("h", helpCommand):
     ("i", increaseCommand):
+    ("s", setCommand):
+    ("b", setBitwidthCommand):
     ("n", nextCommand):
     ("f", findCommand):
     ("q", quitCommand):
-    ("s", saveCommand):
+    ("v", saveCommand):
     ("r", reloadCommand):
     ("scope", scopeCommand):
     ("claferModel", claferModelCommand):
+    ("c", claferModelCommand):
     ("alloyModel", alloyModelCommand):
+    ("a", alloyModelCommand):
     ("alloyInstance", alloyInstanceCommand):
     ("setUnsatCoreMinimization", setUnsatCoreMinimization):
     []
@@ -122,6 +141,10 @@ helpCommand :: ParsecT String () Identity Command
 helpCommand              = return Help
 increaseCommand :: Parser Command
 increaseCommand          = increaseGlobalScope
+setCommand :: Parser Command
+setCommand               = setGlobalScope
+setBitwidthCommand :: Parser Command
+setBitwidthCommand       = setBitwidth
 nextCommand :: ParsecT String () Identity Command
 nextCommand              = return Next
 quitCommand :: ParsecT String () Identity Command
@@ -151,18 +174,25 @@ increaseGlobalScope :: Parser Command
 increaseGlobalScope =
     do
         try (gap >> explicitIncreaseGlobalScope)
-        <|>
-        return (IncreaseGlobalScope 1)
+    <|>
+    return (IncreaseGlobalScope 1)
 
+setGlobalScope :: Parser Command
+setGlobalScope =
+    do
+        try (gap >> explicitSetGlobalScope) 
+    <|>
+    do
+        try (gap >> explicitSetScope)
 
 explicitIncreaseGlobalScope :: Parser Command
 explicitIncreaseGlobalScope =
-    do
-        i <- number
-        return $ IncreaseGlobalScope i
+    fmap IncreaseGlobalScope number
     <|>
     increaseScope
 
+explicitSetGlobalScope :: Parser Command
+explicitSetGlobalScope = fmap SetGlobalScope number
     
 increaseScope :: Parser Command
 increaseScope = 
@@ -173,20 +203,30 @@ increaseScope =
             <|>
             return (IncreaseScope name 1)
             
-        
 explicitIncreaseScope :: String -> Parser Command
-explicitIncreaseScope name =
-    do
-        i <- number
-        return $ IncreaseScope name i
+explicitIncreaseScope name = fmap (IncreaseScope name) number
 
+explicitSetScope :: Parser Command
+explicitSetScope =
+    do
+        name <- clafer
+        gap
+        i <- number
+        return (SetScope name i)
+
+setBitwidth :: Parser Command
+setBitwidth =
+    do
+        gap
+        b <- number
+        return $ SetBitwidth b
 
 number :: Parser Integer
 number = read `liftM` many1 digit
 
 
 clafer :: Parser String        
-clafer = many1 (letter <?> "clafer")
+clafer = many1 ((alphaNum <|> char ':' <|> char '_') <?> "clafer")
 
 
 claferInstance :: Parser String

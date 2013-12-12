@@ -22,8 +22,9 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError, findNecessaryBitwidth, intToFloat) where
+module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError, findNecessaryBitwidth, intToFloat, pickLargerScope) where
 
+import Language.Clafer
 import Language.ClaferT
 import Language.Clafer.Intermediate.Intclafer
 import Language.Clafer.IG.ClaferIG
@@ -40,6 +41,7 @@ import Data.IORef
 import Data.List
 import Data.Monoid
 import Data.Foldable (foldMap)
+import qualified Data.StringMap as SMap
 import qualified Data.Map as Map
 import Data.Maybe
 import System.Console.Haskeline
@@ -170,26 +172,30 @@ runCommandLine =
                 "| " ++ claferIGVersion ++ " |\n" ++
                 "---------------------------\n\n" ++
                 "You can invoke the following commands as indicated by single quotes:\n" ++
-                "[tab]           - print the available commands\n" ++ 
-                "                - auto-complete command name, a clafer name, or clafer instance name in a given context\n" ++
-                "'n'ext, [enter] - to produce the next instance if available or to output a message that no more \n" ++
-                "                  instances exist within the given scope\n" ++
-                "'i'ncrease      - to increase the maximum number of instances of a given clafer or all clafers (scope)\n" ++
-                "'s'ave          - to save all instances displayed so far or a counterexample to files named \n" ++
-                "                  <model file name>.cfr.<instance number>.data, one instance per file\n" ++
-                "'q'uit          - to quit the interactive session\n" ++
-                "'r'eload        - to reload your clafer model\n" ++
-                "'h'elp          - to display this menu options summary\n" ++
-                "'scope'         - to print out the values of the global scope and individual Clafer scopes\n" ++
+                "[tab]              - print the available commands\n" ++ 
+                "                   - auto-complete command name, a clafer name, or clafer instance name in a given context\n" ++
+                "'n'ext, [enter]    - to produce the next instance if available or to output a message that no more \n" ++
+                "                     instances exist within the given scope\n" ++
+                "'i'ncrease         - to increase the maximum number of instances of a given clafer or all clafers (scope)\n" ++
+                "'s'et              - to set the maximum number of instances of a given clafer or all clafers (scope)\n" ++                
+                "'b'itwidth         - to set the bitwidth\n" ++                
+                "sa'v'e             - to save all instances displayed so far or a counterexample to files named \n" ++
+                "                     <model file name>.cfr.<instance number>.data, one instance per file\n" ++
+                "'q'uit             - to quit the interactive session\n" ++
+                "'r'eload           - to reload your clafer model\n" ++
+                "'h'elp             - to display this menu options summary\n" ++
+                "'scope'            - to print out the values of the global scope and individual Clafer scopes\n" ++
                 "'setUnsatCoreMinimization' - to choose UnSAT core minimization strategy [fastest | medium | best]. Default: fastest\n" ++ 
-                "'claferModel'   - to print out the original Clafer model verbatim\n" ++
-                "'alloyModel'    - to print out the output of Clafer translator verbatim\n" ++
-                "'alloyInstance' - to print out the Alloy xml document of the most recent solution\n" ++
-                "'f'ind          - to print a Clafer with given name found in the most recent solution\n\n" ++
+                "'c', 'claferModel' - to print out the original Clafer model verbatim\n" ++
+                "'a', 'alloyModel'  - to print out the output of Clafer translator verbatim\n" ++
+                "'alloyInstance'    - to print out the Alloy xml document of the most recent solution\n" ++
+                "'f'ind             - to print a Clafer with given name found in the most recent solution\n\n" ++
                 "Parameterized command usage:\n" ++
                 "'i [enter]'         - to increase for all clafers by 1\n" ++
                 "'i <name> [enter]'  - to increase for the clafer <name> by 1\n" ++
                 "'i <name> <number>' - to increase for the clafer <name> by <number>\n" ++
+                "'s <number> [enter]'- to set for the clafers to <number>\n" ++
+                "'s <name> <number>' - to set for the clafer <name> to <number>\n" ++
                 "'f <name>'          - to display a clafer <name>\n" ++
                 "'setUnsatCoreMinimization fastest' - fastest but the worst\n" ++ 
                 "'setUnsatCoreMinimization medium'\n" ++ 
@@ -200,96 +206,105 @@ runCommandLine =
             
     loop Save context@Context{saved=saved, unsaved=unsaved} =
         do
-            lift $ save unsaved (toInteger $ length saved)
+            save unsaved (toInteger $ length saved)
             nextLoop context{saved=unsaved ++ saved, unsaved=[]}
 
     loop Reload context =
         do
             oldScopes <- lift getScopes
-            let oldScopeNames = map nameOfScope oldScopes
-            oldScopeVals <- lift $ mapM valueOfScope oldScopes
-            runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
-
             oldBw <- lift getBitwidth
+
+            runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
+            
             env <- lift getClaferEnv
             let ir = fst3 $ fromJust $ cIr env
             tempScopes <- lift getScopes
-            lift $ setScopes (zip oldScopeNames oldScopeVals) tempScopes
+            lift $ mergeScopes oldScopes tempScopes
 
             newScopes <- lift getScopes
-            newScopeVals <- lift $ mapM valueOfScope newScopes
-            lift $ setBitwidth $ findNecessaryBitwidth ir oldBw newScopeVals
+            lift $ setBitwidth $ findNecessaryBitwidth ir oldBw $ snd $ unzip newScopes
             newBw <- lift getBitwidth
-            when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+            when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
             lift $ solve
             nextLoop context
-            where
-                setScopes _ [] = return()
-                setScopes old new = let oldval = lookup (nameOfScope $ head new) old
-                                    in if (oldval == Nothing) then (setScopes old $ tail new) else do 
-                                        newVal <- valueOfScope $ head new
-                                        setScope (max newVal $ fromJust oldval) $ head new
-                                        setScopes old $ tail new 
 
-    loop (IncreaseGlobalScope i) context =
+    loop (IncreaseGlobalScope inc') context =
         do
             globalScope <- lift getGlobalScope
             bitwidth' <- lift getBitwidth
-            lift $ setGlobalScope (globalScope+i)
-            when ((globalScope+i) > ((2 ^ (bitwidth' - 1)) - 1)) $ do
-                liftIO $ putStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
-                lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (globalScope+i)
+            let newGlobalScope = globalScope+inc'
+            lift $ setGlobalScope newGlobalScope
+            when (newGlobalScope > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+                outputStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat newGlobalScope
                 newBw <- lift getBitwidth
-                when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+                when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
 
             oldScopes <- lift getScopes
-            oldScopeVals <- lift $ mapM valueOfScope oldScopes
-            forM ((zip oldScopeVals) $ map nameOfScope oldScopes) (\(value, name) -> do
-                bw <- lift getBitwidth
-                when ((value+i) > ((2 ^ (bw - 1)) - 1)) $ do
-                    liftIO $ putStrLn $ "Warning! Requested scope for " ++ name ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
-                    lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (value+i)
-                    newBw <- lift getBitwidth
-                    when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down.")
-
-            lift $ mapM (increaseScope i) oldScopes
-
+            mapM ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (val'+inc') (sigToClaferName sigName') sigName') oldScopes
             lift solve    
-            outputStrLn ("Global scope increased to " ++ show (globalScope+i))
+            outputStrLn ("Global scope increased to " ++ show newGlobalScope)
             nextLoop context
-            
-    loop (IncreaseScope name i) context =
+    loop (SetGlobalScope newGlobalScope) context =
+        do
+            bitwidth' <- lift getBitwidth
+            lift $ setGlobalScope newGlobalScope
+            when (newGlobalScope > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+                outputStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
+                lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat newGlobalScope
+                newBw <- lift getBitwidth
+                when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+            lift solve    
+            outputStrLn ("Global scope set to " ++ show newGlobalScope)
+            nextLoop context
+
+    loop (IncreaseScope fqName inc') context =
         do
             try $ do
-                scope <- ErrorT $ lift $ getScope name
-                scopeValue <- lift $ lift $ valueOfScope scope 
+                fQNameUIDMap' <- lift $ lift $ getFQNameUIDMap
+                let uids = findUIDsByFQName fQNameUIDMap' fqName
+                let sigs = map ("this/" ++) uids
                 bitwidth' <- lift $ lift getBitwidth
-                ErrorT $ lift $ setScope (scopeValue+i) scope
-                lift $ when ((scopeValue+i) > ((2 ^ (bitwidth' - 1)) - 1)) $ do
-                    liftIO $ putStrLn $ "Warning! Requested scope for " ++ (nameOfScope scope) ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
-                    lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ (scopeValue+i)
-                    newBw <- lift getBitwidth
-                    when (newBw > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
-     
-                lift $ lift $ solve
-                lift $ outputStrLn ("Scope of " ++ name ++ " increased to " ++ show (scopeValue+i))
+
+                lift $ mapM_ (incAlloyScopeAndBitwidth bitwidth' inc' fqName) sigs
                 
+                lift $ lift $ solve
             nextLoop context
-            
+
+    loop (SetScope fqName val') context =
+        do
+            try $ do
+                fQNameUIDMap' <- lift $ lift $ getFQNameUIDMap
+                let uids = findUIDsByFQName fQNameUIDMap' fqName
+                let sigs = map ((++) "this/") uids
+                bitwidth' <- lift $ lift getBitwidth
+
+                lift $ mapM_ (setAlloyScopeAndBitwidth bitwidth' val' fqName) sigs
+                
+                lift $ lift $ solve
+            nextLoop context
+
+    loop (SetBitwidth newBitwidth) context =
+        do 
+            when (newBitwidth >=4) $ do
+                lift $ setBitwidth newBitwidth
+                when (newBitwidth > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBitwidth ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+                lift solve    
+                outputStrLn ("Bitwidth set to " ++ show newBitwidth)
+            nextLoop context
+
     loop ShowScope context =
         do
             globalScope <- lift getGlobalScope
             outputStrLn $ "Global scope = " ++ show globalScope
-            scopes <- lift getScopes
-            mapM_ printScope scopes
+            originalScopes <- lift getScopes
+            -- remove the "this/" prefix
+            mapM_ printScope originalScopes
             nextLoop context
             
             where
-            printScope scope =
-                do
-                    let name = nameOfScope scope
-                    value <- lift $ valueOfScope scope
-                    outputStrLn $ "  " ++ name ++ " scope = " ++ show value
+            printScope (sigName, value)  =
+                outputStrLn $ "  " ++ (drop 5 sigName) ++ " scope = " ++ show value
                     
 
     loop (Find name) context =
@@ -297,18 +312,21 @@ runCommandLine =
             case (unsaved context ++ saved context) of
                 model:_ ->
                     case find ((name ==) . c_name) $ traverse model of
-                        Just clafer -> outputStrLn $ show clafer
+                        Just clafer' -> outputStrLn $ show clafer'
                         Nothing -> outputStrLn $ "\"" ++ name ++ "\" not found in the model."
                 []  -> outputStrLn $ "No instance"
             nextLoop context
 
     loop ShowClaferModel context =
         do
-            scopes <- lift getScopes
-            scopeVals <- lift $ mapM valueOfScope scopes
+            bitwidth' <- lift getBitwidth
+            outputStrLn $ "bitwidth = " ++ show bitwidth'
+            originalScopes <- lift getScopes
+            -- remove the "this/" prefix
+            let scopes = map ( \ (uid', val') -> (drop 5 uid', val') ) originalScopes
             globalScope' <- lift getGlobalScope
 
-            env <- lift getClaferEnv
+            env <- lift getClaferEnv 
             constraints' <- lift getConstraints
             AlloyIG.UnsatCore core <- lift $ ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
             let unSATs = map getConstraintInfo $ catMaybes $ findRemovable env core constraints'
@@ -318,7 +336,7 @@ runCommandLine =
             lineMap <- lift getlineNumMap
 
 
-            outputStrLn $ editModel claferModel commentLines unSATs globalScope' lineMap (zip (map nameOfScope scopes) scopeVals)
+            outputStrLn $ editModel claferModel commentLines unSATs globalScope' lineMap scopes
             nextLoop context
             where
                 editModel :: String -> [Integer] -> [String] -> Integer -> (Map.Map Integer String) -> [(String, Integer)] -> String
@@ -329,7 +347,9 @@ runCommandLine =
                 editLines :: [Integer] -> [String] -> Int -> Int -> [(String, Integer)] -> (Map.Map Integer String) -> [(Integer, String)] -> [String]
                 editLines _ _ _ _ _ _ [] = []
                 editLines cLines unSATs m1 m2 s lineMap ((num, l):rest) = 
-                    if (num `elem` cLines && isEmptyLine l) then editLines cLines unSATs m1 m2 s lineMap rest else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s (Map.lookup num lineMap))) : editLines cLines unSATs m1 m2 s lineMap rest
+                    if (num `elem` cLines && isEmptyLine l) 
+                        then editLines cLines unSATs m1 m2 s lineMap rest 
+                        else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s (Map.lookup num lineMap))) : editLines cLines unSATs m1 m2 s lineMap rest
 
                 isUnSAT :: [String] -> String -> Integer -> Bool
                 isUnSAT us l ln = getAny $ foldMap (\u -> Any (((safehead $ words u) == (safehead $ words l) && (safehead $ reverse $ words u) == (safehead $ reverse $ words l)) || (u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == show ln))) us
@@ -360,13 +380,12 @@ runCommandLine =
             globalScope' <- lift getGlobalScope
             alloyModel <- lift getAlloyModel
             scopes <- lift getScopes
-            scopeValues <- lift $ mapM valueOfScope scopes
 
-            outputStrLn $ editAlloyModel alloyModel (zip (map nameOfScope scopes) scopeValues) globalScope'
+            outputStrLn $ editAlloyModel alloyModel scopes globalScope'
             nextLoop context    
             where
-                editAlloyModel :: String -> [(String, Integer)] -> Integer -> String
-                editAlloyModel model s globalScope' = 
+                editAlloyModel :: String -> [(String, Integer)] -> Integer      -> String
+                editAlloyModel    model     s                      globalScope' = 
                     let alloyLines = lines $ removeCommentsAndUnify model
                         splitNum = 1 + (length $ takeWhile (not . isEmptyLine) alloyLines)
                         (alloyInfo, alloyLines') = splitAt splitNum $ alloyLines
@@ -406,20 +425,47 @@ runCommandLine =
                         Left msg    -> outputStrLn (show msg) >> nextLoop context
                         Right command -> loop command context
     
-    save :: MonadIO m => [ClaferModel] -> Integer -> ClaferIGT m ()
+    save :: MonadIO m => [ClaferModel] -> Integer -> InputT (ClaferIGT m) ()
     save [] _ = return ()
     save (c:cs) counter = do
-        claferIGArgs' <- getClaferIGArgs
+        claferIGArgs' <- lift $ getClaferIGArgs
         let 
             claferModelFile' = claferModelFile claferIGArgs'
             saveName = claferModelFile' ++ "." ++ (show counter) ++ ".data"
         liftIO $ writeFile saveName (show c)
-        liftIO $ putStrLn $ "Saved to " ++ saveName
+        outputStrLn $ "Saved to " ++ saveName
         save cs (counter + 1)
 
 try :: MonadIO m => ErrorT String (InputT m) a -> InputT m ()
 try e = either outputStrLn (void . return) =<< runErrorT e
-        
+
+incAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
+incAlloyScopeAndBitwidth                 bitwidth'  inc'       fqName'   sigName' = do
+    scopeValue <- lift $ valueOfScope sigName' 
+    setAlloyScopeAndBitwidth bitwidth' (scopeValue+inc') fqName' sigName'
+
+setAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
+setAlloyScopeAndBitwidth                 bitwidth'  newValue'   fqName'   sigName' = do
+    when (newValue' > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+        lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ newValue'
+        newBw <- lift $ getBitwidth
+        outputStrLn $ "Warning! Requested scope for " ++ fqName' ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
+        when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, Alloy may be using a large amount of memory. This may cause slow down."
+    lift $ setAlloyScope newValue' sigName'
+    outputStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") increased to " ++ show newValue'    
+
+mergeScopes :: MonadIO m => [(UID, Integer)] -> [(UID, Integer)] -> ClaferIGT m ()
+mergeScopes _ [] = return()
+mergeScopes oldScopes newScopes = do
+    let mergedScopes = map (pickLargerScope oldScopes) newScopes
+    mapM_ (\(uid, val) -> setAlloyScope val uid) mergedScopes
+
+pickLargerScope :: [(String, Integer)] -> (String, Integer) -> (String, Integer)
+pickLargerScope    oldScopes              (uid, val)        =
+    let 
+        oldScopesMap = SMap.fromList oldScopes
+        oldVal = SMap.findWithDefault val uid oldScopesMap
+    in (uid, max val oldVal)
 
 -- i Ali|ce
 --     If the cursor is at | then not open. The "ce" prevents autocomplete.
@@ -522,13 +568,13 @@ numberOfDigits :: Int -> Int
 numberOfDigits 0 = 0
 numberOfDigits x = 1 + (numberOfDigits $ x `div` 10)
 
-findNecessaryBitwidth :: IModule -> Integer -> [Integer] -> Integer
-findNecessaryBitwidth ir oldBw scopes = 
+findNecessaryBitwidth :: IModule -> Integer -> [ Integer ] -> Integer
+findNecessaryBitwidth ir oldBw scopeValues = 
     if (newBw < oldBw) then oldBw else newBw
     where
         newBw = ceiling $ logBase 2 $ (+1) $ (*2) $ maxInModel ir
         maxInModel :: IModule -> Float
-        maxInModel ir' = intToFloat $ (max (maximum scopes)) $ foldIR getMax 0 ir'
+        maxInModel ir' = intToFloat $ max (maximum scopeValues) $ foldIR getMax 0 ir'
         getMax :: Ir -> Integer -> Integer 
         getMax (IRIExp (IInt n)) m = max m $ abs n
         getMax (IRClafer IClafer{card = Just (_, n)}) m = max m n
