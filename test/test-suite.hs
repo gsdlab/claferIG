@@ -49,8 +49,6 @@ claferIGArgsDef = IGArgs {
     claferModelFile = def,
     alloySolution   = False,
     bitwidth        = 4,
-
-
     useUids         = False,
     addTypes        = False,
     json            = False,
@@ -62,13 +60,11 @@ claferIGArgsDef = IGArgs {
 } &= summary claferIGVersion
 
 
-
-
 defaultIGArgs :: FilePath -> IGArgs
 --defaultIGArgs fPath = IGArgs Nothing Nothing fPath False 4 False False False
 defaultIGArgs fPath = claferIGArgsDef{claferModelFile = fPath}
 
---getModel :: FilePath -> ClaferIGT m (Either Language.ClaferT.ClaferErrs Instance)
+--getModel :: MonadIO m => FilePath -> ClaferIGT m (Either Language.ClaferT.ClaferErrs Instance)
 getModel fPath = runClaferIGT (defaultIGArgs fPath) $ do
 	setGlobalScope (fromJust $ all $ defaultIGArgs fPath)
 	solve
@@ -98,7 +94,7 @@ fromRight (Right x) = x
 case_strMapCheck :: Assertion
 case_strMapCheck = do
 		--let claferModel = Right $ Instance (ClaferModel [(Clafer (Id "" 0) (Just (StringValue "")) [])]) ""
-		claferModel <- getModel "suite/i220.cfr"
+		claferModel <- getModel "test/positive/i220.cfr"
 		(valueCheck $ c_value $ head $ c_topLevel $ modelInstance $ fromRight $ claferModel) @? "Mapping Int back to String Failed!"
 		where
 			valueCheck Nothing = False
