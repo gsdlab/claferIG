@@ -216,7 +216,7 @@ load                 igArgs    =
             parse
             compile
             results <- generate
-            let (alloyResult:_) = results
+            let (Just alloyResult) = Map.lookup Alloy results
             return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
