@@ -33,6 +33,8 @@ import Language.Clafer.IG.CommandLineParser
 import Language.Clafer.IG.Constraints
 import Language.Clafer.IG.JSONGenerator
 import Language.Clafer.Comments
+import Language.Clafer.JSONMetaData
+import Language.Clafer.QNameUID
 import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
 import Control.Monad
 import Control.Monad.Error
@@ -185,6 +187,8 @@ runCommandLine =
                 "'r'eload           - to reload your clafer model\n" ++
                 "'h'elp             - to display this menu options summary\n" ++
                 "'scope'            - to print out the values of the global scope and individual Clafer scopes\n" ++
+                "'saveScopes'       - to generate a '<model>.cfr-scope' file with the current scopes\n" ++
+                "'loadScopes'       - to load scopes from a '<model>.cfr-scope' file\n" ++                
                 "'setUnsatCoreMinimization' - to choose UnSAT core minimization strategy [fastest | medium | best]. Default: fastest\n" ++ 
                 "'c', 'claferModel' - to print out the original Clafer model verbatim\n" ++
                 "'a', 'alloyModel'  - to print out the output of Clafer translator verbatim\n" ++
@@ -261,8 +265,8 @@ runCommandLine =
     loop (IncreaseScope fqName inc') context =
         do
             try $ do
-                fQNameUIDMap' <- lift $ lift $ getFQNameUIDMap
-                let uids = findUIDsByFQName fQNameUIDMap' fqName
+                qNameMaps' <- lift $ lift $ getQNameMaps
+                let uids = getUIDs qNameMaps' fqName
                 let sigs = map ("this/" ++) uids
                 bitwidth' <- lift $ lift getBitwidth
 
@@ -271,15 +275,15 @@ runCommandLine =
                 lift $ lift $ solve
             nextLoop context
 
-    loop (SetScope fqName val') context =
+    loop (SetScope qName val') context =
         do
             try $ do
-                fQNameUIDMap' <- lift $ lift $ getFQNameUIDMap
-                let uids = findUIDsByFQName fQNameUIDMap' fqName
+                qNameMaps' <- lift $ lift $ getQNameMaps
+                let uids = getUIDs qNameMaps' qName
                 let sigs = map ((++) "this/") uids
                 bitwidth' <- lift $ lift getBitwidth
 
-                lift $ mapM_ (setAlloyScopeAndBitwidth bitwidth' val' fqName) sigs
+                lift $ mapM_ (setAlloyScopeAndBitwidth bitwidth' val' qName) sigs
                 
                 lift $ lift $ solve
             nextLoop context
@@ -293,7 +297,7 @@ runCommandLine =
                 outputStrLn ("Bitwidth set to " ++ show newBitwidth)
             nextLoop context
 
-    loop ShowScope context =
+    loop ShowScopes context =
         do
             globalScope <- lift getGlobalScope
             outputStrLn $ "Global scope = " ++ show globalScope
@@ -306,6 +310,32 @@ runCommandLine =
             printScope (sigName, value)  =
                 outputStrLn $ "  " ++ (drop 5 sigName) ++ " scope = " ++ show value
                     
+    loop SaveScopes context =
+        do
+            globalScope <- lift getGlobalScope
+            originalScopes <- lift getScopes            
+            claferIGArgs' <- lift getClaferIGArgs
+            qNameMaps' <- lift getQNameMaps
+            let
+                globalScopeTuple = ("", globalScope)
+                -- remove the "this/" prefix
+                uidScopes = globalScopeTuple : (map (\(sigName, value) -> (drop 5 sigName, value)) originalScopes)
+                json = generateJSONScopes qNameMaps' uidScopes
+                claferModelFile' = claferModelFile claferIGArgs'
+                modelName = take (length claferModelFile' - 4) claferModelFile'
+                saveName = modelName ++ ".cfr-scope"
+            
+            liftIO $ writeFile saveName json
+            nextLoop context
+            
+
+            
+
+    loop LoadScopes context =
+        do
+            outputStrLn "Not implemented yet."
+            nextLoop context
+                
 
     loop (Find name) context =
         do

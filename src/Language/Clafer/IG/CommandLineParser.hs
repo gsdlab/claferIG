@@ -42,7 +42,9 @@ data Command = Next |
                Reload | 
                Help | 
                Find String | 
-               ShowScope | 
+               ShowScopes | 
+               SaveScopes |
+               LoadScopes |
                ShowClaferModel | 
                ShowAlloyModel | 
                ShowAlloyInstance | 
@@ -127,7 +129,9 @@ commandMap =
     ("q", quitCommand):
     ("v", saveCommand):
     ("r", reloadCommand):
-    ("scope", scopeCommand):
+    ("scope", showScopesCommand):
+    ("saveScopes", saveScopesCommand):
+    ("loadScopes", loadScopesCommand):
     ("claferModel", claferModelCommand):
     ("c", claferModelCommand):
     ("alloyModel", alloyModelCommand):
@@ -155,8 +159,12 @@ reloadCommand :: ParsecT String () Identity Command
 reloadCommand            = return Reload
 findCommand :: ParsecT String () Identity Command
 findCommand              = Find `liftM` (gap >> claferInstance)
-scopeCommand :: ParsecT String () Identity Command
-scopeCommand             = return ShowScope
+showScopesCommand :: ParsecT String () Identity Command
+showScopesCommand             = return ShowScopes
+saveScopesCommand :: ParsecT String () Identity Command
+saveScopesCommand        = return SaveScopes
+loadScopesCommand :: ParsecT String () Identity Command
+loadScopesCommand        = return LoadScopes
 claferModelCommand :: ParsecT String () Identity Command
 claferModelCommand       = return ShowClaferModel
 alloyModelCommand :: ParsecT String () Identity Command
