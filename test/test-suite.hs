@@ -94,8 +94,8 @@ fromRight (Right x) = x
 case_strMapCheck :: Assertion
 case_strMapCheck = do
 		--let claferModel = Right $ Instance (ClaferModel [(Clafer (Id "" 0) (Just (StringValue "")) [])]) ""
-		claferModel <- getModel "test/positive/i220.cfr"
-		(valueCheck $ c_value $ head $ c_topLevel $ modelInstance $ fromRight $ claferModel) @? "Mapping Int back to String Failed!"
+		claferModel' <- getModel "test/positive/i220.cfr"
+		(valueCheck $ c_value $ head $ c_topLevel $ modelInstance $ fromRight $ claferModel') @? "Mapping Int back to String Failed!"
 		where
 			valueCheck Nothing = False
 			valueCheck (Just (AliasValue _)) = False

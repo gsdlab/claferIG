@@ -44,7 +44,7 @@ module Language.Clafer.IG.ClaferIG (
     setGlobalScope, 
     getScopes, 
     getScope, 
-    getFQNameUIDMap,
+    getQNameMaps,
     valueOfScope, 
     increaseScope, 
     setScope, 
@@ -61,6 +61,7 @@ module Language.Clafer.IG.ClaferIG (
     sigToClaferName) where
 
 import Language.Clafer
+import Language.Clafer.QNameUID
 import Language.ClaferT
 import Language.Clafer.Intermediate.Intclafer
 import qualified Language.Clafer.Intermediate.Analysis as Analysis
@@ -132,7 +133,7 @@ data ClaferIGEnv = ClaferIGEnv{
     claferIGArgs :: IGArgs,
     constraints:: [Constraint], 
     claferModel:: String, 
-    fQNameUIDMap :: FQNameUIDMap,
+    qNameMaps :: QNameMaps,
     info :: Analysis.Info,
     strMap :: Map Int String,
     lineNumMap :: Map Integer String
@@ -183,12 +184,12 @@ load                 igArgs    =
         lift $ AlloyIG.sendLoadCommand alloyModel
         lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
 
-        let fQNameUIDMap = deriveFQNameUIDMap ir
+        let qNameMaps = deriveQNameMaps ir
 
         let info = Analysis.gatherInfo ir 
         let irTrace = editMap $ irModuleTrace claferEnv'
 
-        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel fQNameUIDMap info sMap irTrace
+        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel qNameMaps info sMap irTrace
     where
     editMap :: (Map.Map Span [Ir]) -> (Map.Map Integer String) -- Map Line Number to Clafer Name
     editMap = 
@@ -266,13 +267,13 @@ getScopes :: MonadIO m => ClaferIGT m [ (String, Integer) ]
 getScopes = ClaferIGT $ lift AlloyIG.getScopes
         
         
-getScope :: MonadIO m => String -> ClaferIGT m ([String])
-getScope name = do
-        fQNameUIDMap' <- fetches fQNameUIDMap
-        return $ findUIDsByFQName fQNameUIDMap' name
+getScope :: MonadIO m => QName -> ClaferIGT m ([String])
+getScope qName = do
+        qNameMaps' <- fetches qNameMaps
+        return $ getUIDs qNameMaps' qName
 
-getFQNameUIDMap :: MonadIO m => ClaferIGT m (FQNameUIDMap)
-getFQNameUIDMap = fetches fQNameUIDMap
+getQNameMaps :: MonadIO m => ClaferIGT m (QNameMaps)
+getQNameMaps = fetches qNameMaps
 
 valueOfScope :: MonadIO m => String -> ClaferIGT m Integer
 valueOfScope sigName = ClaferIGT $ lift $ AlloyIG.getScope sigName
