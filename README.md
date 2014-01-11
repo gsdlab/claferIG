@@ -1,7 +1,7 @@
 Clafer Instance Generator
 =========================
 
-v0.3.5.10-01-2014
+v0.3.5.15-01-2014
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
 overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
@@ -18,19 +18,14 @@ Contributors
 Getting Clafer Tools
 --------------------
 
-Binary distributions of release 0.3.5 of 
-Clafer, 
-ClaferIG, 
-ClaferWiki, 
-ClaferMoo,
-ClaferIDE, 
-ClaferMooVisualizer, 
-and ClaferConfigurator 
-for Windows, Mac, and Linux, 
-can be downloaded from [Clafer Tools - Binary Distributions](http://gsd.uwaterloo.ca/node/516). 
+Getting Clafer Tools
+--------------------
+
+Binary distributions of the release 0.3.5 of Clafer Tools for Windows, Mac, and Linux, 
+can be downloaded from [Clafer Tools - Binary Distributions](http://http://gsd.uwaterloo.ca/clafer-tools-binary-distributions). 
 Clafer Wiki requires Haskell Platform and MinGW to run on Windows. 
 
-In case these binaries do not work on your particular machine configuration, the tools can be easily built from source code, as described below.
+In case these binaries do not work on your particular machine configuration, the tools can be built from source code, as described below.
 
 ### Dependencies for running
 
@@ -67,12 +62,11 @@ On Windows
 
 ### Important: Branches must correspond
 
-Clafer, ClaferIG, ClaferWiki, ClaferMoo, ClaferIDE, ClaferMooVisualizer, and ClaferConfigurator are following the *simultaneous release model*. 
+All related projects are following the *simultaneous release model*. 
 The branch `master` contains releases, whereas the branch `develop` contains code under development. 
-When building the tools, the branches should match:
-Releases `clafer/master` and `claferIG/master` are guaranteed to work well together.
-Development versions `clafer/develop` and `claferIG/develop` should work well together but this might not always be the case.
-
+When building the tools, the branches should match.
+Releases from branches 'master` are guaranteed to work well together.
+Development versions from branches `develop` should work well together but this might not always be the case.
 ### Building
 
 1. install the [Clafer compiler](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
@@ -100,7 +94,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG v0.3.5.10-01-2014
+ClaferIG v0.3.5.15-01-2014
 
 igargs [OPTIONS] FILE
 
@@ -148,7 +142,7 @@ In the interactive mode, the users can invoke the following commands by pressing
 
 ```
 ---------------------------
-| ClaferIG v0.3.5.10-01-2014 |
+| ClaferIG v0.3.5.15-01-2014 |
 ---------------------------
 
 You can invoke the following commands as indicated by single quotes:
@@ -289,10 +283,12 @@ The Clafer instance generator:
 
 Need help?
 ==========
-* See [Project's website](http://gsd.uwaterloo.ca/clafer) for news, technical reports and more
-  * Check out a [Clafer tutorial](http://gsd.uwaterloo.ca/node/310)
-  * Try live instance of [ClaferWiki](http://t3-necsis.cs.uwaterloo.ca:8091)
-  * Try [Online translator](http://gsd.uwaterloo.ca/clafer/translator)
-* Take a look at incomplete [Clafer wiki](https://github.com/gsdlab/clafer/wiki)
+* See [language's website](http://clafer.org) for news, technical reports and more
+  * Check out a [Clafer tutorial](http://t3-necsis.cs.uwaterloo.ca:8091/Tutorial/Intro)
+  * Try a live instance of [ClaferWiki](http://t3-necsis.cs.uwaterloo.ca:8091)
+  * Try a live instance of [ClaferIDE](http://t3-necsis.cs.uwaterloo.ca:8094)
+  * Try a live instance of [ClaferConfigurator](http://t3-necsis.cs.uwaterloo.ca:8093)
+  * Try a live instance of [ClaferMooVisualizer](http://t3-necsis.cs.uwaterloo.ca:8092)
+* Take a look at (incomplete) [Clafer wiki](https://github.com/gsdlab/clafer/wiki)
 * Browse example models in the [test suite](https://github.com/gsdlab/clafer/tree/master/test/positive) and [MOO examples](https://github.com/gsdlab/clafer/tree/master/spl_configurator/dataset)
 * Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `claferig` (so that we know what they are related to) and with `jimmy-liang` or `michal` (so that Jimmy or Michał gets a notification).
