@@ -350,8 +350,12 @@ runCommandLine =
             outputStrLn $ "bitwidth = " ++ show bitwidth'
             originalScopes <- lift getScopes
             -- remove the "this/" prefix
-            let scopes = map ( \ (uid', val') -> (drop 5 uid', val') ) originalScopes
+            let 
+                scopes = map ( \ (uid', val') -> (drop 5 uid', val') ) originalScopes
+                scopesMap = Map.fromList scopes
+
             globalScope' <- lift getGlobalScope
+            outputStrLn $ "global scope = " ++ show globalScope' ++ "\n"
 
             env <- lift getClaferEnv 
             constraints' <- lift getConstraints
@@ -363,29 +367,32 @@ runCommandLine =
             lineMap <- lift getlineNumMap
 
 
-            outputStrLn $ editModel claferModel commentLines unSATs globalScope' lineMap scopes
+            outputStrLn $ editModel claferModel commentLines unSATs lineMap scopesMap
             nextLoop context
             where
-                editModel :: String -> [Integer] -> [String] -> Integer -> (Map.Map Integer String) -> [(String, Integer)] -> String
-                editModel model cLines unSATs globalScope' lineMap s = 
-                    let claferLines = lines $ removeCommentsAndUnify model
-                    in unlines $ (("global scope = " ++ show globalScope' ++ "\n") :) $ editLines cLines unSATs (numberOfDigits $ length claferLines) (maximum $ map length claferLines) s lineMap (zip [1..] claferLines)
+                editModel :: String -> [Integer] -> [String] -> (Map.Map Integer String) -> (Map.Map String Integer) -> String
+                editModel model cLines unSATs lineMap scopesMap' = 
+                    let 
+                        claferLines = lines $ removeCommentsAndUnify model
+                        maxLineLength = maximum $ map length claferLines
+                    in unlines $ editLines cLines unSATs (numberOfDigits $ length claferLines) maxLineLength scopesMap' lineMap (zip [1..] claferLines)
 
-                editLines :: [Integer] -> [String] -> Int -> Int -> [(String, Integer)] -> (Map.Map Integer String) -> [(Integer, String)] -> [String]
+                editLines :: [Integer] -> [String] -> Int -> Int -> (Map.Map String Integer) -> (Map.Map Integer String) -> [(Integer, String)] -> [String]
                 editLines _ _ _ _ _ _ [] = []
-                editLines cLines unSATs m1 m2 s lineMap ((num, l):rest) = 
+                editLines cLines unSATs m1 m2 scopesMap' lineMap ((num, l):rest) = 
                     if (num `elem` cLines && isEmptyLine l) 
-                        then editLines cLines unSATs m1 m2 s lineMap rest 
-                        else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal s (Map.lookup num lineMap))) : editLines cLines unSATs m1 m2 s lineMap rest
+                        then editLines cLines unSATs m1 m2 scopesMap' lineMap rest 
+                        else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal scopesMap' (Map.lookup num lineMap))) 
+                        : editLines cLines unSATs m1 m2 scopesMap' lineMap rest
 
                 isUnSAT :: [String] -> String -> Integer -> Bool
                 isUnSAT us l ln = getAny $ foldMap (\u -> Any (((safehead $ words u) == (safehead $ words l) && (safehead $ reverse $ words u) == (safehead $ reverse $ words l)) || (u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == show ln))) us
                 safehead [] = []
                 safehead x = head x
 
-                addScopeVal :: [(String, Integer)] -> (Maybe String) ->String
-                addScopeVal _ Nothing = ""
-                addScopeVal s (Just name) = "scope = " ++ (fromJustShow $ Data.List.lookup name s) 
+                addScopeVal :: (Map.Map String Integer) -> (Maybe String) ->String
+                addScopeVal _       Nothing     = ""
+                addScopeVal scopesMap' (Just name) = "scope = " ++ (fromJustShow $ Map.lookup name scopesMap') 
 
                 getCommentLines :: String -> [Integer]
                 getCommentLines = foldr (\(s, _) acc -> case s of
@@ -577,8 +584,9 @@ printError (ClaferErrs errs) =
 removeCommentsAndUnify :: String -> String
 removeCommentsAndUnify [] = []
 removeCommentsAndUnify ['\t'] = "   "
+removeCommentsAndUnify ('\r':model) = model
 removeCommentsAndUnify [c] = [c]
-removeCommentsAndUnify ('\t':c2:model) = ' ' : ' ' : ' ' : (removeCommentsAndUnify $ c2 : model)
+removeCommentsAndUnify ('\t':model) = ' ' : ' ' : ' ' : (removeCommentsAndUnify $ model)
 removeCommentsAndUnify (c1:c2:model) = if (c1 /= '/') then (c1 : (removeCommentsAndUnify $ c2 : model)) else if (c2 /= '/' && c2 /='*') then (c1 : (removeCommentsAndUnify $ c2 : model))
     else if (c2 == '/') then (removeCommentsAndUnify $ dropWhile (/='\n') model) else (removeBlock model)
     where
@@ -589,11 +597,10 @@ removeCommentsAndUnify (c1:c2:model) = if (c1 /= '/') then (c1 : (removeComments
         removeBlock (c1':c2':model') = if (c1' == '*' && c2' == '/') then (removeCommentsAndUnify model') else (removeBlock $ c2' : model)  
 
 isEmptyLine :: String -> Bool
-isEmptyLine l = filter (`notElem` [' ', '\n', '\t']) l == []
+isEmptyLine l = filter (`notElem` [' ', '\n', '\t', '\r']) l == []
 
 numberOfDigits :: Int -> Int
-numberOfDigits 0 = 0
-numberOfDigits x = 1 + (numberOfDigits $ x `div` 10)
+numberOfDigits x = length $ show x
 
 findNecessaryBitwidth :: IModule -> Integer -> [ Integer ] -> Integer
 findNecessaryBitwidth ir oldBw scopeValues = 
