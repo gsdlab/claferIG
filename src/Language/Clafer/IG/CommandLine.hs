@@ -236,7 +236,7 @@ runCommandLine =
         do
             globalScope <- lift getGlobalScope
             bitwidth' <- lift getBitwidth
-            let newGlobalScope = globalScope+inc'
+            let newGlobalScope = max 1 $ globalScope+inc'
             lift $ setGlobalScope newGlobalScope
             when (newGlobalScope > ((2 ^ (bitwidth' - 1)) - 1)) $ do
                 outputStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
@@ -245,12 +245,13 @@ runCommandLine =
                 when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
 
             oldScopes <- lift getScopes
-            mapM ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (val'+inc') (sigToClaferName sigName') sigName') oldScopes
+            mapM ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (max 1 $ val'+inc') (sigToClaferName sigName') sigName') oldScopes
             lift solve    
-            outputStrLn ("Global scope increased to " ++ show newGlobalScope)
+            outputStrLn ("Global scope changed to " ++ show newGlobalScope)
             nextLoop context
-    loop (SetGlobalScope newGlobalScope) context =
+    loop (SetGlobalScope newGlobalScope') context =
         do
+            let newGlobalScope = max 1 newGlobalScope'
             bitwidth' <- lift getBitwidth
             lift $ setGlobalScope newGlobalScope
             when (newGlobalScope > ((2 ^ (bitwidth' - 1)) - 1)) $ do
@@ -328,14 +329,10 @@ runCommandLine =
             liftIO $ writeFile saveName json
             nextLoop context
             
-
-            
-
     loop LoadScopes context =
         do
             outputStrLn "Not implemented yet."
             nextLoop context
-                
 
     loop (Find name) context =
         do
@@ -472,7 +469,7 @@ try e = either outputStrLn (void . return) =<< runErrorT e
 incAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
 incAlloyScopeAndBitwidth                 bitwidth'  inc'       fqName'   sigName' = do
     scopeValue <- lift $ valueOfScope sigName' 
-    setAlloyScopeAndBitwidth bitwidth' (scopeValue+inc') fqName' sigName'
+    setAlloyScopeAndBitwidth bitwidth' (max 1 $ scopeValue+inc') fqName' sigName'
 
 setAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
 setAlloyScopeAndBitwidth                 bitwidth'  newValue'   fqName'   sigName' = do
@@ -482,7 +479,7 @@ setAlloyScopeAndBitwidth                 bitwidth'  newValue'   fqName'   sigNam
         outputStrLn $ "Warning! Requested scope for " ++ fqName' ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
         when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, Alloy may be using a large amount of memory. This may cause slow down."
     lift $ setAlloyScope newValue' sigName'
-    outputStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") increased to " ++ show newValue'    
+    outputStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") changed to " ++ show newValue'    
 
 mergeScopes :: MonadIO m => [(UID, Integer)] -> [(UID, Integer)] -> ClaferIGT m ()
 mergeScopes _ [] = return()

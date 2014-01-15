@@ -195,7 +195,7 @@ setGlobalScope =
 
 explicitIncreaseGlobalScope :: Parser Command
 explicitIncreaseGlobalScope =
-    fmap IncreaseGlobalScope number
+    fmap IncreaseGlobalScope signedNumber
     <|>
     increaseScope
 
@@ -212,7 +212,7 @@ increaseScope =
             return (IncreaseScope name 1)
             
 explicitIncreaseScope :: String -> Parser Command
-explicitIncreaseScope name = fmap (IncreaseScope name) number
+explicitIncreaseScope name = fmap (IncreaseScope name) signedNumber
 
 explicitSetScope :: Parser Command
 explicitSetScope =
@@ -232,6 +232,11 @@ setBitwidth =
 number :: Parser Integer
 number = read `liftM` many1 digit
 
+signedNumber :: Parser Integer
+signedNumber = liftM read $ do
+    sign <- option "" $ string "-"
+    number <- many1 digit
+    return $ sign ++ number
 
 clafer :: Parser String        
 clafer = many1 ((alphaNum <|> char ':' <|> char '_') <?> "clafer")
