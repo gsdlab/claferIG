@@ -230,13 +230,15 @@ setBitwidth =
         return $ SetBitwidth b
 
 number :: Parser Integer
-number = read `liftM` many1 digit
+number = do 
+            n <- many1 digit
+            return $ read n
 
 signedNumber :: Parser Integer
-signedNumber = liftM read $ do
-    sign <- option "" $ string "-"
-    number <- many1 digit
-    return $ sign ++ number
+signedNumber = do
+    s <- option "" $ string "-"
+    n <- many1 digit
+    return $ read $ s ++ n
 
 clafer :: Parser String        
 clafer = many1 ((alphaNum <|> char ':' <|> char '_') <?> "clafer")
