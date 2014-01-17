@@ -584,7 +584,6 @@ printError (ClaferErrs errs) =
 removeCommentsAndUnify :: String -> String
 removeCommentsAndUnify [] = []
 removeCommentsAndUnify model@[_] = model
-removeCommentsAndUnify ['\t'] = "   "
 removeCommentsAndUnify ('\t':model) = ' ' : ' ' : ' ' : removeCommentsAndUnify model
 removeCommentsAndUnify ('/':'/':model) = removeCommentsAndUnify $ dropWhile (/='\n') model
 removeCommentsAndUnify ('/':'*':model) = removeBlock model
