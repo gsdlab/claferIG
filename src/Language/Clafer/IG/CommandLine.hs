@@ -583,18 +583,20 @@ printError (ClaferErrs errs) =
 
 removeCommentsAndUnify :: String -> String
 removeCommentsAndUnify [] = []
+removeCommentsAndUnify model@[_] = model
 removeCommentsAndUnify ['\t'] = "   "
-removeCommentsAndUnify ('\r':model) = model
-removeCommentsAndUnify [c] = [c]
-removeCommentsAndUnify ('\t':model) = ' ' : ' ' : ' ' : (removeCommentsAndUnify $ model)
-removeCommentsAndUnify (c1:c2:model) = if (c1 /= '/') then (c1 : (removeCommentsAndUnify $ c2 : model)) else if (c2 /= '/' && c2 /='*') then (c1 : (removeCommentsAndUnify $ c2 : model))
-    else if (c2 == '/') then (removeCommentsAndUnify $ dropWhile (/='\n') model) else (removeBlock model)
+removeCommentsAndUnify ('\t':model) = ' ' : ' ' : ' ' : removeCommentsAndUnify model
+removeCommentsAndUnify ('/':'/':model) = removeCommentsAndUnify $ dropWhile (/='\n') model
+removeCommentsAndUnify ('/':'*':model) = removeBlock model
     where
+        -- discard everything until "*/" is found or end of text
         removeBlock :: String -> String
         removeBlock [] = []
         removeBlock [_] = []
-        removeBlock ('\n':model') = '\n' : removeBlock model'
-        removeBlock (c1':c2':model') = if (c1' == '*' && c2' == '/') then (removeCommentsAndUnify model') else (removeBlock $ c2' : model)  
+        removeBlock ('*':'/':model') = removeCommentsAndUnify model'
+        -- discard contents of the block comment
+        removeBlock (_:model') = removeBlock model'
+removeCommentsAndUnify (c:model) = c : removeCommentsAndUnify model
 
 isEmptyLine :: String -> Bool
 isEmptyLine l = filter (`notElem` [' ', '\n', '\t', '\r']) l == []
