@@ -1,7 +1,7 @@
 Clafer Instance Generator
 =========================
 
-v0.3.5.17-01-2014
+v0.3.5.20-01-2014
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
 overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
@@ -94,7 +94,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG v0.3.5.17-01-2014
+ClaferIG v0.3.5.20-01-2014
 
 igargs [OPTIONS] FILE
 
@@ -142,7 +142,7 @@ In the interactive mode, the users can invoke the following commands by pressing
 
 ```
 ---------------------------
-| ClaferIG v0.3.5.17-01-2014 |
+| ClaferIG v0.3.5.20-01-2014 |
 ---------------------------
 
 You can invoke the following commands as indicated by single quotes:

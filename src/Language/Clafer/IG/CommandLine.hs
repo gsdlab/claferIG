@@ -95,7 +95,7 @@ runCommandLine =
                     
                     outputStrLn $ if json claferIGArgs' 
                         then generateJSON info claferModel
-                        else show claferModel
+                        else "\n=== Instance " ++ (show $ 1 + (length $ unsaved context)) ++ " ===\n\n" ++ (show claferModel)
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 UnsatCore core counterexample -> do
                     liftIO $ hPutStrLn stderr "No more instances found. Try increasing scope to get more instances."
