@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2014 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -36,7 +36,8 @@ data Command = Next |
                IncreaseScope String Integer | 
                SetGlobalScope Integer | 
                SetScope String Integer | 
-               SetBitwidth Integer | 
+               SetBitwidth Integer |
+               SetMaxInt Integer | 
                Save | 
                Quit | 
                Reload | 
@@ -124,6 +125,8 @@ commandMap =
     ("i", increaseCommand):
     ("s", setCommand):
     ("b", setBitwidthCommand):
+    ("m", setMaxIntCommand):
+    ("maxint", setMaxIntCommand):
     ("n", nextCommand):
     ("f", findCommand):
     ("q", quitCommand):
@@ -149,6 +152,8 @@ setCommand :: Parser Command
 setCommand               = setGlobalScope
 setBitwidthCommand :: Parser Command
 setBitwidthCommand       = setBitwidth
+setMaxIntCommand :: Parser Command
+setMaxIntCommand       = setMaxInt
 nextCommand :: ParsecT String () Identity Command
 nextCommand              = return Next
 quitCommand :: ParsecT String () Identity Command
@@ -228,6 +233,13 @@ setBitwidth =
         gap
         b <- number
         return $ SetBitwidth b
+
+setMaxInt :: Parser Command
+setMaxInt =
+    do
+        gap
+        b <- number
+        return $ SetMaxInt b
 
 number :: Parser Integer
 number = do 

@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 {-
- Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2014 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -22,7 +22,7 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError, findNecessaryBitwidth, intToFloat, pickLargerScope) where
+module Language.Clafer.IG.CommandLine (claferIGVersion, runCommandLine, printError, findNecessaryBitwidth, intToFloat, pickLargerScope, allowedMaxInt, requiredBitwidth) where
 
 import Language.Clafer
 import Language.ClaferT
@@ -63,9 +63,6 @@ runCommandLine :: ClaferIGT IO ()
 runCommandLine =
     do
         solve
-        bitwidth' <- getBitwidth
-        when (bitwidth' > 9) $ liftIO $ putStrLn $ "Warning! Bitwidth has been set to " ++ show bitwidth' ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
-        
         clafers <- getClafers
 
         clafersRef <- liftIO $ newIORef clafers
@@ -180,7 +177,7 @@ runCommandLine =
                 "                     instances exist within the given scope\n" ++
                 "'i'ncrease         - to increase the maximum number of instances of a given clafer or all clafers (scope)\n" ++
                 "'s'et              - to set the maximum number of instances of a given clafer or all clafers (scope)\n" ++                
-                "'b'itwidth         - to set the bitwidth\n" ++                
+                "'m'axint, 'maxint' - to set the bitwidth by providing the largest integer\n" ++                
                 "sa'v'e             - to save all instances displayed so far or a counterexample to files named \n" ++
                 "                     <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                 "'q'uit             - to quit the interactive session\n" ++
@@ -228,7 +225,7 @@ runCommandLine =
             newScopes <- lift getScopes
             lift $ setBitwidth $ findNecessaryBitwidth ir oldBw $ snd $ unzip newScopes
             newBw <- lift getBitwidth
-            when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+            printBitwidthWarning newBw
             lift $ solve
             nextLoop context
 
@@ -238,11 +235,11 @@ runCommandLine =
             bitwidth' <- lift getBitwidth
             let newGlobalScope = max 1 $ globalScope+inc'
             lift $ setGlobalScope newGlobalScope
-            when (newGlobalScope > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+            when (newGlobalScope > allowedMaxInt bitwidth') $ do
                 outputStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
-                lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat newGlobalScope
+                lift $ setBitwidth $ requiredBitwidth newGlobalScope
                 newBw <- lift getBitwidth
-                when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+                printBitwidthWarning newBw
 
             oldScopes <- lift getScopes
             mapM ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (max 1 $ val'+inc') (sigToClaferName sigName') sigName') oldScopes
@@ -254,11 +251,11 @@ runCommandLine =
             let newGlobalScope = max 1 newGlobalScope'
             bitwidth' <- lift getBitwidth
             lift $ setGlobalScope newGlobalScope
-            when (newGlobalScope > ((2 ^ (bitwidth' - 1)) - 1)) $ do
+            when (newGlobalScope > allowedMaxInt bitwidth') $ do
                 outputStrLn $ "Warning! Requested global scope is larger than maximum allowed by bitwidth ... increasing bitwidth"
-                lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat newGlobalScope
+                lift $ setBitwidth $ requiredBitwidth newGlobalScope
                 newBw <- lift getBitwidth
-                when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+                printBitwidthWarning newBw
             lift solve    
             outputStrLn ("Global scope set to " ++ show newGlobalScope)
             nextLoop context
@@ -293,9 +290,19 @@ runCommandLine =
         do 
             when (newBitwidth >=4) $ do
                 lift $ setBitwidth newBitwidth
-                when (newBitwidth > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBitwidth ++ ". This is a very large bitwidth, alloy may be using a large amount of memory. This may cause slow down."
+                printBitwidthWarning newBitwidth
                 lift solve    
-                outputStrLn ("Bitwidth set to " ++ show newBitwidth)
+                printBitwidthIntRange newBitwidth
+            nextLoop context
+
+    loop (SetMaxInt newMaxInt) context =
+        do 
+            when (newMaxInt >= 7) $ do
+                let newBitwidth = requiredBitwidth newMaxInt
+                lift $ setBitwidth newBitwidth
+                printBitwidthWarning newBitwidth
+                lift solve    
+                printBitwidthIntRange newBitwidth
             nextLoop context
 
     loop ShowScopes context =
@@ -347,7 +354,7 @@ runCommandLine =
     loop ShowClaferModel context =
         do
             bitwidth' <- lift getBitwidth
-            outputStrLn $ "bitwidth = " ++ show bitwidth'
+            printBitwidthIntRange bitwidth'
             originalScopes <- lift getScopes
             -- remove the "this/" prefix
             let 
@@ -355,7 +362,7 @@ runCommandLine =
                 scopesMap = Map.fromList scopes
 
             globalScope' <- lift getGlobalScope
-            outputStrLn $ "global scope = " ++ show globalScope' ++ "\n"
+            outputStrLn $ "Global scope = " ++ show globalScope' ++ "\n"
 
             env <- lift getClaferEnv 
             constraints' <- lift getConstraints
@@ -480,11 +487,11 @@ incAlloyScopeAndBitwidth                 bitwidth'  inc'       fqName'   sigName
 
 setAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
 setAlloyScopeAndBitwidth                 bitwidth'  newValue'   fqName'   sigName' = do
-    when (newValue' > ((2 ^ (bitwidth' - 1)) - 1)) $ do
-        lift $ setBitwidth $ ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat $ newValue'
+    when (newValue' > allowedMaxInt bitwidth') $ do
+        lift $ setBitwidth $ requiredBitwidth $ newValue'
         newBw <- lift $ getBitwidth
         outputStrLn $ "Warning! Requested scope for " ++ fqName' ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
-        when (newBw > 9) $ outputStrLn $ "Warning! Bitwidth has been set to " ++ show newBw ++ ". This is a very large bitwidth, Alloy may be using a large amount of memory. This may cause slow down."
+        printBitwidthWarning newBw
     lift $ setAlloyScope newValue' sigName'
     outputStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") changed to " ++ show newValue'    
 
@@ -500,6 +507,32 @@ pickLargerScope    oldScopes              (uid, val)        =
         oldScopesMap = SMap.fromList oldScopes
         oldVal = SMap.findWithDefault val uid oldScopesMap
     in (uid, max val oldVal)
+
+-- bitwidth required to store the given integer
+requiredBitwidth :: Integer -> Integer
+requiredBitwidth    n    = ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat n
+
+-- the largest integer allowed by the given bitwidth
+allowedMaxInt :: Integer -> Integer
+allowedMaxInt    bw       = (2 ^ (bw - 1)) - 1
+
+-- the smallest integer allowed by the given bitwidth
+allowedMinInt :: Integer -> Integer
+allowedMinInt    bw       = -((allowedMaxInt bw) + 1)
+
+printBitwidthIntRange :: MonadIO m => Integer -> InputT m ()
+printBitwidthIntRange    bw       = outputStrLn $ concat [
+    "Integer range = ",
+    show $ allowedMinInt bw,
+    "..",
+    show $ allowedMaxInt bw,
+    " (",
+    "bitwidth = ", 
+    show bw,
+    ")" ]
+
+printBitwidthWarning :: MonadIO m => Integer -> InputT m ()
+printBitwidthWarning bw = when (bw > 9) $ outputStrLn $ "Warning! This is a very large bitwidth for Alloy, which may cause slow down."
 
 -- i Ali|ce
 --     If the cursor is at | then not open. The "ce" prevents autocomplete.

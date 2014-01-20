@@ -49,6 +49,7 @@ claferIGArgsDef = IGArgs {
     claferModelFile = def,
     alloySolution   = False,
     bitwidth        = 4,
+    maxInt          = 7,
     useUids         = False,
     addTypes        = False,
     json            = False,
