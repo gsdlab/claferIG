@@ -92,7 +92,7 @@ runCommandLine =
                     
                     outputStrLn $ if json claferIGArgs' 
                         then generateJSON info claferModel
-                        else "\n=== Instance " ++ (show $ 1 + (length $ unsaved context)) ++ " ===\n\n" ++ (show claferModel)
+                        else "=== Instance " ++ (show $ 1 + (length $ unsaved context)) ++ " ===\n\n" ++ (show claferModel)
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 UnsatCore core counterexample -> do
                     liftIO $ hPutStrLn stderr "No more instances found. Try increasing scope to get more instances."
@@ -362,7 +362,7 @@ runCommandLine =
                 scopesMap = Map.fromList scopes
 
             globalScope' <- lift getGlobalScope
-            outputStrLn $ "Global scope = " ++ show globalScope' ++ "\n"
+            outputStrLn $ "Global scope  = " ++ show globalScope' ++ "\n"
 
             env <- lift getClaferEnv 
             constraints' <- lift getConstraints
@@ -371,26 +371,26 @@ runCommandLine =
 
             claferModel <- lift getClaferModel
             let commentLines = getCommentLines claferModel
-            lineMap <- lift getlineNumMap
+            lineNumMap <- lift getlineNumMap
 
 
-            outputStrLn $ editModel claferModel commentLines unSATs lineMap scopesMap
+            outputStrLn $ editModel claferModel commentLines unSATs lineNumMap scopesMap
             nextLoop context
             where
                 editModel :: String -> [Integer] -> [String] -> (Map.Map Integer String) -> (Map.Map String Integer) -> String
-                editModel model cLines unSATs lineMap scopesMap' = 
+                editModel model cLines unSATs lineNumMap scopesMap' = 
                     let 
                         claferLines = lines $ removeCommentsAndUnify model
                         maxLineLength = maximum $ map length claferLines
-                    in unlines $ editLines cLines unSATs (numberOfDigits $ length claferLines) maxLineLength scopesMap' lineMap (zip [1..] claferLines)
+                    in unlines $ editLines cLines unSATs (numberOfDigits $ length claferLines) maxLineLength scopesMap' lineNumMap (zip [1..] claferLines)
 
                 editLines :: [Integer] -> [String] -> Int -> Int -> (Map.Map String Integer) -> (Map.Map Integer String) -> [(Integer, String)] -> [String]
                 editLines _ _ _ _ _ _ [] = []
-                editLines cLines unSATs m1 m2 scopesMap' lineMap ((num, l):rest) = 
+                editLines cLines unSATs m1 m2 scopesMap' lineNumMap ((num, l):rest) = 
                     if (num `elem` cLines && isEmptyLine l) 
-                        then editLines cLines unSATs m1 m2 scopesMap' lineMap rest 
-                        else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal scopesMap' (Map.lookup num lineMap))) 
-                        : editLines cLines unSATs m1 m2 scopesMap' lineMap rest
+                        then editLines cLines unSATs m1 m2 scopesMap' lineNumMap rest 
+                        else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal scopesMap' (Map.lookup num lineNumMap))) 
+                        : editLines cLines unSATs m1 m2 scopesMap' lineNumMap rest
 
                 isUnSAT :: [String] -> String -> Integer -> Bool
                 isUnSAT us l ln = getAny $ foldMap (\u -> Any (((safehead $ words u) == (safehead $ words l) && (safehead $ reverse $ words u) == (safehead $ reverse $ words l)) || (u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == show ln))) us
@@ -614,6 +614,7 @@ printError (ClaferErrs errs) =
     printErr (ClaferErr msg) =
         "Error:\n    " ++ msg
 
+-- only remove the contents while preserving the empty lines
 removeCommentsAndUnify :: String -> String
 removeCommentsAndUnify [] = []
 removeCommentsAndUnify model@[_] = model
@@ -621,10 +622,11 @@ removeCommentsAndUnify ('\t':model) = ' ' : ' ' : ' ' : removeCommentsAndUnify m
 removeCommentsAndUnify ('/':'/':model) = removeCommentsAndUnify $ dropWhile (/='\n') model
 removeCommentsAndUnify ('/':'*':model) = removeBlock model
     where
-        -- discard everything until "*/" is found or end of text
+        -- discard everything until "*/" is found or end of text while preserving new lines
         removeBlock :: String -> String
         removeBlock [] = []
         removeBlock [_] = []
+        removeBlock ('\n':model') = '\n' : removeBlock model'
         removeBlock ('*':'/':model') = removeCommentsAndUnify model'
         -- discard contents of the block comment
         removeBlock (_:model') = removeBlock model'
