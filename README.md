@@ -107,6 +107,10 @@ Common flags:
      --alloysolution                           Convert Alloy solution to a
                                                Clafer solution.
   -b --bitwidth=INTEGER                        Set the bitwidth for integers.
+  -m --maxint=INTEGER                          Set the bitwidth for integers
+                                               based on the largest required
+                                               number. Overrides --bitwidth
+                                               argument.
   -u --useuids                                 Use unique clafer names in the
                                                Clafer solution.
      --addtypes                                Add colon/reference types to
@@ -141,9 +145,9 @@ Common flags:
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
 ```
----------------------------
+------------------------------
 | ClaferIG v0.3.5.20-01-2014 |
----------------------------
+------------------------------
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands
@@ -152,7 +156,7 @@ You can invoke the following commands as indicated by single quotes:
                      instances exist within the given scope
 'i'ncrease         - to increase the maximum number of instances of a given clafer or all clafers (scope)
 's'et              - to set the maximum number of instances of a given clafer or all clafers (scope)
-'b'itwidth         - to set the bitwidth
+'m'axint, 'maxint' - to set the bitwidth by providing the largest integer
 sa'v'e             - to save all instances displayed so far or a counterexample to files named
                      <model file name>.cfr.<instance number>.data, one instance per file
 'q'uit             - to quit the interactive session
