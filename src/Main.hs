@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
 {-
- Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2014 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -47,6 +47,7 @@ claferIGArgsDef = IGArgs {
     all                         = def &= help "Saves all instances up to the provided scope or a counterexample.",
     saveDir                     = def &= help "Specify the directory for storing saved files." &= typ "FILE",
     bitwidth                    = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER", -- Default bitwidth is 4.
+    maxInt                      = 7 &= help "Set the bitwidth for integers based on the largest required number. Overrides --bitwidth argument." &= typ "INTEGER",
     alloySolution               = False &= help "Convert Alloy solution to a Clafer solution.",
     claferModelFile             = def &= argPos 0 &= typ "FILE",
     useUids                     = False &= help "Use unique clafer names in the Clafer solution.",
@@ -64,25 +65,33 @@ main :: IO ()
 main =
     do
         args' <- cmdArgs claferIGArgsDef
-        if (alloySolution args')
+        let
+            bw = bitwidth args'
+            mi = maxInt args'
+            -- maxInt overrides the bitwidth setting
+            args'' = if (mi > allowedMaxInt bw)
+                        then args' {bitwidth = requiredBitwidth mi}
+                        else args'
+
+        if (alloySolution args'')
             then
-                runAlloySolution args'
-            else if (json args')
+                runAlloySolution args''
+            else if (json args'')
                 then 
-                    tryClaferIG (args' { useUids = True })
+                    tryClaferIG (args'' { useUids = True })
                 else
-                    tryClaferIG args'
+                    tryClaferIG args''
     where
-    tryClaferIG args' =
+    tryClaferIG args3 =
         do
-            try <- runClaferIG args'
+            try <- runClaferIG args3
             case try of
                 Right r -> return r
                 Left l  -> do
                     mapM putStrLn $ printError l
                     putStrLn "Press enter to retry."
                     void getLine
-                    tryClaferIG args'
+                    tryClaferIG args3
 
 runClaferIG :: IGArgs -> IO (Either ClaferErrs ())    
 runClaferIG args' =
@@ -93,8 +102,7 @@ runClaferIG args' =
         env <- getClaferEnv
         let ir = fst3 $ fromJust $ cIr env
         scopes <- getScopes
-        scopeVals <- mapM valueOfScope scopes
-        setBitwidth $ findNecessaryBitwidth ir oldBw scopeVals
+        setBitwidth $ findNecessaryBitwidth ir oldBw $ map snd scopes
         solve
         case all args' of
             Just scope ->

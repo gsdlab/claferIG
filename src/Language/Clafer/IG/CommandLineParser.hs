@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2014 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -31,7 +31,25 @@ import Data.Functor.Identity
 
 
 
-data Command = Next | IncreaseGlobalScope Integer | IncreaseScope String Integer | Save | Quit | Reload | Help | Find String | ShowScope | ShowClaferModel | ShowAlloyModel | ShowAlloyInstance | SetUnsatCoreMinimization UnsatCoreMinimization deriving Show
+data Command = Next | 
+               IncreaseGlobalScope Integer | 
+               IncreaseScope String Integer | 
+               SetGlobalScope Integer | 
+               SetScope String Integer | 
+               SetBitwidth Integer |
+               SetMaxInt Integer | 
+               Save | 
+               Quit | 
+               Reload | 
+               Help | 
+               Find String | 
+               ShowScopes | 
+               SaveScopes |
+               LoadScopes |
+               ShowClaferModel | 
+               ShowAlloyModel | 
+               ShowAlloyInstance | 
+               SetUnsatCoreMinimization UnsatCoreMinimization deriving Show
 
 
 data UnsatCoreMinimization = Fastest | Medium | Best deriving Show
@@ -105,14 +123,22 @@ commandMap :: [(String, Parser Command)]
 commandMap =
     ("h", helpCommand):
     ("i", increaseCommand):
+    ("s", setCommand):
+    ("b", setBitwidthCommand):
+    ("m", setMaxIntCommand):
+    ("maxint", setMaxIntCommand):
     ("n", nextCommand):
     ("f", findCommand):
     ("q", quitCommand):
-    ("s", saveCommand):
+    ("v", saveCommand):
     ("r", reloadCommand):
-    ("scope", scopeCommand):
+    ("scope", showScopesCommand):
+    ("saveScopes", saveScopesCommand):
+    ("loadScopes", loadScopesCommand):
     ("claferModel", claferModelCommand):
+    ("c", claferModelCommand):
     ("alloyModel", alloyModelCommand):
+    ("a", alloyModelCommand):
     ("alloyInstance", alloyInstanceCommand):
     ("setUnsatCoreMinimization", setUnsatCoreMinimization):
     []
@@ -122,6 +148,12 @@ helpCommand :: ParsecT String () Identity Command
 helpCommand              = return Help
 increaseCommand :: Parser Command
 increaseCommand          = increaseGlobalScope
+setCommand :: Parser Command
+setCommand               = setGlobalScope
+setBitwidthCommand :: Parser Command
+setBitwidthCommand       = setBitwidth
+setMaxIntCommand :: Parser Command
+setMaxIntCommand       = setMaxInt
 nextCommand :: ParsecT String () Identity Command
 nextCommand              = return Next
 quitCommand :: ParsecT String () Identity Command
@@ -132,8 +164,12 @@ reloadCommand :: ParsecT String () Identity Command
 reloadCommand            = return Reload
 findCommand :: ParsecT String () Identity Command
 findCommand              = Find `liftM` (gap >> claferInstance)
-scopeCommand :: ParsecT String () Identity Command
-scopeCommand             = return ShowScope
+showScopesCommand :: ParsecT String () Identity Command
+showScopesCommand             = return ShowScopes
+saveScopesCommand :: ParsecT String () Identity Command
+saveScopesCommand        = return SaveScopes
+loadScopesCommand :: ParsecT String () Identity Command
+loadScopesCommand        = return LoadScopes
 claferModelCommand :: ParsecT String () Identity Command
 claferModelCommand       = return ShowClaferModel
 alloyModelCommand :: ParsecT String () Identity Command
@@ -151,18 +187,25 @@ increaseGlobalScope :: Parser Command
 increaseGlobalScope =
     do
         try (gap >> explicitIncreaseGlobalScope)
-        <|>
-        return (IncreaseGlobalScope 1)
+    <|>
+    return (IncreaseGlobalScope 1)
 
+setGlobalScope :: Parser Command
+setGlobalScope =
+    do
+        try (gap >> explicitSetGlobalScope) 
+    <|>
+    do
+        try (gap >> explicitSetScope)
 
 explicitIncreaseGlobalScope :: Parser Command
 explicitIncreaseGlobalScope =
-    do
-        i <- number
-        return $ IncreaseGlobalScope i
+    fmap IncreaseGlobalScope signedNumber
     <|>
     increaseScope
 
+explicitSetGlobalScope :: Parser Command
+explicitSetGlobalScope = fmap SetGlobalScope number
     
 increaseScope :: Parser Command
 increaseScope = 
@@ -173,20 +216,44 @@ increaseScope =
             <|>
             return (IncreaseScope name 1)
             
-        
 explicitIncreaseScope :: String -> Parser Command
-explicitIncreaseScope name =
-    do
-        i <- number
-        return $ IncreaseScope name i
+explicitIncreaseScope name = fmap (IncreaseScope name) signedNumber
 
+explicitSetScope :: Parser Command
+explicitSetScope =
+    do
+        name <- clafer
+        gap
+        i <- number
+        return (SetScope name i)
+
+setBitwidth :: Parser Command
+setBitwidth =
+    do
+        gap
+        b <- number
+        return $ SetBitwidth b
+
+setMaxInt :: Parser Command
+setMaxInt =
+    do
+        gap
+        b <- number
+        return $ SetMaxInt b
 
 number :: Parser Integer
-number = read `liftM` many1 digit
+number = do 
+            n <- many1 digit
+            return $ read n
 
+signedNumber :: Parser Integer
+signedNumber = do
+    s <- option "" $ string "-"
+    n <- many1 digit
+    return $ read $ s ++ n
 
 clafer :: Parser String        
-clafer = many1 (letter <?> "clafer")
+clafer = many1 ((alphaNum <|> char ':' <|> char '_') <?> "clafer")
 
 
 claferInstance :: Parser String

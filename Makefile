@@ -111,10 +111,12 @@ lib:
 		cp lib/$(LIB) lib; \
 	fi
 	
-runTests:
+test:
 	# Only test a subset of the suite. The other cases do not work yet.
 	cabal configure --enable-tests
 	cabal build
+	mkdir dist/build/test-suite/lib
+	cp alloyIG.jar dist/build/test-suite/lib
 	cabal test
 	./claferIG --all=4 -s dist/run test/suite/backquoted.cfr
 	./claferIG --all=4 -s dist/run test/suite/BobsTeam.cfr

@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns, GeneralizedNewtypeDeriving, StandaloneDeriving, DeriveDataTypeable #-}
 
 {-
- Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2014 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -32,7 +32,6 @@ module Language.Clafer.IG.ClaferIG (
     getInfo,
     getStrMap,
     ClaferIGT(..), 
-    Scope(nameOfScope), 
     Instance(..), 
     Counterexample(..), 
     runClaferIGT, 
@@ -45,9 +44,11 @@ module Language.Clafer.IG.ClaferIG (
     setGlobalScope, 
     getScopes, 
     getScope, 
+    getQNameMaps,
     valueOfScope, 
     increaseScope, 
     setScope, 
+    setAlloyScope, 
     next, 
     setUnsatCoreMinimization,  
     setBitwidth, 
@@ -56,9 +57,11 @@ module Language.Clafer.IG.ClaferIG (
     findRemovable,
     fst3,
     getlineNumMap,
-    strictReadFile) where
+    strictReadFile,
+    sigToClaferName) where
 
 import Language.Clafer
+import Language.Clafer.QNameUID
 import Language.ClaferT
 import Language.Clafer.Intermediate.Intclafer
 import qualified Language.Clafer.Intermediate.Analysis as Analysis
@@ -88,6 +91,7 @@ data IGArgs = IGArgs {
     claferModelFile :: FilePath,
     alloySolution :: Bool,
     bitwidth :: Integer,
+    maxInt :: Integer,
     useUids :: Bool,
     addTypes :: Bool,
     json :: Bool,
@@ -130,13 +134,11 @@ data ClaferIGEnv = ClaferIGEnv{
     claferIGArgs :: IGArgs,
     constraints:: [Constraint], 
     claferModel:: String, 
-    claferToSigNameMap :: Map String String,
+    qNameMaps :: QNameMaps,
     info :: Analysis.Info,
     strMap :: Map Int String,
     lineNumMap :: Map Integer String
 }
-
-data Scope = Scope {nameOfScope::String, sigName::String}
 
 data Instance =
     Instance {modelInstance::ClaferModel, alloyModelInstance::String} |
@@ -183,18 +185,17 @@ load                 igArgs    =
         lift $ AlloyIG.sendLoadCommand alloyModel
         lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
 
-        sigs <- lift $ AlloyIG.getSigs
-        let claferToSigNameMap = fromListWithKey (error . ("Duplicate clafer name " ++)) [(sigToClaferName x, x) | x <- sigs]
-        
+        let qNameMaps = deriveQNameMaps ir
+
         let info = Analysis.gatherInfo ir 
         let irTrace = editMap $ irModuleTrace claferEnv'
 
-        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel claferToSigNameMap info sMap irTrace
+        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel qNameMaps info sMap irTrace
     where
     editMap :: (Map.Map Span [Ir]) -> (Map.Map Integer String) -- Map Line Number to Clafer Name
     editMap = 
         fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case (getIClafer ir) of 
-            Just (IClafer _ _ _ i _ _ _ _ _) -> (num, i) : acc
+            Just (IClafer _ _ _ _ uid' _ _ _ _) -> (num, uid') : acc
             _ -> acc) [] . tail . (Data.List.foldr (\x acc -> case x of
                 ((Span (Pos l1 _) (Pos l2 _)), irs)                 -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
                 ((PosSpan _ (Pos l1 _) (Pos l2 _)), irs)            -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
@@ -216,8 +217,9 @@ load                 igArgs    =
             addModuleFragment code
             parse
             compile
-            result <- generate
-            return (claferEnv result, outputCode result, mappingToAlloy result, stringMap result)
+            results <- generate
+            let (Just alloyResult) = Map.lookup Alloy results
+            return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
     claferArgs = defaultClaferArgs{keep_unused = True, no_stats = True, skip_goals = True ,flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
@@ -262,37 +264,32 @@ setGlobalScope :: MonadIO m => Integer -> ClaferIGT m ()
 setGlobalScope scope = ClaferIGT $ lift $ AlloyIG.sendSetGlobalScopeCommand scope
 
 
-getScopes :: MonadIO m => ClaferIGT m [Scope]
-getScopes = 
-    do
-        scopes <- ClaferIGT $ lift AlloyIG.getScopes
-        return $ [Scope (sigToClaferName sig) sig | (sig, _) <- scopes]
+getScopes :: MonadIO m => ClaferIGT m [ (String, Integer) ]
+getScopes = ClaferIGT $ lift AlloyIG.getScopes
         
         
-getScope :: MonadIO m => String -> ClaferIGT m (Either String Scope)
-getScope name =
-    do
-        claferToSigNameMap' <- fetches claferToSigNameMap
-        runErrorT $ case name `Map.lookup` claferToSigNameMap' of
-            Just sigName -> return $ Scope name sigName
-            Nothing      -> throwError $ "Unknown clafer " ++ name
-        
+getScope :: MonadIO m => QName -> ClaferIGT m ([String])
+getScope qName = do
+        qNameMaps' <- fetches qNameMaps
+        return $ getUIDs qNameMaps' qName
 
-valueOfScope :: MonadIO m => Scope -> ClaferIGT m Integer
-valueOfScope Scope{sigName} = ClaferIGT $ lift $ AlloyIG.getScope sigName
+getQNameMaps :: MonadIO m => ClaferIGT m (QNameMaps)
+getQNameMaps = fetches qNameMaps
+
+valueOfScope :: MonadIO m => String -> ClaferIGT m Integer
+valueOfScope sigName = ClaferIGT $ lift $ AlloyIG.getScope sigName
 
 
-increaseScope :: MonadIO m => Integer -> Scope -> ClaferIGT m (Either String ())
-increaseScope increment scope =
-    do
-        value <- valueOfScope scope
-        setScope (value + increment) scope
+increaseScope :: MonadIO m => Integer -> (String, Integer) -> ClaferIGT m (Either String ())
+increaseScope increment (sigName, value) = setAlloyScope (value + increment) sigName
     
+setScope :: MonadIO m => Integer -> (String, Integer) -> ClaferIGT m (Either String ())
+setScope value (sigName, _) = setAlloyScope value sigName
 
-setScope :: MonadIO m => Integer -> Scope -> ClaferIGT m (Either String ())
-setScope scope Scope{sigName} =
+setAlloyScope :: MonadIO m => Integer -> String -> ClaferIGT m (Either String ())
+setAlloyScope value sigName =
     do
-        subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName scope
+        subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName value
         runErrorT $ maybe (return ()) throwError $ sigToClaferName <$> subset
 
 
