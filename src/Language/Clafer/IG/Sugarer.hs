@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2012-2013 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2014 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -30,15 +30,15 @@ import Data.Map as Map hiding (map, foldr, foldl)
 import Prelude hiding (id)
 
 
--- Sample: maps the id to the its simple name and the number of times its simple name appeared in the census before it
--- Count: maps the simple name to the total count of the simple name
+-- | Sample: maps the id to the its simple name and the number of times its simple name appeared in the census before it
+-- | Count: maps the simple name to the total count of the simple name
 data Census = Census 
     (Map Id (Int, String))  -- Sample 
     (Map String Int)        -- Counts
  deriving Show
 
 
--- Adds the full name to the census
+-- | Adds the full name to the census
 poll :: Id -> Census -> Census
 poll id (Census sample' counts') =
     Census sample'' counts''
@@ -54,7 +54,7 @@ poll id (Census sample' counts') =
         "" ->  error "Unexpected Clafer name " ++ name'
         x -> tail x
 
--- Count the number of each clafer
+-- | Count the number of each clafer
 claferModelCensus :: ClaferModel -> Census
 claferModelCensus (ClaferModel topLevelClafers) =
     clafersCensus (Census Map.empty Map.empty) topLevelClafers
@@ -63,7 +63,7 @@ claferModelCensus (ClaferModel topLevelClafers) =
     claferCensus census Clafer{c_id=id, c_children=children} = poll id (clafersCensus census children) 
 
 
--- Rewrite the model into a human-friendlier format
+-- | Rewrite the model into a human-friendlier format
 sugarClaferModel:: Bool -> Bool  -> Maybe Analysis.Info -> ClaferModel -> (Map Int String) -> ClaferModel
 sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMap =
     ClaferModel $ map sugarClafer topLevelClafers

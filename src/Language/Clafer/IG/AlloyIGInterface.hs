@@ -35,6 +35,7 @@ import Language.Clafer.Front.Absclafer (Span(..), Pos(..))
 import Language.Clafer.IG.Process
 import System.Console.Haskeline.MonadException
 
+-- | An interface to the Alloy Analyzer
 
 newtype AlloyIGT m a = AlloyIGT (StateT (Maybe AlloyIGEnv) (ReaderT Process m) a) deriving (Applicative, Functor, Monad, MonadIO)
 
@@ -55,7 +56,7 @@ set = AlloyIGT . put . Just
 proc :: Monad m => AlloyIGT m Process
 proc = AlloyIGT ask
 
-
+-- | Instance generator's environment
 data AlloyIGEnv = AlloyIGEnv {alloyModel::String, sigMap::Map String Sig, scopes::Map String Integer, globalScope::Integer}
 
 
@@ -94,7 +95,7 @@ getAlloyModel = fetches alloyModel
 getSigs :: MonadIO m => AlloyIGT m [String]
 getSigs = keys `liftM` fetches sigMap
 
-
+-- | Call load before any other commands.
 load :: Process -> String -> IO AlloyIGEnv
 load proce alloyModel' =
     do
@@ -120,7 +121,6 @@ load proce alloyModel' =
             return $ Sig sig multiplicity (if null subset then Nothing else Just subset) startingScope
 
 
--- Call load before any other commands.
 sendLoadCommand :: MonadIO m => String -> AlloyIGT m ()
 sendLoadCommand alloyModel' =
     do
@@ -137,7 +137,7 @@ sendLoadCommand alloyModel' =
             Nothing    -> sendSetScopeCommand name 1 >> return ()
 
 
--- Get the next solution from alloyIG
+-- | Get the next solution from alloyIG
 sendNextCommand :: MonadIO m => AlloyIGT m (Maybe String)
 sendNextCommand =
     do
@@ -161,7 +161,7 @@ getScopes :: MonadIO m => AlloyIGT m [(String, Integer)]
 getScopes = toList `liftM` fetches scopes
             
 
--- Tell alloyIG to change the scope of a sig
+-- | Tell alloyIG to change the scope of a sig
 sendSetScopeCommand :: MonadIO m => String -> Integer -> AlloyIGT m (Maybe String)
 sendSetScopeCommand sig scope =
     do
@@ -191,7 +191,7 @@ getGlobalScope :: MonadIO m => AlloyIGT m Integer
 getGlobalScope = fetches globalScope
 
 
--- Tell alloyIG to change the global scope
+-- | Tell alloyIG to change the global scope
 sendSetGlobalScopeCommand :: MonadIO m => Integer -> AlloyIGT m ()
 sendSetGlobalScopeCommand scope =
     do
@@ -202,22 +202,22 @@ sendSetGlobalScopeCommand scope =
         set env {globalScope = scope}
 
 
--- Tell alloyIG to recalculate the solution
+-- | Tell alloyIG to recalculate the solution
 sendResolveCommand :: MonadIO m => AlloyIGT m ()
 sendResolveCommand = putMsg "resolve"
 
 
--- Tell alloyIG to save the current state
+-- | Tell alloyIG to save the current state
 sendSaveStateCommand :: MonadIO m => AlloyIGT m ()
 sendSaveStateCommand = putMsg "saveState"
 
 
--- Tell alloyIG to restore the state
+-- | Tell alloyIG to restore the state
 sendRestoreStateCommand :: MonadIO m => AlloyIGT m ()
 sendRestoreStateCommand = putMsg "restoreState"
 
 
--- Tell alloyIG to remove the constraint
+-- | Tell alloyIG to remove the constraint
 sendRemoveConstraintCommand :: MonadIO m => Span -> AlloyIGT m ()
 sendRemoveConstraintCommand s = case s of
     (Span from to) -> 
@@ -235,7 +235,7 @@ sendRemoveConstraintCommand s = case s of
         putMsg (show line) >> putMsg (show column)  -- Should never happen
         
 
--- Tell alloyIG to return the unsat core of the previous operation        
+-- | Tell alloyIG to return the unsat core of the previous operation        
 sendUnsatCoreCommand :: MonadIO m => AlloyIGT m UnsatCore
 sendUnsatCoreCommand =
     do
@@ -248,10 +248,10 @@ sendUnsatCoreCommand =
     readConstraint = liftM2 Span readPosition readPosition
             
             
--- Tell alloyIG to change the unsat core minimization level.
--- 0 -> Fastest
--- 1 -> Medium
--- 2 -> Best
+-- | Tell alloyIG to change the unsat core minimization level.
+--  0 -> Fastest,
+--  1 -> Medium,
+--  2 -> Best
 sendSetUnsatCoreMinimizationCommand :: MonadIO m => Integer -> AlloyIGT m ()
 sendSetUnsatCoreMinimizationCommand level =
     do
@@ -259,7 +259,7 @@ sendSetUnsatCoreMinimizationCommand level =
         putMsg $ show level
         
 
--- Tell alloyIG to change the bitwidth        
+-- | Tell alloyIG to change the bitwidth        
 sendSetBitwidthCommand :: MonadIO m => Integer -> AlloyIGT m ()
 sendSetBitwidthCommand bitwidth =
     do
@@ -268,7 +268,7 @@ sendSetBitwidthCommand bitwidth =
         putMsg $ show bitwidth
 
 
--- Tell alloyIG to quit
+-- | Tell alloyIG to quit
 sendQuitCommand :: MonadIO m => AlloyIGT m ()
 sendQuitCommand = putMsg "quit"
 

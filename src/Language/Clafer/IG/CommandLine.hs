@@ -58,7 +58,7 @@ data AutoCompleteContext = AutoCompleteContext {clafers::IORef [String], claferI
 
 data Context = Context {currentAlloyInstance::Maybe String, saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
 
-
+-- | Interactive session interface
 runCommandLine :: ClaferIGT IO ()
 runCommandLine =
     do
@@ -508,15 +508,15 @@ pickLargerScope    oldScopes              (uid, val)        =
         oldVal = SMap.findWithDefault val uid oldScopesMap
     in (uid, max val oldVal)
 
--- bitwidth required to store the given integer
+-- | bitwidth required to store the given integer
 requiredBitwidth :: Integer -> Integer
 requiredBitwidth    n    = ceiling $ logBase 2 $ (+1) $ (*2) $ intToFloat n
 
--- the largest integer allowed by the given bitwidth
+-- | the largest integer allowed by the given bitwidth
 allowedMaxInt :: Integer -> Integer
 allowedMaxInt    bw       = (2 ^ (bw - 1)) - 1
 
--- the smallest integer allowed by the given bitwidth
+-- | the smallest integer allowed by the given bitwidth
 allowedMinInt :: Integer -> Integer
 allowedMinInt    bw       = -((allowedMaxInt bw) + 1)
 

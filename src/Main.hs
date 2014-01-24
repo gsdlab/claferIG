@@ -119,7 +119,8 @@ runClaferIG args' =
             Nothing    -> runCommandLine
             
         quit
-            
+
+-- | Convert an Alloy XML file into an instance in Clafer
 runAlloySolution :: IGArgs -> IO () 
 runAlloySolution args' =
     do

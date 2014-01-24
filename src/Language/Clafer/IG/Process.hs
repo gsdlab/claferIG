@@ -37,7 +37,7 @@ executableDirectory :: IO FilePath
 executableDirectory = fst `liftM` splitExecutablePath
 
 
--- Start another process and return the piped std_in, std_out stream
+-- | Start another process and return the piped std_in, std_out stream
 pipeProcess :: FilePath -> [String] -> IO Process
 pipeProcess exec args =
     do
@@ -47,12 +47,12 @@ pipeProcess exec args =
         return $ Process stdIn' stdOut' proceHandle -- Pipe always has a handle according to docs
     
     
--- Wait until the process terminates
+-- | Wait until the process terminates
 waitFor :: Process -> IO ExitCode
 waitFor proce = waitForProcess (procHandle proce)
 
 
--- Reads the entire output verbatim
+-- | Reads the entire output verbatim
 getContentsVerbatim :: Process -> IO String
 getContentsVerbatim proce =
     do
@@ -62,7 +62,7 @@ getContentsVerbatim proce =
         return contents
 
     
--- Read the message
+-- | Read the message
 getMessage :: MonadIO m => Process -> m String
 getMessage proce =
     liftIO $ do
@@ -72,7 +72,7 @@ getMessage proce =
 readMessage :: (Read r, MonadIO m) => Process -> m r   
 readMessage proce = read `liftM` getMessage proce
 
--- Put the message
+-- | Put the message
 putMessage :: MonadIO m => Process -> String -> m ()
 putMessage proce message =
     liftIO $ do

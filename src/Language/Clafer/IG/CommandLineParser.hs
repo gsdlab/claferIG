@@ -30,7 +30,7 @@ import Text.Parsec.Prim hiding (try)
 import Data.Functor.Identity
 
 
-
+-- | Interactive session commands
 data Command = Next | 
                IncreaseGlobalScope Integer | 
                IncreaseScope String Integer | 
@@ -79,8 +79,8 @@ parseCommandLine input =
             return c
 
 
--- This function uses the expected/unexpected messages to understand what to autocomplete.
--- Any unexpected character means parse did not reach the end of the input, hence cannot autocomplete.
+-- | This function uses the expected/unexpected messages to understand what to autocomplete.
+--   Any unexpected character means parse did not reach the end of the input, hence cannot autocomplete.
 parseCommandLineAutoComplete :: String -> ParseError
 parseCommandLineAutoComplete input =
     case parse doParse "claferIG autocomplete" input of
