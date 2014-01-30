@@ -23,6 +23,7 @@
 -}
 
 module Language.Clafer.IG.ClaferIG (
+    claferIGVersion,
     IGArgs(..),
     ClaferIGEnv(..),
     getClaferEnv,
@@ -35,7 +36,6 @@ module Language.Clafer.IG.ClaferIG (
     Instance(..), 
     Counterexample(..), 
     runClaferIGT, 
-    claferIGVersion, 
     getAlloyModel, 
     solve, 
     getClafers, 
@@ -71,7 +71,6 @@ import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.Constraints
 import Language.Clafer.IG.Solution
 import Language.Clafer.IG.Sugarer
-import Language.Clafer.IG.Version
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Error
@@ -84,6 +83,11 @@ import qualified Data.Sequence as Seq
 import Data.Maybe
 import Data.Data
 import System.Console.Haskeline.MonadException
+import Paths_claferIG (version)
+import Data.Version (showVersion)
+
+claferIGVersion :: String
+claferIGVersion = "ClaferIG " ++ showVersion Paths_claferIG.version
 
 data IGArgs = IGArgs {
     all :: Maybe Integer,
@@ -148,9 +152,6 @@ data Instance =
 
 data Counterexample = Counterexample {removedConstraints::[Constraint], counterexampleInstance::ClaferModel, counterexampleAlloyInstance::String}
 
-claferIGVersion :: String
-claferIGVersion = "ClaferIG " ++ version
-    
 getClaferEnv :: Monad m => ClaferIGT m ClaferEnv
 getClaferEnv = fetches claferEnv'
 

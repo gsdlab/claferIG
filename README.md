@@ -18,9 +18,6 @@ Contributors
 Getting Clafer Tools
 --------------------
 
-Getting Clafer Tools
---------------------
-
 Binary distributions of the release 0.3.5 of Clafer Tools for Windows, Mac, and Linux, 
 can be downloaded from [Clafer Tools - Binary Distributions](http://http://gsd.uwaterloo.ca/clafer-tools-binary-distributions). 
 Clafer Wiki requires Haskell Platform and MinGW to run on Windows. 
@@ -43,6 +40,20 @@ Integration with Sublime Text 2
 -------------------------------
 
 See [IDEs/claferIG-README.md](IDEs/claferIG-README.md)
+
+Installation From Hackage
+-------------------------
+
+Dependencies
+
+* [The Haskell Platform](http://hackage.haskell.org/platform/) v2013.2.0.0
+
+ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.3.5/) and it can be installed using
+
+* `cabal update`
+* `cabal install claferIG`
+* To get the minisatproover library, execute `make lib` and copy the `lib` folder into the Cabal's `bin` folder
+* To automatically download Alloy jars, execute `make` in `claferIG-0.3.5/tools` inside the Cabal's library folder and copy the `tools` folder into the Cabal's `bin` folder
 
 Building & Installation From Source Code
 ----------------------------------------

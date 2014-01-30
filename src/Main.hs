@@ -58,7 +58,7 @@ claferIGArgsDef = IGArgs {
     check_duplicates_comp       = def &= help "Check duplicated clafer names during compiling"  &= name "c",
     skip_resolver_comp          = def &= help "Skip name resolution during compiling" &= name "f",
     scope_strategy_comp         = Simple &= help "Use scope computation strategy during compiling: none, simple (default), or full." &= name "ss"
-} &= summary claferIGVersion
+} &= summary claferIGVersion &= program "claferig"
 
 
 main :: IO ()
