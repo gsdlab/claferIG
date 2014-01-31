@@ -46,11 +46,11 @@ ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/clafer
 
 1. `cabal update`
 2. `cabal install claferIG`
-3. `cd <cabal's lib or share folder>`  (`lib` on Windows or `share` on Linux and Mac)
+3. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\i386-windows-ghc-7.6.3\claferIG-0.3.5.1` on Windows or `.cabal/share/x86_64-linux-ghc-7.6.3/claferIG-0.3.5.1/` on Linux)
 3. to automatically download Alloy jars
-  * execute `make` in `clafer-0.3.5.1/tools` 
+  * execute `make` in `tools` 
 4. To get the `minisatproover` library
-  * execute `make lib` in clafer-0.3.5.1`
+  * execute `make lib`
 5. copy the following into the Cabal's `bin` folder
   * the file `alloyIG.jar`
   * the folder `tools`
