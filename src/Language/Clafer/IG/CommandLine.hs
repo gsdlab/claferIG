@@ -167,9 +167,9 @@ runCommandLine =
     loop Help context =
         do
             outputStrLn (
-                "------------------\n" ++
+                "--------------------\n" ++
                 "| " ++ claferIGVersion ++ " |\n" ++
-                "------------------\n\n" ++
+                "--------------------\n\n" ++
                 "You can invoke the following commands as indicated by single quotes:\n" ++
                 "[tab]              - print the available commands\n" ++ 
                 "                   - auto-complete command name, a clafer name, or clafer instance name in a given context\n" ++
