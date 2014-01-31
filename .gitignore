@@ -7,6 +7,7 @@ tools
 *.lkshs
 *.lkshw
 *.jar
+!alloyIG.jar
 *.dll
 *.sublime-project
 *.sublime-workspace
