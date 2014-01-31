@@ -1,5 +1,6 @@
 dist
 lib
+!lib/minisatproover.md
 tools
 .dist-buildwrapper
 .project
