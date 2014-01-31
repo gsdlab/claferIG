@@ -1,7 +1,7 @@
 Clafer Instance Generator
 =========================
 
-v0.3.5.20-01-2014
+v0.3.5.1
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
 overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
@@ -11,54 +11,48 @@ For more information, see [technical report](http://gsd.uwaterloo.ca/node/462).
 Contributors
 ------------
 
-* [Jimmy Liang](http://gsd.uwaterloo.ca/jliang), MSc. Candidate. Main developer.
-* [Michał Antkiewicz](http://gsd.uwaterloo.ca/mantkiew), Research Engineer. Requirements, development, architecture, testing, technology transfer.
+* [Jimmy Liang](http://gsd.uwaterloo.ca/jliang), Main developer.
+* [Michał Antkiewicz](http://gsd.uwaterloo.ca/mantkiew), Requirements, development, architecture, testing, technology transfer.
 * Luke Michael Brown, co-op student May-Aug 2013. Many improvements.
 
-Getting Clafer Tools
---------------------
+Getting the Clafer Instance Generator
+-------------------------------------
 
-Binary distributions of the release 0.3.5 of Clafer Tools for Windows, Mac, and Linux, 
-can be downloaded from [Clafer Tools - Binary Distributions](http://http://gsd.uwaterloo.ca/clafer-tools-binary-distributions). 
-Clafer Wiki requires Haskell Platform and MinGW to run on Windows. 
-
-In case these binaries do not work on your particular machine configuration, the tools can be built from source code, as described below.
+Clafer can be installed from a binary distribution (preferred), from Hackage, and from the source code.
 
 ### Dependencies for running
 
-* [Clafer](https://github.com/gsdlab/clafer) v0.3.5
+Regardless of the installation method, the following are required:
+
+* [Clafer](https://github.com/gsdlab/clafer) v0.3.5.1
 * [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) v6+, 32bit
 * [Alloy4.1](http://alloy.mit.edu/alloy/download.html)
 
-### Installation
+### Installation from binaries
+
+Binary distributions of the release 0.3.5.1 of Clafer Tools for Windows, Mac, and Linux, 
+can be downloaded from [Clafer Tools - Binary Distributions](http://http://gsd.uwaterloo.ca/clafer-tools-binary-distributions). 
 
 1. download the binaries and unpack `<target directory>` of your choice
 2. add the `<target directory>` to your system path so that the executables can be found
-3. copy Alloy 4.1's jar to the `<target directory>/tools` folder
 
-Integration with Sublime Text 2
--------------------------------
-
-See [IDEs/claferIG-README.md](IDEs/claferIG-README.md)
-
-Installation From Hackage
--------------------------
+### Installation From Hackage
 
 Dependencies
 
 * [The Haskell Platform](http://hackage.haskell.org/platform/) v2013.2.0.0
 
-ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.3.5/) and it can be installed using
+ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.3.5.1/) and it can be installed using
 
-* `cabal update`
-* `cabal install claferIG`
-* To get the minisatproover library, execute `make lib` and copy the `lib` folder into the Cabal's `bin` folder
-* To automatically download Alloy jars, execute `make` in `claferIG-0.3.5/tools` inside the Cabal's library folder and copy the `tools` folder into the Cabal's `bin` folder
+1. `cabal update`
+2. `cabal install clafer`
+3. to automatically download Alloy jars
+  * execute `make` in `clafer-0.3.5.1/tools` inside the Cabal's library folder
+4. To get the `minisatproover` library, execute `make lib` and copy the `lib` folder into the Cabal's `bin` folder
 
-Building & Installation From Source Code
-----------------------------------------
+### Installation from the source code
 
-### Additional dependencies for building
+Dependencies
 
 * [Clafer compiler](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`)). The version number of the compiler must match the version of the instance generator.
 * On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
@@ -95,6 +89,13 @@ Development versions from branches `develop` should work well together but this 
 #### Note: 
 > On Windows, use `/` with the `make` command instead of `\`.
 
+
+Integration with Sublime Text 2
+-------------------------------
+
+See [IDEs/claferIG-README.md](IDEs/claferIG-README.md)
+
+
 Usage
 =====
 
@@ -104,10 +105,9 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 
 (As printed by `claferIG --help`)
 
-```
-ClaferIG v0.3.5.20-01-2014
+``` v0.3.5.1
 
-igargs [OPTIONS] FILE
+igaONS] FILE
 
 Common flags:
      --all=INT                                 Saves all instances up to the
@@ -156,9 +156,9 @@ Common flags:
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
 ```
-------------------------------
-| ClaferIG v0.3.5.20-01-2014 |
-------------------------------
+---------------------
+| ClaferIG v0.3.5.1 |
+---------------------
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands
@@ -304,6 +304,6 @@ Need help?
   * Try a live instance of [ClaferIDE](http://t3-necsis.cs.uwaterloo.ca:8094)
   * Try a live instance of [ClaferConfigurator](http://t3-necsis.cs.uwaterloo.ca:8093)
   * Try a live instance of [ClaferMooVisualizer](http://t3-necsis.cs.uwaterloo.ca:8092)
-* Take a look at (incomplete) [Clafer wiki](https://github.com/gsdlab/clafer/wiki)
+* Take a look at (incomplete) [Clafer by examples wiki](https://github.com/gsdlab/clafer/wiki)
 * Browse example models in the [test suite](https://github.com/gsdlab/clafer/tree/master/test/positive) and [MOO examples](https://github.com/gsdlab/clafer/tree/master/spl_configurator/dataset)
-* Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `claferig` (so that we know what they are related to) and with `jimmy-liang` or `michal` (so that Jimmy or Michał gets a notification).
+* Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `clafer` (so that we know what they are related to) and with `jimmy-liang` or `michal` (so that Jimmy or Michał gets a notification).
