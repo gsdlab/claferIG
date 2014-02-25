@@ -1,6 +1,6 @@
 dist
 lib
-!lib/minisatproover.md
+!lib/minisatprover.md
 tools
 .dist-buildwrapper
 .project

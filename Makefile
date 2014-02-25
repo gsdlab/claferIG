@@ -129,5 +129,7 @@ clean:
 	rm -rf dist
 	rm -f alloyIG.jar
 	rm -f claferIG
-	rm -rf lib
-	rm -f dateVer*
+	rm -rf lib/x86-linux
+	rm -rf lib/amd64-linux
+	rm -rf lib/x86-windows
+	rm -rf lib/x86-mac
