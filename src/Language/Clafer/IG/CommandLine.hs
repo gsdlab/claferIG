@@ -328,19 +328,31 @@ runCommandLine =
                 globalScopeTuple = ("", globalScope)
                 -- remove the "this/" prefix
                 uidScopes = globalScopeTuple : (map (\(sigName, value) -> (drop 5 sigName, value)) originalScopes)
-                json = generateJSONScopes qNameMaps' uidScopes
-                claferModelFile' = claferModelFile claferIGArgs'
-                modelName = take (length claferModelFile' - 4) claferModelFile'
-                saveName = modelName ++ ".cfr-scope"
-            
-            liftIO $ writeFile saveName json
+            liftIO $ writeCfrScopeFile uidScopes qNameMaps' $ claferModelFile claferIGArgs'
+            outputStrLn "Scopes saved to the `.cfr-scope` file."
             nextLoop context
             
     loop LoadScopes context =
         do
-            outputStrLn "Not implemented yet."
-            nextLoop context
-
+            claferIGArgs' <- lift getClaferIGArgs
+            qNameMaps' <- lift getQNameMaps
+            maybeUidScopes <- liftIO $ readCfrScopeFile qNameMaps' $ claferModelFile claferIGArgs'
+            case maybeUidScopes of
+                Nothing -> do
+                    outputStrLn "The `.cfr-scope` file does not exist. Use the command `saveScopes` to create one."
+                    nextLoop context
+                Just uidScopes -> do 
+                    let 
+                        (globalScopes, normalScopes) = partition (\(uid, _) -> null uid) uidScopes
+                        -- from the globalScopes, take the maximum
+                        globalScopeVals = map snd globalScopes
+                        globalScope = maximum globalScopeVals
+                        -- add the "this/" prefix
+                        normalScopesAlloy = map (\(uid, scope) -> ("this/"++uid, scope)) normalScopes
+                    lift $ setGlobalScope globalScope
+                    lift $ mapM_ (\(uid, val) -> setAlloyScope val uid) normalScopesAlloy
+                    outputStrLn "Scopes loaded from the `.cfr-scope` file."
+                    loop ShowScopes context
     loop (Find name) context =
         do
             case (unsaved context ++ saved context) of
