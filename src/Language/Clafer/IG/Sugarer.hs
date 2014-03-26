@@ -96,11 +96,12 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
     
     sugarId :: Bool -> Bool  -> Bool    -> Id -> Id
     sugarId    useUids' addTypes' addRefDecl id  =
-        if count == 1 
-            then Id (finalName ++ (refDecl addTypes' addRefDecl info)) 0
-            else Id (finalName ++ "$" ++ show ordinal ++ (refDecl addTypes' addRefDecl info)) 0  
+        Id (finalName ++ ordinalDisplay ++ (refDecl addTypes' addRefDecl info)) 0  
         where
         fullName = i_name id
+        ordinalDisplay = if (useUids || count > 1)
+                         then "$" ++ show ordinal
+                         else ""
 
         refDecl :: Bool -> Bool -> Maybe Analysis.Info -> String
         refDecl    True    True    (Just info')          = retrieveSuper info' $ i_name id
