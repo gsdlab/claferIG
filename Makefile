@@ -1,58 +1,28 @@
 TOOL_DIR = tools
 
-UNAME := $(shell uname | tr "A-Z" "a-z")
-
-ifeq ($(UNAME), darwin)
-	ONAME := $(shell uname -s | tr "A-Z" "a-z")
-else
-	ONAME := $(shell uname -o | tr "A-Z" "a-z")
-endif
-
+WGET_COMMAND := wget
 MNAME := $(shell uname -m | tr "A-Z" "a-z")
 
-ifeq ($(UNAME), linux)
-	ifeq ($(MNAME), i686)
-		LIB := x86-linux/libminisatprover*
+ifeq ($(OS),Windows_NT)
+	ifeq ($(shell which wget), which: wget: unkown command)
+		mingw-get install msys-wget-bin
 	endif
-	ifeq ($(MNAME), x86_64)
-		# amd64 is a nickname for x86_64
-		LIB := amd64-linux/libminisatprover*
-	endif
-endif
-ifeq ($(UNAME), windows)
-	ifeq ($(MNAME), i686)
-		LIB := x86-windows/minisatprover*
-	endif
-	ifeq ($(MNAME), x86_64)
-		LIB := x86-windows/minisatprover*
-	endif
-endif
-ifeq ($(basename $(UNAME)), mingw32_nt-6)
-	ifeq ($(MNAME), i686)
-		LIB := x86-windows/minisatprover*
-	endif
-	ifeq ($(MNAME), x86_64)
-		LIB := x86-windows/minisatprover*
-	endif
-endif
-ifeq ($(ONAME), cygwin)
-	ifeq ($(MNAME), i686)
-		LIB := x86-windows/minisatprover*
-	endif
-	ifeq ($(MNAME), x86_64)
-		LIB := x86-windows/minisatprover*
-	endif
-endif
-ifeq ($(UNAME), darwin)
-	ifeq ($(MNAME), i686)
-		LIB := x86-mac/libminisatprover*
-	endif
-	ifeq ($(MNAME), x86_64)
-		LIB := x86-mac/libminisatprover*
-	endif
-	WGET_COMMAND := curl -O
+	LIB := x86-windows/minisatprover*
 else
-	WGET_COMMAND := wget
+	UNAME := $(shell uname -s)
+	ifeq ($(UNAME), Linux)
+		ifeq ($(MNAME), i686)
+			LIB := x86-linux/libminisatprover*
+		endif
+		ifeq ($(MNAME), x86_64)
+			# amd64 is a nickname for x86_64
+			LIB := amd64-linux/libminisatprover*
+		endif
+	endif
+	ifeq ($(UNAME),Darwin)
+		WGET_COMMAND := curl -O
+		LIB := x86-mac/libminisatprover*
+	endif
 endif
 
 # Calling `make` should only build
@@ -98,11 +68,6 @@ alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/cl
 	jar cfm alloyIG.jar src/manifest -C dist/javabuild org/clafer/ig/ -C dist/javabuild edu
 
 lib:
-
-	@if [[ "$(basename $(UNAME))"=="mingw32_nt-6" && -z "$(shell which unzip)" ]] ; then \
-		mingw-get install msys-unzip-bin; \
-	fi 	
-	
 	@if test -z $(LIB); then \
 		echo "[WARNING] Did not find a minisat prover binary suitable for your system. You may need to build the binary yourself."; \
 	else \
@@ -129,5 +94,7 @@ clean:
 	rm -rf dist
 	rm -f alloyIG.jar
 	rm -f claferIG
-	rm -rf lib
-	rm -f dateVer*
+	rm -rf lib/x86-linux
+	rm -rf lib/amd64-linux
+	rm -rf lib/x86-windows
+	rm -rf lib/x86-mac

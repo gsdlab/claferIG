@@ -1,13 +1,15 @@
-UNAME := $(shell uname | tr "A-Z" "a-z")
+WGET_COMMAND := wget
 
-
-ifeq ($(UNAME), darwin)
-        WGET_COMMAND :=  curl -O
+ifeq ($(OS),Windows_NT)
+	ifeq ($(shell which wget), which: wget: unkown command)
+		mingw-get install msys-wget-bin
+	endif
 else
-	WGET_COMMAND := wget
+	UNAME := $(shell uname -s)
+	ifeq ($(UNAME),Darwin)
+		WGET_COMMAND := curl -O
+	endif
 endif
-
-
 
 all:
 	@if test ! -f "alloy4.jar"; then \
