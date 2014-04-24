@@ -1,5 +1,6 @@
 dist
 lib
+!lib/minisatproover.md
 tools
 .dist-buildwrapper
 .project
@@ -7,6 +8,7 @@ tools
 *.lkshs
 *.lkshw
 *.jar
+!alloyIG.jar
 *.dll
 *.sublime-project
 *.sublime-workspace

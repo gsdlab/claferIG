@@ -29,7 +29,7 @@ import Data.Maybe
 import Language.Clafer.IG.Solution
 import Prelude hiding (id)
 
-
+-- | Clafer model instance
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]} deriving Eq
 data Clafer = Clafer {c_id::Id, c_value::Maybe Value, c_children::[Clafer]} deriving Eq
 data Value = AliasValue {c_alias::Id} | IntValue {v_value::Int} | StringValue {v_str ::String} deriving (Show, Eq)
@@ -37,7 +37,7 @@ data Value = AliasValue {c_alias::Id} | IntValue {v_value::Int} | StringValue {v
 c_name :: Clafer -> String
 c_name = i_name . c_id
 
--- The tuple of name and ordinal must be globally unique
+-- | The tuple of name and ordinal must be globally unique
 data Id = Id {i_name::String, i_ordinal::Int} deriving (Eq, Ord, Show)
 
 data FamilyTree = FamilyTree (Map Id Node) (Map Id [Node]) deriving Show
@@ -163,7 +163,7 @@ buildFamilyTree (Solution sigs fields) =
         (s, e) = break (== '$') label
 
 
--- A map of label -> Sig
+-- | A map of label -> Sig
 buildSigMap :: Solution -> Map String Sig
 buildSigMap (Solution sigs _) = Map.fromList $ zip (map s_label sigs) sigs
 

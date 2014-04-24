@@ -28,6 +28,7 @@ import Data.Json.Builder
 import Data.String.Conversions
 import Prelude hiding (id)
 
+-- | Generate a representation of the instance in JSON format
 generateJSON :: A.Info -> M.ClaferModel                        -> String
 generateJSON    info      (M.ClaferModel topLevelClafers) = 
 	convertString $ toJsonBS $ constructElements $ map (printClafer info) topLevelClafers 

@@ -28,10 +28,10 @@ import Text.XML.HaXml
 import Text.XML.HaXml.Posn
 import Prelude hiding (id)
 
-
+-- | Alloy solution
 data Solution = Solution{s_sigs::[Sig], s_fields::[Field]} deriving (Show, Eq)
 
--- The univ sig does not have a parent
+-- | The univ sig does not have a parent
 data Sig = Sig {s_label::String, s_id::Int, s_parentId::Maybe Int, s_atoms::[Atom]} deriving (Show, Eq)
 
 data Atom = Atom {a_label::String} deriving (Show, Eq)

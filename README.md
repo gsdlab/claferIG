@@ -1,8 +1,7 @@
 Clafer Instance Generator
 =========================
 
-v0.4.0.??-??-????
-
+v0.4.0
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
 overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
@@ -12,47 +11,54 @@ For more information, see [technical report](http://gsd.uwaterloo.ca/node/462).
 Contributors
 ------------
 
-* [Jimmy Liang](http://gsd.uwaterloo.ca/jliang), MSc. Candidate. Main developer.
-* [Michał Antkiewicz](http://gsd.uwaterloo.ca/mantkiew), Research Engineer. Requirements, development, architecture, testing, technology transfer.
+* [Jimmy Liang](http://gsd.uwaterloo.ca/jliang), Main developer.
+* [Michał Antkiewicz](http://gsd.uwaterloo.ca/mantkiew), Requirements, development, architecture, testing, technology transfer.
 * Luke Michael Brown, co-op student May-Aug 2013. Many improvements.
 
-Getting Clafer Tools
---------------------
+Getting the Clafer Instance Generator
+-------------------------------------
 
-Binary distributions of release 0.4.0 of 
-Clafer, 
-ClaferIG, 
-ClaferWiki, 
-ClaferMoo, 
-ClaferMooVisualizer, 
-and ClaferConfigurator 
-for Windows, Mac, and Linux, 
-can be downloaded from [Clafer Tools - Binary Distributions](http://gsd.uwaterloo.ca/node/516). 
-Clafer Wiki requires Haskell Platform and MinGW to run on Windows. 
-
-In case these binaries do not work on your particular machine configuration, the tools can be easily built from source code, as described below.
+Clafer can be installed from a binary distribution (preferred), from Hackage, and from the source code.
 
 ### Dependencies for running
+
+Regardless of the installation method, the following are required:
 
 * [Clafer](https://github.com/gsdlab/clafer) v0.4.0
 * [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) v6+, 32bit
 * [Alloy4.1](http://alloy.mit.edu/alloy/download.html)
 
-### Installation
+### Installation from binaries
+
+Binary distributions of the release 0.4.0 of Clafer Tools for Windows, Mac, and Linux, 
+can be downloaded from [Clafer Tools - Binary Distributions](http://http://gsd.uwaterloo.ca/clafer-tools-binary-distributions). 
 
 1. download the binaries and unpack `<target directory>` of your choice
 2. add the `<target directory>` to your system path so that the executables can be found
-3. copy Alloy 4.1's jar to the `<target directory>/tools` folder
 
-Integration with Sublime Text 2
--------------------------------
+### Installation From Hackage
 
-See [IDEs/claferIG-README.md](IDEs/claferIG-README.md)
+Dependencies
 
-Building & Installation From Source Code
-----------------------------------------
+* [The Haskell Platform](http://hackage.haskell.org/platform/) v2013.2.0.0
 
-### Additional dependencies for building
+ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.3.5.1/) and it can be installed using
+
+1. `cabal update`
+2. `cabal install claferIG`
+3. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\i386-windows-ghc-7.6.3\claferIG-0.3.5.1` on Windows or `.cabal/share/x86_64-linux-ghc-7.6.3/claferIG-0.3.5.1/` on Linux)
+3. to automatically download Alloy jars
+  * execute `make` in `tools` 
+4. To get the `minisatproover` library
+  * execute `make lib`
+5. copy the following into the Cabal's `bin` folder
+  * the file `alloyIG.jar`
+  * the folder `tools`
+  * the folder `lib` 
+
+### Installation from the source code
+
+Dependencies
 
 * [Clafer compiler](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`)). The version number of the compiler must match the version of the instance generator.
 * On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
@@ -67,12 +73,11 @@ On Windows
 
 ### Important: Branches must correspond
 
-Clafer, ClaferIG, ClaferWiki, ClaferMoo,  ClaferMooVisualizer, and ClaferConfigurator are following the *simultaneous release model*. 
+All related projects are following the *simultaneous release model*. 
 The branch `master` contains releases, whereas the branch `develop` contains code under development. 
-When building the tools, the branches should match:
-Releases `clafer/master` and `claferIG/master` are guaranteed to work well together.
-Development versions `clafer/develop` and `claferIG/develop` should work well together but this might not always be the case.
-
+When building the tools, the branches should match.
+Releases from branches 'master` are guaranteed to work well together.
+Development versions from branches `develop` should work well together but this might not always be the case.
 ### Building
 
 1. install the [Clafer compiler](https://github.com/gsdlab/clafer) into a `<target directory>` of your choice
@@ -90,6 +95,13 @@ Development versions `clafer/develop` and `claferIG/develop` should work well to
 #### Note: 
 > On Windows, use `/` with the `make` command instead of `\`.
 
+
+Integration with Sublime Text 2
+-------------------------------
+
+See [IDEs/claferIG-README.md](IDEs/claferIG-README.md)
+
+
 Usage
 =====
 
@@ -100,10 +112,10 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
+ClaferIG v0.4.0
+=======
 
-ClaferIG v0.4.0.??-??-????
-
-igargs [OPTIONS] FILE
+claferig [OPTIONS] FILE
 
 Common flags:
      --all=INT                                 Saves all instances up to the
@@ -114,6 +126,10 @@ Common flags:
      --alloysolution                           Convert Alloy solution to a
                                                Clafer solution.
   -b --bitwidth=INTEGER                        Set the bitwidth for integers.
+  -m --maxint=INTEGER                          Set the bitwidth for integers
+                                               based on the largest required
+                                               number. Overrides --bitwidth
+                                               argument.
   -u --useuids                                 Use unique clafer names in the
                                                Clafer solution.
      --addtypes                                Add colon/reference types to
@@ -147,7 +163,7 @@ Common flags:
 ### Interactive Session Usage
 In the interactive mode, the users can invoke the following commands by pressing the first letter of the command name or the whole command as marked by boldface:
 
-ClaferIG v0.4.0.??-??-????
+ClaferIG v0.4.0
 
 * [tab] - print the available commands or auto-complete command name, a clafer name, or clafer instance name in a given context
 * **n**ext or **[enter]** - to produce the next instance if available, a counterexample, or to output a message that no more instances exist within the given scope
@@ -163,21 +179,44 @@ ClaferIG v0.4.0.??-??-????
 * **alloyInstance** - to print out the Alloy xml document of the most recent solution
 * **f**ind - to print a Clafer with given name found in the most recent solution
 
-The command '**i**ncrease' allows you to change the maximum number of instances for a given clafer or for all clafers as follows:
+```
+-------------------
+| ClaferIG v0.4.0 |
+-------------------
 
-* `i [enter]` - to increase for all clafers by `1` 
-* `i <name> [enter]` - to increase for the clafer `<name>` by `1` 
-* `i <name> <number>` - to increase for the clafer `<name>` by `<number>`
+You can invoke the following commands as indicated by single quotes:
+[tab]              - print the available commands
+                   - auto-complete command name, a clafer name, or clafer instance name in a given context
+'n'ext, [enter]    - to produce the next instance if available or to output a message that no more
+                     instances exist within the given scope
+'i'ncrease         - to increase the maximum number of instances of a given clafer or all clafers (scope)
+'s'et              - to set the maximum number of instances of a given clafer or all clafers (scope)
+'m'axint, 'maxint' - to set the bitwidth by providing the largest integer
+sa'v'e             - to save all instances displayed so far or a counterexample to files named
+                     <model file name>.cfr.<instance number>.data, one instance per file
+'q'uit             - to quit the interactive session
+'r'eload           - to reload your clafer model
+'h'elp             - to display this menu options summary
+'scope'            - to print out the values of the global scope and individual Clafer scopes
+'saveScopes'       - to generate a '<model>.cfr-scope' file with the current scopes
+'loadScopes'       - to load scopes from a '<model>.cfr-scope' file
+'setUnsatCoreMinimization' - to choose UnSAT core minimization strategy [fastest | medium | best]. Default: fastest
+'c', 'claferModel' - to print out the original Clafer model verbatim
+'a', 'alloyModel'  - to print out the output of Clafer translator verbatim
+'alloyInstance'    - to print out the Alloy xml document of the most recent solution
+'f'ind             - to print a Clafer with given name found in the most recent solution
 
-The command '**f**ind' allows you find a clafer with the given name and print it:
-
-* `f <name>` 
-
-The command **setUnsatCoreMinimization** let's you choose UnSAT core minimization strategy 
-
-* `setUnsatCoreMinimization fastest` - fastest but the worst
-* `setUnsatCoreMinimization medium` 
-* `setUnsatCoreMinimization best` - best but slowest even for modest size cores
+Parameterized command usage:
+'i [enter]'         - to increase for all clafers by 1
+'i <name> [enter]'  - to increase for the clafer <name> by 1
+'i <name> <number>' - to increase for the clafer <name> by <number>
+'s <number> [enter]'- to set for the clafers to <number>
+'s <name> <number>' - to set for the clafer <name> to <number>
+'f <name>'          - to display a clafer <name>
+'setUnsatCoreMinimization fastest' - fastest but the worst
+'setUnsatCoreMinimization medium'
+'setUnsatCoreMinimization best' - best but slowest even for modest size cores
+```
 
 
 Output format
@@ -283,10 +322,12 @@ The Clafer instance generator:
 
 Need help?
 ==========
-* See [Project's website](http://gsd.uwaterloo.ca/clafer) for news, technical reports and more
-  * Check out a [Clafer tutorial](http://gsd.uwaterloo.ca/node/310)
-  * Try live instance of [ClaferWiki](http://t3-necsis.cs.uwaterloo.ca:8091)
-  * Try [Online translator](http://gsd.uwaterloo.ca/clafer/translator)
-* Take a look at incomplete [Clafer wiki](https://github.com/gsdlab/clafer/wiki)
+* See [language's website](http://clafer.org) for news, technical reports and more
+  * Check out a [Clafer tutorial](http://t3-necsis.cs.uwaterloo.ca:8091/Tutorial/Intro)
+  * Try a live instance of [ClaferWiki](http://t3-necsis.cs.uwaterloo.ca:8091)
+  * Try a live instance of [ClaferIDE](http://t3-necsis.cs.uwaterloo.ca:8094)
+  * Try a live instance of [ClaferConfigurator](http://t3-necsis.cs.uwaterloo.ca:8093)
+  * Try a live instance of [ClaferMooVisualizer](http://t3-necsis.cs.uwaterloo.ca:8092)
+* Take a look at (incomplete) [Clafer by examples wiki](https://github.com/gsdlab/clafer/wiki)
 * Browse example models in the [test suite](https://github.com/gsdlab/clafer/tree/master/test/positive) and [MOO examples](https://github.com/gsdlab/clafer/tree/master/spl_configurator/dataset)
-* Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `claferig` (so that we know what they are related to) and with `kacper-bak`, `jimmy-liang`, or `michal` (so that Kacper, Jimmy, or Michał gets a notification).
+* Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `clafer` (so that we know what they are related to) and with `jimmy-liang` or `michal` (so that Jimmy or Michał gets a notification).
