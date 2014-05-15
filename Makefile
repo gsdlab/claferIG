@@ -54,10 +54,12 @@ newVersion:
 	ghc -isrc src/dateVer.hs dist/build/autogen/Paths_claferIG.hs -outputdir dist/build --make -o dateVer
 	./dateVer > src/Language/Clafer/IG/Version.hs
 
+init:
+	cabal sandbox init --sandbox=../.clafertools-cabal-sandbox
+	cabal install --only-dependencies
 
 # Build takes less time. For ease of development.
 build: alloyIG.jar
-	cabal install --only-dependencies
 	cabal configure
 	cabal build
 

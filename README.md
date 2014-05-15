@@ -61,6 +61,7 @@ ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/clafer
 Dependencies
 
 * [Clafer compiler](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`)). The version number of the compiler must match the version of the instance generator.
+* Cabal >= 1.18
 * On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
   * on Ubuntu, execute `sudo apt-get install zlib1g-dev libncurses5-dev`
 
@@ -84,6 +85,7 @@ Development versions from branches `develop` should work well together but this 
 2. in some `<source directory>`, execute `git clone git://github.com/gsdlab/claferIG.git`
 3. in `<source directory>/claferIG`, execute
   * `cabal update`
+  * `make init`
   * `make`
 
 ### Installation

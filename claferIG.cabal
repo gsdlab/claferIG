@@ -10,7 +10,7 @@ Maintainer:         Jimmy Liang <jliang@gsd.uwaterloo.ca>
 Stability:          Experimental
 Category:           Model
 Build-type:         Simple
-Cabal-version:      >=1.16
+Cabal-version:      >=1.18
 data-files:         alloyIG.jar,
                     README.md,
                     CHANGES.md,
