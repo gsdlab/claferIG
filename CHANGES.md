@@ -1,3 +1,7 @@
+**ClaferIG Version 0.3.6 released on May 23, 2014**
+
+[Release](https://github.com/gsdlab/claferIG/pull/19)
+
 **ClaferIG Version 0.3.5 released on January 20, 2014**
 
 [Release](https://github.com/gsdlab/claferIG/pull/17)
