@@ -30,11 +30,13 @@ import Language.Clafer.IG.CommandLine
 import Language.Clafer.IG.Solution
 import Language.Clafer.IG.Sugarer
 import Language.Clafer.ClaferArgs
+import Language.Clafer.JSONMetaData
 import Language.ClaferT
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
 import qualified Data.Map as Map
+import Data.List (partition)
 import Data.Maybe
 import Data.IORef
 import Prelude hiding (all)
@@ -44,7 +46,7 @@ import System.FilePath
 
 claferIGArgsDef :: IGArgs
 claferIGArgsDef = IGArgs {
-    all                         = def &= help "Saves all instances up to the provided scope or a counterexample.",
+    all                         = def &= opt "1" &= help "Saves all instances or a counterexample. Reads scopes from a `.cfr.scope` file or uses the provided global scope." &= typ "INTEGER",
     saveDir                     = def &= help "Specify the directory for storing saved files." &= typ "FILE",
     bitwidth                    = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER", -- Default bitwidth is 4.
     maxInt                      = 7 &= help "Set the bitwidth for integers based on the largest required number. Overrides --bitwidth argument." &= typ "INTEGER",
@@ -96,29 +98,45 @@ main =
 runClaferIG :: IGArgs -> IO (Either ClaferErrs ())    
 runClaferIG args' =
     runClaferIGT args' $ do
-        cModel <- liftIO $ strictReadFile $ claferModelFile args'
+        let claferModelFileName = claferModelFile args'
+        cModel <- liftIO $ strictReadFile claferModelFileName
         when (cModel == "") $ error "Cannot instantiate an empty model."
         oldBw <- getBitwidth
         env <- getClaferEnv
         let ir = fst3 $ fromJust $ cIr env
         scopes <- getScopes
         setBitwidth $ findNecessaryBitwidth ir oldBw $ map snd scopes
+        
         solve
         case all args' of
-            Just scope ->
-                do
-                    setGlobalScope scope
-                    solve
-   
-                    let file' = claferModelFile args'
-                    counterRef <- liftIO $ newIORef 1
-                    
-                    let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir args'
-                    saveAll (savePath file' counterRef >>= saveDirectory)
-                    return ()
+            Just scope -> do
+                -- copied from CommandLine LoadScopes command
+                qNameMaps' <- getQNameMaps
+                maybeUidScopes <- liftIO $ readCfrScopeFile qNameMaps' claferModelFileName
+                case maybeUidScopes of
+                    Nothing -> do
+                        liftIO $ putStrLn "Using the provided global scope as a `.cfr-scope` file does not exist. Use the command `saveScopes` to create one."
+                        setGlobalScope scope
+                    Just uidScopes -> do 
+                        let 
+                            (globalScopes, normalScopes) = partition (\(uid, _) -> null uid) uidScopes
+                            -- from the globalScopes, take the maximum
+                            globalScopeVals = map snd globalScopes
+                            globalScope = maximum globalScopeVals
+                            -- add the "this/" prefix
+                            normalScopesAlloy = map (\(uid, scope) -> ("this/"++uid, scope)) normalScopes
+                        setGlobalScope globalScope
+                        mapM_ (\(uid, val) -> setAlloyScope val uid) normalScopesAlloy
+                -- end copied
+
+                solve
+
+                counterRef <- liftIO $ newIORef 1
+                
+                let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir args'
+                saveAll (savePath claferModelFileName counterRef >>= saveDirectory)
+                quit
             Nothing    -> runCommandLine
-            
-        quit
 
 -- | Convert an Alloy XML file into an instance in Clafer
 runAlloySolution :: IGArgs -> IO () 

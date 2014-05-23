@@ -99,10 +99,10 @@ parseConstraints :: String -> IModule -> [(Span, IrTrace)] -> [Constraint]
 parseConstraints claferModel imodule mapping =
     mapMaybe (uncurry convert) mapping
     where
-    clafers = mDecls imodule >>= subclafers
-    pexps = (mapMaybe constraint $ mDecls imodule ++ concatMap elements clafers) >>= subexpressions
+    clafers = _mDecls imodule >>= subclafers
+    pexps = (mapMaybe constraint $ _mDecls imodule ++ concatMap _elements clafers) >>= subexpressions
     convert s IrPExp{pUid} =
-        Just $ UserConstraint s $ ConstraintInfo pUid (inPos $ findPExp pUid) $ extract $ inPos $ findPExp pUid
+        Just $ UserConstraint s $ ConstraintInfo pUid (_inPos $ findPExp pUid) $ extract $ _inPos $ findPExp pUid
     convert s LowerCard{pUid, isGroup = False} =
         Just $ LowerCardinalityConstraint s $ claferInfo pUid 
     convert s UpperCard{pUid, isGroup = False} =
@@ -111,8 +111,8 @@ parseConstraints claferModel imodule mapping =
         Just $ ExactCardinalityConstraint s $ claferInfo pUid
     convert _ _ = Nothing
     
-    findPExp pUid   = fromMaybe (error $ "Unknown constraint " ++ pUid) $ find ((== pUid) . pid) pexps
-    findClafer pUid = fromMaybe (error $ "Unknown clafer " ++ pUid) $ find ((== pUid) . uid) clafers
+    findPExp pUid   = fromMaybe (error $ "Unknown constraint " ++ pUid) $ find ((== pUid) . _pid) pexps
+    findClafer pUid = fromMaybe (error $ "Unknown clafer " ++ pUid) $ find ((== pUid) . _uid) clafers
     text = lines claferModel
     extract (Span (Pos l1 c1) (Pos l2 c2)) -- This one should occur the rest should not happen
         | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
@@ -173,24 +173,24 @@ parseConstraints claferModel imodule mapping =
     convertCard (l, -1) = Cardinality l Nothing
     convertCard (l, h)  = Cardinality l $ Just h
     claferInfo pUid =
-        ClaferInfo (ident claf) $ convertCard $ fromJust $ card claf
+        ClaferInfo (_ident claf) $ convertCard $ fromJust $ _card claf
         where
         claf = findClafer pUid
 
 
 subclafers :: IElement -> [IClafer]
-subclafers (IEClafer claf) = claf : (elements claf >>= subclafers)
+subclafers (IEClafer claf) = claf : (_elements claf >>= subclafers)
 subclafers _ = []
 
 constraint :: IElement -> Maybe PExp
-constraint (IEConstraint _ pexp) = Just pexp
+constraint (IEConstraint _ pexp') = Just pexp'
 constraint _ = Nothing
 
 subexpressions :: PExp -> [PExp]
-subexpressions p@PExp{I.exp = exp'} =
+subexpressions p@PExp{I._exp = exp'} =
     p : subexpressions' exp'
     where
-    subexpressions' IDeclPExp{oDecls, bpexp} =
-        concatMap (subexpressions . body) oDecls ++ subexpressions bpexp
-    subexpressions' IFunExp{exps} = concatMap subexpressions exps
+    subexpressions' IDeclPExp{_oDecls, _bpexp} =
+        concatMap (subexpressions . _body) _oDecls ++ subexpressions _bpexp
+    subexpressions' IFunExp{_exps} = concatMap subexpressions _exps
     subexpressions' _ = []

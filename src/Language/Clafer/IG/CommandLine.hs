@@ -92,7 +92,12 @@ runCommandLine =
                     
                     outputStrLn $ if json claferIGArgs' 
                         then generateJSON info claferModel
-                        else "=== Instance " ++ (show $ 1 + (length $ unsaved context)) ++ " ===\n\n" ++ (show claferModel)
+                        else let
+                                iNumber = show $ 1 + (length $ unsaved context)
+                             in
+                                "=== Instance " ++ iNumber ++ " Begin ===\n\n" ++ 
+                                (show claferModel) ++ 
+                                "\n--- Instance " ++ iNumber ++ " End ---\n\n"
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 UnsatCore core counterexample -> do
                     liftIO $ hPutStrLn stderr "No more instances found. Try increasing scope to get more instances."
@@ -328,19 +333,31 @@ runCommandLine =
                 globalScopeTuple = ("", globalScope)
                 -- remove the "this/" prefix
                 uidScopes = globalScopeTuple : (map (\(sigName, value) -> (drop 5 sigName, value)) originalScopes)
-                json = generateJSONScopes qNameMaps' uidScopes
-                claferModelFile' = claferModelFile claferIGArgs'
-                modelName = take (length claferModelFile' - 4) claferModelFile'
-                saveName = modelName ++ ".cfr-scope"
-            
-            liftIO $ writeFile saveName json
+            liftIO $ writeCfrScopeFile uidScopes qNameMaps' $ claferModelFile claferIGArgs'
+            outputStrLn "Scopes saved to the `.cfr-scope` file."
             nextLoop context
             
     loop LoadScopes context =
         do
-            outputStrLn "Not implemented yet."
-            nextLoop context
-
+            claferIGArgs' <- lift getClaferIGArgs
+            qNameMaps' <- lift getQNameMaps
+            maybeUidScopes <- liftIO $ readCfrScopeFile qNameMaps' $ claferModelFile claferIGArgs'
+            case maybeUidScopes of
+                Nothing -> do
+                    outputStrLn "The `.cfr-scope` file does not exist. Use the command `saveScopes` to create one."
+                    nextLoop context
+                Just uidScopes -> do 
+                    let 
+                        (globalScopes, normalScopes) = partition (\(uid', _) -> null uid') uidScopes
+                        -- from the globalScopes, take the maximum
+                        globalScopeVals = map snd globalScopes
+                        globalScope = maximum globalScopeVals
+                        -- add the "this/" prefix
+                        normalScopesAlloy = map (\(uid', scope) -> ("this/"++uid', scope)) normalScopes
+                    lift $ setGlobalScope globalScope
+                    lift $ mapM_ (\(uid', val) -> setAlloyScope val uid') normalScopesAlloy
+                    outputStrLn "Scopes loaded from the `.cfr-scope` file."
+                    loop ShowScopes context
     loop (Find name) context =
         do
             case (unsaved context ++ saved context) of
@@ -499,14 +516,14 @@ mergeScopes :: MonadIO m => [(UID, Integer)] -> [(UID, Integer)] -> ClaferIGT m 
 mergeScopes _ [] = return()
 mergeScopes oldScopes newScopes = do
     let mergedScopes = map (pickLargerScope oldScopes) newScopes
-    mapM_ (\(uid, val) -> setAlloyScope val uid) mergedScopes
+    mapM_ (\(uid', val) -> setAlloyScope val uid') mergedScopes
 
 pickLargerScope :: [(String, Integer)] -> (String, Integer) -> (String, Integer)
-pickLargerScope    oldScopes              (uid, val)        =
+pickLargerScope    oldScopes              (uid', val)        =
     let 
         oldScopesMap = SMap.fromList oldScopes
-        oldVal = SMap.findWithDefault val uid oldScopesMap
-    in (uid, max val oldVal)
+        oldVal = SMap.findWithDefault val uid' oldScopesMap
+    in (uid', max val oldVal)
 
 -- | bitwidth required to store the given integer
 requiredBitwidth :: Integer -> Integer
@@ -647,7 +664,7 @@ findNecessaryBitwidth ir oldBw scopeValues =
         maxInModel ir' = intToFloat $ max (maximum scopeValues) $ foldIR getMax 0 ir'
         getMax :: Ir -> Integer -> Integer 
         getMax (IRIExp (IInt n)) m = max m $ abs n
-        getMax (IRClafer IClafer{card = Just (_, n)}) m = max m n
+        getMax (IRClafer IClafer{_card = Just (_, n)}) m = max m n
         getMax _ m = m
 
 intToFloat :: Integer -> Float
