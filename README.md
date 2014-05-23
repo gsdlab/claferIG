@@ -68,9 +68,11 @@ Dependencies
 On Windows 
 
 * [MinGW+MSYS](http://mingw.org) 
-  * since the Haskell Platform already contains MinGW, you may choose to install MinGW+MSYS to the same location, e.g., `c:\...\Haskell Platform\2013.2.0.0`
-  * add the `bin` folders of MinGW (`MinGW\bin`) and MSYS (`MinGW\MSYS\1.0\bin`) to your system path
-  * `unzip` will be automatically installed 
+  * download [mingw-get-setup.exe](http://sourceforge.net/projects/mingw/files/Installer/mingw-get/)
+  * since the Haskell Platform already contains MinGW, only install MSYS. Installing another MinGW causes problems as it contains different versions of tools as compared to the MinGW in the Haskell Platform
+  * choose the existing MinGW location, e.g., `c:\...\HaskellPlatform\2013.2.0.0\MinGw`
+  * ensure `wget` and `unzip` are selected to be installed 
+  * add the `bin` folder of MSYS (`MinGW\MSYS\1.0\bin`) to your system path
 
 ### Important: Branches must correspond
 
@@ -162,9 +164,9 @@ Common flags:
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
 ```
----------------------
-| ClaferIG v0.3.6 |
----------------------
+--------------------
+| ClaferIG 0.3.6 |
+--------------------
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands
@@ -243,6 +245,8 @@ e2 : E
 A possible instance data looks as follows:
 
 ```clafer
+=== Instance 1 Begin ===
+
 a1
     b$1
     b$2
@@ -258,6 +262,8 @@ e1
     f$1 = 2
     f$2 = 3
     f$3 = 4 
+
+--- Instance 1 End ---
 ```
 
 ### Near-miss instance
@@ -306,7 +312,7 @@ Need help?
 ==========
 * See [language's website](http://clafer.org) for news, technical reports and more
   * Check out a [Clafer tutorial](http://t3-necsis.cs.uwaterloo.ca:8091/Tutorial/Intro)
-  * Try a live instance of [ClaferWiki](http://t3-necsis.cs.uwaterloo.ca:8091)
+  * Try a live instance of [ClaferWiki](http://t3-necsis.cs.uwaterloo.ca:8091) which contains a repository of models for various applications
   * Try a live instance of [ClaferIDE](http://t3-necsis.cs.uwaterloo.ca:8094)
   * Try a live instance of [ClaferConfigurator](http://t3-necsis.cs.uwaterloo.ca:8093)
   * Try a live instance of [ClaferMooVisualizer](http://t3-necsis.cs.uwaterloo.ca:8092)
