@@ -90,6 +90,7 @@ getModel fPath = runClaferIGT (defaultIGArgs fPath) $ do
 
 
 fromRight (Right x) = x
+fromRight _         = error "fromRight received Left _. Should never happen."
 
 
 case_strMapCheck :: Assertion

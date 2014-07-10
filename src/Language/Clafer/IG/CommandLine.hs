@@ -419,15 +419,7 @@ runCommandLine =
                 addScopeVal scopesMap' (Just name) = "scope = " ++ (fromJustShow $ Map.lookup name scopesMap') 
 
                 getCommentLines :: String -> [Integer]
-                getCommentLines = foldr (\(s, _) acc -> case s of
-                    (Span (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc
-                    (PosSpan _ (Pos l1 _) (Pos l2 _)) -> [l1..l2] ++ acc
-                    (Span (PosPos _ l1 _) (Pos l2 _)) -> [l1..l2] ++ acc --This one and bellow should not happen
-                    (Span (Pos l1 _) (PosPos _ l2 _)) -> [l1..l2] ++ acc
-                    (Span (PosPos _ l1 _) (PosPos _ l2 _)) -> [l1..l2] ++ acc
-                    (PosSpan _ (PosPos _ l1 _) (Pos l2 _)) -> [l1..l2] ++ acc
-                    (PosSpan _ (Pos l1 _) (PosPos _ l2 _)) ->  [l1..l2] ++ acc
-                    (PosSpan _ (PosPos _ l1 _) (PosPos _ l2 _)) -> [l1..l2] ++ acc) [] . getComments
+                getCommentLines = foldr (\((Span (Pos l1 _) (Pos l2 _)), _) acc -> [l1..l2] ++ acc) [] . getComments
 
                 getConstraintInfo :: Constraint -> String
                 getConstraintInfo (UserConstraint _ info) = show info
@@ -624,10 +616,6 @@ printError (ClaferErrs errs) =
         "Parse error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
     printErr (SemanticErr (ErrPos _ _ (Pos l c)) msg) =
         "Error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
-    printErr (ParseErr (ErrPos _ _ (PosPos _ l c)) msg) =
-        "Parse error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg   --This should never happen
-    printErr (SemanticErr (ErrPos _ _ (PosPos _ l c)) msg) =
-        "Error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg         --This should never happen
     printErr (ClaferErr msg) =
         "Error:\n    " ++ msg
 
