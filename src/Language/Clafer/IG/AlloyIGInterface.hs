@@ -224,16 +224,9 @@ sendRemoveConstraintCommand s = case s of
         do
             putMsg "removeConstraint"
             sendPosition from >> sendPosition to
-    (PosSpan _ from to) ->                          -- Should never happen
-        do
-            putMsg "removeConstraint"
-            sendPosition from >> sendPosition to
     where
     sendPosition (Pos line column) =
-        putMsg (show line) >> putMsg (show column)
-    sendPosition (PosPos _ line column) =
-        putMsg (show line) >> putMsg (show column)  -- Should never happen
-        
+        putMsg (show line) >> putMsg (show column)      
 
 -- | Tell alloyIG to return the unsat core of the previous operation        
 sendUnsatCoreCommand :: MonadIO m => AlloyIGT m UnsatCore
