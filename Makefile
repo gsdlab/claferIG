@@ -1,30 +1,5 @@
 TOOL_DIR = tools
 
-WGET_COMMAND := wget
-MNAME := $(shell uname -m | tr "A-Z" "a-z")
-
-ifeq ($(OS),Windows_NT)
-	ifeq ($(shell which wget), which: wget: unkown command)
-		mingw-get install msys-wget-bin
-	endif
-	LIB := x86-windows/minisatprover*
-else
-	UNAME := $(shell uname -s)
-	ifeq ($(UNAME), Linux)
-		ifeq ($(MNAME), i686)
-			LIB := x86-linux/libminisatprover*
-		endif
-		ifeq ($(MNAME), x86_64)
-			# amd64 is a nickname for x86_64
-			LIB := amd64-linux/libminisatprover*
-		endif
-	endif
-	ifeq ($(UNAME),Darwin)
-		WGET_COMMAND := curl -O
-		LIB := x86-mac/libminisatprover*
-	endif
-endif
-
 # Calling `make` should only build
 all: alloyIG.jar lib build
 
@@ -70,13 +45,7 @@ alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/cl
 	jar cfm alloyIG.jar src/manifest -C dist/javabuild org/clafer/ig/ -C dist/javabuild edu
 
 lib:
-	@if test -z $(LIB); then \
-		echo "[WARNING] Did not find a minisat prover binary suitable for your system. You may need to build the binary yourself."; \
-	else \
-		unzip tools/alloy4.jar $(LIB) -d lib; \
-		chmod +x lib/$(LIB); \
-		cp lib/$(LIB) lib; \
-	fi
+	$(MAKE) -C $(TOOL_DIR) lib
 	
 test:
 	# Only test a subset of the suite. The other cases do not work yet.
@@ -96,7 +65,7 @@ clean:
 	rm -rf dist
 	rm -f alloyIG.jar
 	rm -f claferIG
-	rm -rf lib/x86-linux
-	rm -rf lib/amd64-linux
-	rm -rf lib/x86-windows
-	rm -rf lib/x86-mac
+	rm -rf tools/x86-linux
+	rm -rf tools/amd64-linux
+	rm -rf tools/x86-windows
+	rm -rf tools/x86-mac
