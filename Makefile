@@ -56,7 +56,7 @@ newVersion:
 
 init:
 	cabal sandbox init --sandbox=../.clafertools-cabal-sandbox
-	cabal install --only-dependencies
+	cabal install --only-dependencies --enable-tests
 
 # Build takes less time. For ease of development.
 build: alloyIG.jar
