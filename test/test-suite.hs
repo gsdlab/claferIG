@@ -31,16 +31,15 @@ import System.Directory
 import System.FilePath
 import System.Console.CmdArgs
 import Prelude hiding (all)
-import Test.Framework
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
-import Test.HUnit
+import Test.Tasty
+import Test.Tasty.HUnit
+import Test.Tasty.TH
 
-tg_testsuite :: Test.Framework.Test
+tg_testsuite :: TestTree
 tg_testsuite = $(testGroupGenerator)
 
 main :: IO ()
-main = defaultMain[tg_testsuite]
+main = defaultMain $ testGroup "Tests" [ tg_testsuite ]
 
 claferIGArgsDef :: IGArgs
 claferIGArgsDef = IGArgs {
@@ -67,7 +66,7 @@ defaultIGArgs fPath = claferIGArgsDef{claferModelFile = fPath}
 
 --getModel :: MonadIO m => FilePath -> ClaferIGT m (Either Language.ClaferT.ClaferErrs Instance)
 getModel fPath = runClaferIGT (defaultIGArgs fPath) $ do
-	setGlobalScope (fromJust $ all $ defaultIGArgs fPath)
+	setGlobalScope (fromMaybe 1 $ all $ defaultIGArgs fPath)
 	solve
 	counterRef <- liftIO $ newIORef 1
 	let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir (defaultIGArgs fPath)

@@ -82,15 +82,15 @@ test:
 	# Only test a subset of the suite. The other cases do not work yet.
 	cabal configure --enable-tests
 	cabal build
-	mkdir dist/build/test-suite/lib
-	cp alloyIG.jar dist/build/test-suite/lib
+	# Install what's needed for running the tests
+	cp alloyIG.jar dist/build/test-suite/
+	cp alloyIG.jar dist/build/claferIG/
+	cp -r tools/ dist/build/test-suite/
+	cp -r tools/ dist/build/claferIG/
+	cp -r lib/ dist/build/test-suite/
+	cp -r lib/ dist/build/claferIG/
+	# On Windows, also need to manually copy glpk_4_52.dll to dist/build/test-suite/
 	cabal test
-	./claferIG --all=4 -s dist/run test/suite/backquoted.cfr
-	./claferIG --all=4 -s dist/run test/suite/BobsTeam.cfr
-	./claferIG --all=4 -s dist/run test/suite/inconsistent.cfr
-	./claferIG --all=4 -s dist/run test/suite/PersonFingers.cfr
-	./claferIG --all=4 -s dist/run test/suite/waitingLine.cfr
-	./claferIG --all=4 -s dist/run test/suite/subclaferCardinality.cfr
 	
 clean:
 	rm -rf dist
