@@ -34,7 +34,7 @@ install:
 	mkdir -p $(to)/lib
 	mkdir -p $(to)/tools
 	cp -f lib/*minisatprover* $(to)/lib
-	cp -f tools/alloy4.jar $(to)/tools
+	cp -f tools/alloy4.2.jar $(to)/tools
 	cp -f alloyIG.jar $(to)
 	cp -f LICENSE $(to)/
 	cp -f CHANGES.md $(to)/claferIG-CHANGES.md
@@ -66,14 +66,14 @@ build: alloyIG.jar
 alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	$(MAKE) -C $(TOOL_DIR)
 	mkdir -p dist/javabuild
-	javac  -source 1.6 -target 1.6 -cp "tools/alloy4.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
+	javac  -source 1.6 -target 1.6 -cp "tools/alloy4.2.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	jar cfm alloyIG.jar src/manifest -C dist/javabuild org/clafer/ig/ -C dist/javabuild edu
 
 lib:
 	@if test -z $(LIB); then \
 		echo "[WARNING] Did not find a minisat prover binary suitable for your system. You may need to build the binary yourself."; \
 	else \
-		unzip tools/alloy4.jar $(LIB) -d lib; \
+		unzip tools/alloy4.2.jar $(LIB) -d lib; \
 		chmod +x lib/$(LIB); \
 		cp lib/$(LIB) lib; \
 	fi
