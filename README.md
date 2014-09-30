@@ -26,7 +26,7 @@ Regardless of the installation method, the following are required:
 
 * [Clafer](https://github.com/gsdlab/clafer) v0.3.7
 * [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) v7+, 32bit
-* [Alloy4.1](http://alloy.mit.edu/alloy/download.html)
+* [Alloy4.2](http://alloy.mit.edu/alloy/download.html)
 
 ### Installation from binaries
 
@@ -47,7 +47,7 @@ ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/clafer
 1. `cabal update`
 2. `cabal install claferIG`
 3. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\i386-windows-ghc-7.6.3\claferIG-0.3.7` on Windows or `.cabal/share/x86_64-linux-ghc-7.6.3/claferIG-0.3.7/` on Linux)
-3. to automatically download Alloy jars
+3. to automatically download Alloy4.2 jar
   * execute `make` in `tools` 
 4. To get the `minisatproover` library
   * execute `make lib`
