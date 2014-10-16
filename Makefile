@@ -38,8 +38,7 @@ install:
 	cp -f alloyIG.jar $(to)
 	cp -f LICENSE $(to)/
 	cp -f CHANGES.md $(to)/claferIG-CHANGES.md
-	cp -f README.md $(to)/claferIG-README.md
-	cp -f -R IDEs $(to)
+	cp -f README.md $(to)/claferIG-README.mds
 	cabal install --bindir=$(to) --ghc-option="-O"
 
 # Removes current build and makes a clean new one (Don't use if starting from scratch!)

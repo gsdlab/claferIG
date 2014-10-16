@@ -98,10 +98,10 @@ Development versions from branches `develop` should work well together but this 
 > On Windows, use `/` with the `make` command instead of `\`.
 
 
-Integration with Sublime Text 2
+Integration with Sublime Text 3
 -------------------------------
 
-See [IDEs/claferIG-README.md](IDEs/claferIG-README.md)
+See [clafer-tools-st3](https://github.com/gsdlab/clafer-tools-st3)
 
 
 Usage
