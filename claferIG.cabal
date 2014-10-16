@@ -16,12 +16,7 @@ data-files:         alloyIG.jar,
                     CHANGES.md,
                     Makefile,
                     lib/minisatprover.md,
-                    tools/Makefile,
-                    IDEs/claferIG-README.md,
-                    IDEs/sublime-text-2/Packages/SublimeREPL/config/ClaferIG/Default.sublime-commands,
-                    IDEs/sublime-text-2/Packages/SublimeREPL/config/ClaferIG/IGF.sublime-menu,
-                    IDEs/sublime-text-2/Packages/SublimeREPL/config/ClaferIG/IGS.sublime-menu
-                    
+                    tools/Makefile                    
 source-repository head
     type:           git
     location:       git://github.com/gsdlab/claferIG.git
