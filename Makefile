@@ -1,30 +1,5 @@
 TOOL_DIR = tools
 
-WGET_COMMAND := wget
-MNAME := $(shell uname -m | tr "A-Z" "a-z")
-
-ifeq ($(OS),Windows_NT)
-	ifeq ($(shell which wget), which: wget: unkown command)
-		mingw-get install msys-wget-bin
-	endif
-	LIB := x86-windows/minisatprover*
-else
-	UNAME := $(shell uname -s)
-	ifeq ($(UNAME), Linux)
-		ifeq ($(MNAME), i686)
-			LIB := x86-linux/libminisatprover*
-		endif
-		ifeq ($(MNAME), x86_64)
-			# amd64 is a nickname for x86_64
-			LIB := amd64-linux/libminisatprover*
-		endif
-	endif
-	ifeq ($(UNAME),Darwin)
-		WGET_COMMAND := curl -O
-		LIB := x86-mac/libminisatprover*
-	endif
-endif
-
 # Calling `make` should only build
 all: alloyIG.jar lib build
 
@@ -95,7 +70,7 @@ clean:
 	rm -rf dist
 	rm -f alloyIG.jar
 	rm -f claferIG
-	rm -rf lib/x86-linux
-	rm -rf lib/amd64-linux
-	rm -rf lib/x86-windows
-	rm -rf lib/x86-mac
+	rm -rf tools/x86-linux
+	rm -rf tools/amd64-linux
+	rm -rf tools/x86-windows
+	rm -rf tools/x86-mac
