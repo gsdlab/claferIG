@@ -124,7 +124,7 @@ runClaferIG args' =
                             globalScopeVals = map snd globalScopes
                             globalScope = maximum globalScopeVals
                             -- add the "this/" prefix
-                            normalScopesAlloy = map (\(uid, scope) -> ("this/"++uid, scope)) normalScopes
+                            normalScopesAlloy = map (\(uid, scope2) -> ("this/"++uid, scope2)) normalScopes
                         setGlobalScope globalScope
                         mapM_ (\(uid, val) -> setAlloyScope val uid) normalScopesAlloy
                 -- end copied

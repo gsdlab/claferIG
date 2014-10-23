@@ -64,11 +64,6 @@ data ConstraintInfo = ConstraintInfo {pId::String, pos::Span, syntax::String} de
 
 instance Show ConstraintInfo where
     show ConstraintInfo{pos = Span (Pos l c) _, syntax} = syntax ++ " (line " ++ show l ++ ", column " ++ show c ++ ")"
-    show ConstraintInfo{pos = PosSpan _ (Pos l c) _, syntax} = syntax ++ " (line " ++ show l ++ ", column " ++ show c ++ ")" -- Should never happen
-    show ConstraintInfo{pos = Span (PosPos _ l c) _, syntax} = syntax ++ " (line " ++ show l ++ ", column " ++ show c ++ ")"      -- Should never happen
-    show ConstraintInfo{pos = PosSpan _ (PosPos _ l c) _, syntax} = syntax ++ " (line " ++ show l ++ ", column " ++ show c ++ ")" -- Should never happen
-    
-
 
 isLowerCardinalityConstraint :: Constraint -> Bool
 isLowerCardinalityConstraint LowerCardinalityConstraint{} = True
@@ -82,10 +77,8 @@ isUpperCardinalityConstraint _ = False
 
 to :: Span -> Pos
 to (Span _ t) = t
-to (PosSpan _ _ t) = t -- Should never happen
 {-from :: Span -> Pos
-from (Span f _) = f
-from (PosSpan _ f _) = f -- Should never happen-}
+from (Span f _) = f -}
 
 
 lookupConstraint :: Span -> [Constraint] -> Constraint
@@ -114,56 +107,7 @@ parseConstraints claferModel imodule mapping =
     findPExp pUid   = fromMaybe (error $ "Unknown constraint " ++ pUid) $ find ((== pUid) . _pid) pexps
     findClafer pUid = fromMaybe (error $ "Unknown clafer " ++ pUid) $ find ((== pUid) . _uid) clafers
     text = lines claferModel
-    extract (Span (Pos l1 c1) (Pos l2 c2)) -- This one should occur the rest should not happen
-        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
-        | otherwise = unlines $ f1 : fs ++ [fn]
-        where
-        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
-        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
-        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
-    extract (Span (PosPos _ l1 c1) (Pos l2 c2))
-        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
-        | otherwise = unlines $ f1 : fs ++ [fn]
-        where
-        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
-        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
-        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
-    extract (Span (Pos l1 c1) (PosPos _ l2 c2))
-        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
-        | otherwise = unlines $ f1 : fs ++ [fn]
-        where
-        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
-        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
-        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
-    extract (Span (PosPos _ l1 c1) (PosPos _ l2 c2))
-        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
-        | otherwise = unlines $ f1 : fs ++ [fn]
-        where
-        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
-        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
-        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
-    extract (PosSpan _ (Pos l1 c1) (Pos l2 c2))
-        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
-        | otherwise = unlines $ f1 : fs ++ [fn]
-        where
-        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
-        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
-        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
-    extract (PosSpan _ (PosPos _ l1 c1) (Pos l2 c2))
-        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
-        | otherwise = unlines $ f1 : fs ++ [fn]
-        where
-        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
-        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
-        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
-    extract (PosSpan _ (Pos l1 c1) (PosPos _ l2 c2))
-        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
-        | otherwise = unlines $ f1 : fs ++ [fn]
-        where
-        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
-        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
-        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
-    extract (PosSpan _ (PosPos _ l1 c1) (PosPos _ l2 c2))
+    extract (Span (Pos l1 c1) (Pos l2 c2))
         | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
         | otherwise = unlines $ f1 : fs ++ [fn]
         where

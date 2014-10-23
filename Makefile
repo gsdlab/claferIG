@@ -9,12 +9,11 @@ install:
 	mkdir -p $(to)/lib
 	mkdir -p $(to)/tools
 	cp -f lib/*minisatprover* $(to)/lib
-	cp -f tools/alloy4.jar $(to)/tools
+	cp -f tools/alloy4.2.jar $(to)/tools
 	cp -f alloyIG.jar $(to)
 	cp -f LICENSE $(to)/
 	cp -f CHANGES.md $(to)/claferIG-CHANGES.md
-	cp -f README.md $(to)/claferIG-README.md
-	cp -f -R IDEs $(to)
+	cp -f README.md $(to)/claferIG-README.mds
 	cabal install --bindir=$(to) --ghc-option="-O"
 
 # Removes current build and makes a clean new one (Don't use if starting from scratch!)
@@ -31,7 +30,7 @@ newVersion:
 
 init:
 	cabal sandbox init --sandbox=../.clafertools-cabal-sandbox
-	cabal install --only-dependencies
+	cabal install --only-dependencies --enable-tests
 
 # Build takes less time. For ease of development.
 build: alloyIG.jar
@@ -41,25 +40,31 @@ build: alloyIG.jar
 alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	$(MAKE) -C $(TOOL_DIR)
 	mkdir -p dist/javabuild
-	javac  -source 1.6 -target 1.6 -cp "tools/alloy4.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
+	javac  -source 1.6 -target 1.6 -cp "tools/alloy4.2.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	jar cfm alloyIG.jar src/manifest -C dist/javabuild org/clafer/ig/ -C dist/javabuild edu
 
 lib:
-	$(MAKE) -C $(TOOL_DIR) lib
+	@if test -z $(LIB); then \
+		echo "[WARNING] Did not find a minisat prover binary suitable for your system. You may need to build the binary yourself."; \
+	else \
+		unzip tools/alloy4.2.jar $(LIB) -d lib; \
+		chmod +x lib/$(LIB); \
+		cp lib/$(LIB) lib; \
+	fi
 	
 test:
 	# Only test a subset of the suite. The other cases do not work yet.
 	cabal configure --enable-tests
 	cabal build
-	mkdir dist/build/test-suite/lib
-	cp alloyIG.jar dist/build/test-suite/lib
+	# Install what's needed for running the tests
+	cp alloyIG.jar dist/build/test-suite/
+	cp alloyIG.jar dist/build/claferIG/
+	cp -r tools/ dist/build/test-suite/
+	cp -r tools/ dist/build/claferIG/
+	cp -r lib/ dist/build/test-suite/
+	cp -r lib/ dist/build/claferIG/
+	# On Windows, also need to manually copy glpk_4_52.dll to dist/build/test-suite/
 	cabal test
-	./claferIG --all=4 -s dist/run test/suite/backquoted.cfr
-	./claferIG --all=4 -s dist/run test/suite/BobsTeam.cfr
-	./claferIG --all=4 -s dist/run test/suite/inconsistent.cfr
-	./claferIG --all=4 -s dist/run test/suite/PersonFingers.cfr
-	./claferIG --all=4 -s dist/run test/suite/waitingLine.cfr
-	./claferIG --all=4 -s dist/run test/suite/subclaferCardinality.cfr
 	
 clean:
 	rm -rf dist

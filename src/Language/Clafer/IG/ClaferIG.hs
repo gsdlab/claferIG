@@ -197,15 +197,7 @@ load                 igArgs    =
     editMap = 
         fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case (getIClafer ir) of 
             Just (IClafer _ _ _ _ uid' _ _ _ _) -> (num, uid') : acc
-            _ -> acc) [] . tail . (Data.List.foldr (\x acc -> case x of
-                ((Span (Pos l1 _) (Pos l2 _)), irs)                 -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
-                ((PosSpan _ (Pos l1 _) (Pos l2 _)), irs)            -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
-                ((Span (PosPos _ l1 _) (Pos l2 _)), irs)            -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
-                ((Span (Pos l1 _) (PosPos _ l2 _)), irs)            -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
-                ((Span (PosPos _ l1 _) (PosPos _ l2 _)), irs)       -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
-                ((PosSpan _ (PosPos _ l1 _) (Pos l2 _)), irs)       -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
-                ((PosSpan _ (Pos l1 _) (PosPos _ l2 _)), irs)       -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc
-                ((PosSpan _ (PosPos _ l1 _) (PosPos _ l2 _)), irs)  -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc) []) . toList
+            _ -> acc) [] . tail . (Data.List.foldr (\((Span (Pos l1 _) (Pos l2 _)), irs) acc -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc) []) . toList
     getIClafer :: [Ir] -> Maybe IClafer
     getIClafer [] = Nothing
     getIClafer ((IRClafer c):_) = Just c 
@@ -219,11 +211,11 @@ load                 igArgs    =
             parse
             compile
             results <- generate
-            let (Just alloyResult) = Map.lookup Alloy results
+            let (Just alloyResult) = Map.lookup Alloy42 results
             return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
-    claferArgs = defaultClaferArgs{keep_unused = True, no_stats = True, skip_goals = True ,flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
+    claferArgs = defaultClaferArgs{mode = [Alloy42], keep_unused = True, no_stats = True, skip_goals = True ,flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
     claferFile' = claferModelFile igArgs
     bitwidth' = bitwidth igArgs
 
