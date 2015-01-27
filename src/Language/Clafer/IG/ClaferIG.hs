@@ -32,27 +32,27 @@ module Language.Clafer.IG.ClaferIG (
     getClaferModel,
     getInfo,
     getStrMap,
-    ClaferIGT(..), 
-    Instance(..), 
-    Counterexample(..), 
-    runClaferIGT, 
-    getAlloyModel, 
-    solve, 
-    getClafers, 
-    getGlobalScope, 
+    ClaferIGT(..),
+    Instance(..),
+    Counterexample(..),
+    runClaferIGT,
+    getAlloyModel,
+    solve,
+    getClafers,
+    getGlobalScope,
     getBitwidth,
-    setGlobalScope, 
-    getScopes, 
-    getScope, 
+    setGlobalScope,
+    getScopes,
+    getScope,
     getQNameMaps,
-    valueOfScope, 
-    increaseScope, 
-    setScope, 
-    setAlloyScope, 
-    next, 
-    setUnsatCoreMinimization,  
-    setBitwidth, 
-    quit, 
+    valueOfScope,
+    increaseScope,
+    setScope,
+    setAlloyScope,
+    next,
+    setUnsatCoreMinimization,
+    setBitwidth,
+    quit,
     reload,
     findRemovable,
     fst3,
@@ -91,7 +91,7 @@ claferIGVersion = "ClaferIG " ++ showVersion Paths_claferIG.version
 
 data IGArgs = IGArgs {
     all :: Maybe Integer,
-    saveDir :: Maybe FilePath,  
+    saveDir :: Maybe FilePath,
     claferModelFile :: FilePath,
     alloySolution :: Bool,
     bitwidth :: Integer,
@@ -136,8 +136,8 @@ runClaferIGT                 args      run =
 data ClaferIGEnv = ClaferIGEnv{
     claferEnv'::ClaferEnv,
     claferIGArgs :: IGArgs,
-    constraints:: [Constraint], 
-    claferModel:: String, 
+    constraints:: [Constraint],
+    claferModel:: String,
     qNameMaps :: QNameMaps,
     info :: Analysis.Info,
     strMap :: Map Int String,
@@ -148,7 +148,7 @@ data Instance =
     Instance {modelInstance::ClaferModel, alloyModelInstance::String} |
     UnsatCore {unsatConstraints::[Constraint], counterexample::Maybe Counterexample} |
     NoInstance
-    
+
 
 data Counterexample = Counterexample {removedConstraints::[Constraint], counterexampleInstance::ClaferModel, counterexampleAlloyInstance::String}
 
@@ -177,30 +177,30 @@ load :: MonadIO m => IGArgs -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
 load                 igArgs    =
     runErrorT $ do
         claferModel <- liftIO $ strictReadFile claferFile'
-        
-        (claferEnv', alloyModel, mapping, sMap) <- ErrorT $ return $ callClaferTranslator claferModel 
+
+        (claferEnv', alloyModel, mapping, sMap) <- ErrorT $ return $ callClaferTranslator claferModel
 
         let ir = fst3 $ fromJust $ cIr claferEnv'
         let constraints = parseConstraints claferModel ir mapping
-        
+
         lift $ AlloyIG.sendLoadCommand alloyModel
         lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
 
         let qNameMaps = deriveQNameMaps ir
 
-        let info = Analysis.gatherInfo ir 
+        let info = Analysis.gatherInfo ir
         let irTrace = editMap $ irModuleTrace claferEnv'
 
         return $ ClaferIGEnv claferEnv' igArgs constraints claferModel qNameMaps info sMap irTrace
     where
     editMap :: (Map.Map Span [Ir]) -> (Map.Map Integer String) -- Map Line Number to Clafer Name
-    editMap = 
-        fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case (getIClafer ir) of 
-            Just (IClafer _ _ _ _ uid' _ _ _ _) -> (num, uid') : acc
+    editMap =
+        fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case (getIClafer ir) of
+            Just (IClafer _ _ _ _ uid' _ _ _ _ _ _) -> (num, uid') : acc
             _ -> acc) [] . tail . (Data.List.foldr (\((Span (Pos l1 _) (Pos l2 _)), irs) acc -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc) []) . toList
     getIClafer :: [Ir] -> Maybe IClafer
     getIClafer [] = Nothing
-    getIClafer ((IRClafer c):_) = Just c 
+    getIClafer ((IRClafer c):_) = Just c
     getIClafer (_:rs) = getIClafer rs
     removeConstraints :: [(Integer, String)] -> [(Integer, String)]
     removeConstraints = map swap . reverse . toList . fromList . reverse . map swap
@@ -209,7 +209,8 @@ load                 igArgs    =
         mapLeft ClaferErrs $ runClafer claferArgs $ do
             addModuleFragment code
             parse
-            compile
+            iModule <- desugar Nothing
+            compile iModule
             results <- generate
             let (Just alloyResult) = Map.lookup Alloy42 results
             return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult)
@@ -219,9 +220,9 @@ load                 igArgs    =
     claferFile' = claferModelFile igArgs
     bitwidth' = bitwidth igArgs
 
-                
-strictReadFile :: FilePath -> IO String 
-strictReadFile filePath = 
+
+strictReadFile :: FilePath -> IO String
+strictReadFile filePath =
     do
         contents <- readFile filePath
         -- readFile is lazy. Force it to evaluate by mapping over everything doing nothing
@@ -236,7 +237,7 @@ getAlloyModel = ClaferIGT $ lift AlloyIG.getAlloyModel
 solve :: MonadIO m => ClaferIGT m ()
 solve = ClaferIGT $ lift AlloyIG.sendResolveCommand
 
- 
+
 getClafers :: MonadIO m => ClaferIGT m [String]
 getClafers =
     do
@@ -248,7 +249,7 @@ getGlobalScope :: MonadIO m => ClaferIGT m Integer
 getGlobalScope = ClaferIGT $ lift AlloyIG.getGlobalScope
 
 getBitwidth :: MonadIO m => ClaferIGT m Integer
-getBitwidth = 
+getBitwidth =
     do
         claferIGArgs' <- getClaferIGArgs
         return $ bitwidth claferIGArgs'
@@ -259,8 +260,8 @@ setGlobalScope scope = ClaferIGT $ lift $ AlloyIG.sendSetGlobalScopeCommand scop
 
 getScopes :: MonadIO m => ClaferIGT m [ (String, Integer) ]
 getScopes = ClaferIGT $ lift AlloyIG.getScopes
-        
-        
+
+
 getScope :: MonadIO m => QName -> ClaferIGT m ([String])
 getScope qName = do
         qNameMaps' <- fetches qNameMaps
@@ -275,7 +276,7 @@ valueOfScope sigName = ClaferIGT $ lift $ AlloyIG.getScope sigName
 
 increaseScope :: MonadIO m => Integer -> (String, Integer) -> ClaferIGT m (Either String ())
 increaseScope increment (sigName, value) = setAlloyScope (value + increment) sigName
-    
+
 setScope :: MonadIO m => Integer -> (String, Integer) -> ClaferIGT m (Either String ())
 setScope value (sigName, _) = setAlloyScope value sigName
 
@@ -290,7 +291,7 @@ next :: MonadIO m => ClaferIGT m Instance
 next = do
     env <- getClaferEnv
     claferIGArgs' <- getClaferIGArgs
-    let 
+    let
         useUids' = useUids claferIGArgs'
         addTypes' = addTypes claferIGArgs'
     constraints' <- getConstraints
@@ -325,7 +326,7 @@ next = do
                                 counterexample' env'' core' (remove : removed) useUids''' addTypes''' info''' constraints' sMap'
                 Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
- 
+
     xmlToModel :: Bool -> Bool -> Analysis.Info -> String -> (Map Int String) -> ClaferModel
     xmlToModel  useUids' addTypes' info' xml sMap = (sugarClaferModel useUids' addTypes' (Just info') $ buildClaferModel $ parseSolution xml) sMap
 
@@ -337,8 +338,8 @@ reload  =
         env <- ErrorT $ ClaferIGT $ lift $ load claferIGArgs'
         lift $ set env
         lift $ setGlobalScope globalScope
-        
-        
+
+
 setUnsatCoreMinimization :: MonadIO m => Integer -> ClaferIGT m ()
 setUnsatCoreMinimization level = ClaferIGT $ lift $ AlloyIG.sendSetUnsatCoreMinimizationCommand level
 
@@ -350,11 +351,11 @@ setBitwidth bitwidth' = do
     set igEnv{claferIGArgs = claferIGArgs'{bitwidth=bitwidth'}}
     ClaferIGT $ lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
 
-    
+
 quit :: MonadIO m => ClaferIGT m ()
 quit = ClaferIGT $ lift AlloyIG.sendQuitCommand
-    
-    
+
+
 sigToClaferName :: String -> String
 sigToClaferName n =
     case snd $ break ('_' ==) n of
@@ -370,7 +371,7 @@ findRemovable env core constraints' =
         removeAbsZero absIDs (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) = ((Seq.elemIndexL uID absIDs)==Nothing)
         removeAbsZero _ _ = True
         getId :: Ir -> (Seq.Seq String)
-        getId (IRClafer (IClafer _ True _ uID _ _ _ _ _)) = Seq.singleton uID
+        getId (IRClafer (IClafer _ True _ uID _ _ _ _ _ _ _)) = Seq.singleton uID
         getId _ = mempty
 
 fst3 :: (IModule, GEnv, Bool) -> IModule

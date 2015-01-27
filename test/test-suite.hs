@@ -66,26 +66,26 @@ defaultIGArgs fPath = claferIGArgsDef{claferModelFile = fPath}
 
 --getModel :: MonadIO m => FilePath -> ClaferIGT m (Either Language.ClaferT.ClaferErrs Instance)
 getModel fPath = runClaferIGT (defaultIGArgs fPath) $ do
-	setGlobalScope (fromMaybe 1 $ all $ defaultIGArgs fPath)
-	solve
-	counterRef <- liftIO $ newIORef 1
-	let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir (defaultIGArgs fPath)
-	let nextFile = savePath fPath counterRef >>= saveDirectory
-	file <- liftIO nextFile
-	liftIO $ createDirectoryIfMissing True $ takeDirectory file
-	next
-	where
-		savePath :: FilePath -> IORef Int -> IO FilePath
-		savePath fPath' counterRef =
-		    do
-		        counter <- readIORef counterRef
-		        writeIORef counterRef (counter + 1)
-		        return $ fPath' ++ "." ++ (show counter) ++ ".data"
-		underDirectory :: FilePath -> FilePath -> IO FilePath
-		underDirectory dir file =
-		    do
-		        createDirectoryIfMissing True dir
-		        return $ joinPath [dir, file]
+    setGlobalScope (fromMaybe 1 $ all $ defaultIGArgs fPath)
+    solve
+    counterRef <- liftIO $ newIORef 1
+    let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir (defaultIGArgs fPath)
+    let nextFile = savePath fPath counterRef >>= saveDirectory
+    file <- liftIO nextFile
+    liftIO $ createDirectoryIfMissing True $ takeDirectory file
+    next
+    where
+        savePath :: FilePath -> IORef Int -> IO FilePath
+        savePath fPath' counterRef =
+            do
+                counter <- readIORef counterRef
+                writeIORef counterRef (counter + 1)
+                return $ fPath' ++ "." ++ (show counter) ++ ".data"
+        underDirectory :: FilePath -> FilePath -> IO FilePath
+        underDirectory dir file =
+            do
+                createDirectoryIfMissing True dir
+                return $ joinPath [dir, file]
 
 
 fromRight (Right x) = x
@@ -94,22 +94,22 @@ fromRight _         = error "fromRight received Left _. Should never happen."
 
 case_strMapCheck :: Assertion
 case_strMapCheck = do
-		--let claferModel = Right $ Instance (ClaferModel [(Clafer (Id "" 0) (Just (StringValue "")) [])]) ""
-		claferModel' <- getModel "test/positive/i220.cfr"
-		(valueCheck $ c_value $ head $ c_topLevel $ modelInstance $ fromRight $ claferModel') @? "Mapping Int back to String Failed!"
-		where
-			valueCheck Nothing = False
-			valueCheck (Just (AliasValue _)) = False
-			valueCheck (Just (IntValue _)) = False
-			valueCheck (Just (StringValue _)) = True
-			
+        --let claferModel = Right $ Instance (ClaferModel [(Clafer (Id "" 0) (Just (StringValue "")) [])]) ""
+        claferModel' <- getModel "test/positive/i220.cfr"
+        (valueCheck $ c_value $ head $ c_topLevel $ modelInstance $ fromRight $ claferModel') @? "Mapping Int back to String Failed!"
+        where
+            valueCheck Nothing = False
+            valueCheck (Just (AliasValue _)) = False
+            valueCheck (Just (IntValue _)) = False
+            valueCheck (Just (StringValue _)) = True
+
 case_pickLargerScope :: Assertion
 case_pickLargerScope = do
     let
         oldScopes = [ ("c0_1", 1), ("c1_b", 2), ("c0_x", 5) ]
         newScopes = [ ("c0_1", 2), ("c0_b", 2), ("c1_b", 1)]
         mergedScopes = map (pickLargerScope oldScopes) newScopes
-    
+
     mergedScopes @?= [ ("c0_1", 2), ("c0_b", 2), ("c1_b", 2)]
 
 

@@ -97,13 +97,13 @@ parseConstraints claferModel imodule mapping =
     convert s IrPExp{pUid} =
         Just $ UserConstraint s $ ConstraintInfo pUid (_inPos $ findPExp pUid) $ extract $ _inPos $ findPExp pUid
     convert s LowerCard{pUid, isGroup = False} =
-        Just $ LowerCardinalityConstraint s $ claferInfo pUid 
+        Just $ LowerCardinalityConstraint s $ claferInfo pUid
     convert s UpperCard{pUid, isGroup = False} =
         Just $ UpperCardinalityConstraint s $ claferInfo pUid
     convert s ExactCard{pUid, isGroup = False} =
         Just $ ExactCardinalityConstraint s $ claferInfo pUid
     convert _ _ = Nothing
-    
+
     findPExp pUid   = fromMaybe (error $ "Unknown constraint " ++ pUid) $ find ((== pUid) . _pid) pexps
     findClafer pUid = fromMaybe (error $ "Unknown clafer " ++ pUid) $ find ((== pUid) . _uid) clafers
     text = lines claferModel

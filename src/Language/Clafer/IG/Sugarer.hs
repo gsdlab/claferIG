@@ -32,8 +32,8 @@ import Prelude hiding (id)
 
 -- | Sample: maps the id to the its simple name and the number of times its simple name appeared in the census before it
 -- | Count: maps the simple name to the total count of the simple name
-data Census = Census 
-    (Map Id (Int, String))  -- Sample 
+data Census = Census
+    (Map Id (Int, String))  -- Sample
     (Map String Int)        -- Counts
  deriving Show
 
@@ -60,7 +60,7 @@ claferModelCensus (ClaferModel topLevelClafers) =
     clafersCensus (Census Map.empty Map.empty) topLevelClafers
     where
     clafersCensus = foldl claferCensus
-    claferCensus census Clafer{c_id=id, c_children=children} = poll id (clafersCensus census children) 
+    claferCensus census Clafer{c_id=id, c_children=children} = poll id (clafersCensus census children)
 
 
 -- | Rewrite the model into a human-friendlier format
@@ -68,35 +68,33 @@ sugarClaferModel:: Bool -> Bool  -> Maybe Analysis.Info -> ClaferModel -> (Map I
 sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMap =
     ClaferModel $ map sugarClafer topLevelClafers
     where
-    sugarClafer (Clafer id value children) = 
+    sugarClafer (Clafer id value children) =
         Clafer (sugarId useUids addTypes True id) (sugarValue (Clafer id value children)) (map sugarClafer children)
 
     sugarValue (Clafer _ (Just (AliasValue alias)) _) = Just $ AliasValue $ sugarId useUids addTypes False alias
     sugarValue (Clafer _ Nothing _) = Nothing
     sugarValue c  = if (cType c) == "string" then (Just ((StringValue) (getString c))) else (c_value c)
 
-    cType (Clafer id _ _) = 
-        case (fromJust (Analysis.super (Analysis.runAnalysis (Analysis.claferWithUid (i_name id)) (fromJust info)))) of
-            (Analysis.Ref s) -> cTypeSolve s
-            (Analysis.Colon s) -> cTypeSolve s
-    
-    cTypeSolve "string" = "string"
-    cTypeSolve "integer" = "integer"
-    cTypeSolve "int" = "integer"
-    cTypeSolve "real" = "real"
-    cTypeSolve x = cType (Clafer (Id x 0) Nothing []) 
+    cType (Clafer id _ _) = cTypeSolve $ (Analysis.super (Analysis.runAnalysis (Analysis.claferWithUid (i_name id)) (fromJust info)))
+
+    cTypeSolve Nothing = ""
+    cTypeSolve (Just "string") = "string"
+    cTypeSolve (Just "integer") = "integer"
+    cTypeSolve (Just "int") = "integer"
+    cTypeSolve (Just "real") = "real"
+    cTypeSolve (Just x) = cType (Clafer (Id x 0) Nothing [])
 
     getString c = case (Map.lookup strNumber sMap) of
         Nothing -> "\"<text " ++ show strNumber ++ ">\""
         Just s -> s
         where strNumber = v_value  $ fromJust  $ c_value c
-    
+
 
     Census sample' counts' = claferModelCensus model
-    
+
     sugarId :: Bool -> Bool  -> Bool    -> Id -> Id
     sugarId    useUids' addTypes' addRefDecl id  =
-        Id (finalName ++ ordinalDisplay ++ (refDecl addTypes' addRefDecl info)) 0  
+        Id (finalName ++ ordinalDisplay ++ (refDecl addTypes' addRefDecl info)) 0
         where
         fullName = i_name id
         ordinalDisplay = if (useUids || count > 1)
@@ -106,19 +104,23 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
         refDecl :: Bool -> Bool -> Maybe Analysis.Info -> String
         refDecl    True    True    (Just info')          = retrieveSuper info' $ i_name id
         refDecl    _       _       _                    = ""
-        
+
         (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample'
         count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts'
         finalName = if useUids' then fullName else simpleName
 
 retrieveSuper :: Analysis.Info -> String -> String
-retrieveSuper info uid = 
-    if (Analysis.isBase sclafer)
-        then ""
-        else maybe "" sugarSuper (Analysis.super sclafer)
+retrieveSuper info uid =
+    (if (Analysis.isBase sclafer)
+            then ""
+            else sugarSuper (Analysis.super sclafer))
+    ++ sugarReference  (Analysis.reference sclafer)
     where
         sclafer = Analysis.runAnalysis (Analysis.claferWithUid uid) info
 
-        sugarSuper :: Analysis.SSuper -> String
-        sugarSuper (Analysis.Ref s) = " -> " ++ s
-        sugarSuper (Analysis.Colon s) = " : " ++ s    
+        sugarSuper :: Maybe String -> String
+        sugarSuper (Just s) = " : " ++ s
+        sugarSuper Nothing = ""
+        sugarReference :: Maybe String -> String
+        sugarReference (Just s) = " -> " ++ s
+        sugarReference Nothing = ""
