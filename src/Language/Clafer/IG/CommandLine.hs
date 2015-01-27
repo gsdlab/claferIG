@@ -74,29 +74,29 @@ runCommandLine =
             historyFile = Nothing,
             autoAddHistory = True
         } $ loop Next (Context Nothing [] [] autoCompleteContext)
-    where 
+    where
 
 
     loop :: Command -> Context -> InputT (ClaferIGT IO) ()
-    
+
     loop Quit _ = return ()
-    
+
     loop Next context =
         do
             solution <- lift next
-            claferIGArgs' <- lift getClaferIGArgs 
+            claferIGArgs' <- lift getClaferIGArgs
             info <- lift getInfo
             case solution of
                 Instance claferModel xml -> do
                     liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse claferModel)
-                    
-                    outputStrLn $ if json claferIGArgs' 
+
+                    outputStrLn $ if json claferIGArgs'
                         then generateJSON info claferModel
                         else let
                                 iNumber = show $ 1 + (length $ unsaved context)
                              in
-                                "=== Instance " ++ iNumber ++ " Begin ===\n\n" ++ 
-                                (show claferModel) ++ 
+                                "=== Instance " ++ iNumber ++ " Begin ===\n\n" ++
+                                (show claferModel) ++
                                 "\n--- Instance " ++ iNumber ++ " End ---\n\n"
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 UnsatCore core counterexample -> do
@@ -114,8 +114,8 @@ runCommandLine =
                 NoInstance -> do
                     liftIO $ hPutStrLn stderr "No more instances found. Try increasing scope to get more instances."
                     nextLoop context
-            where           
-            printTransformation :: Constraint -> [Constraint] -> (String, [Constraint])        
+            where
+            printTransformation :: Constraint -> [Constraint] -> (String, [Constraint])
             printTransformation UserConstraint{constraintInfo = info} rest = ("removed " ++ syntax info, rest)
             printTransformation ExactCardinalityConstraint{claferInfo = info} rest =
                 (show info ++ " changed to " ++ show (setUpper (setLower info 0) Nothing), rest)
@@ -149,26 +149,26 @@ runCommandLine =
                     let (prnt, rest) = printTransformation c cs
                     liftIO $ hPutStrLn stderr $ "  " ++ show i ++ ") " ++ prnt
                     printTransformations' (i + 1) rest
-                    
+
             setLower info@ClaferInfo{cardinality = c} lower = info{cardinality = c{lower = lower}}
 
             setUpper info@ClaferInfo{cardinality = c} upper = info{cardinality = c{upper = upper}}
 
-            deleteLower :: String -> [Constraint] -> Maybe [Constraint]                    
+            deleteLower :: String -> [Constraint] -> Maybe [Constraint]
             deleteLower id ys =
                 findAndDelete id (filter isLowerCardinalityConstraint ys)
-            
+
             deleteUpper :: String -> [Constraint] -> Maybe [Constraint]
             deleteUpper id ys =
                 findAndDelete id (filter isUpperCardinalityConstraint ys)
-            
+
             findAndDelete :: String -> [Constraint] -> Maybe [Constraint]
             findAndDelete _ [] = Nothing
             findAndDelete id (c:cs)
                 | id == uniqueId (claferInfo c) = Just cs
                 | otherwise                     = (c :) `fmap` findAndDelete id cs
-                
-                    
+
+
     loop Help context =
         do
             outputStrLn (
@@ -176,13 +176,13 @@ runCommandLine =
                 "| " ++ claferIGVersion ++ " |\n" ++
                 "--------------------\n\n" ++
                 "You can invoke the following commands as indicated by single quotes:\n" ++
-                "[tab]              - print the available commands\n" ++ 
+                "[tab]              - print the available commands\n" ++
                 "                   - auto-complete command name, a clafer name, or clafer instance name in a given context\n" ++
                 "'n'ext, [enter]    - to produce the next instance if available or to output a message that no more \n" ++
                 "                     instances exist within the given scope\n" ++
                 "'i'ncrease         - to increase the maximum number of instances of a given clafer or all clafers (scope)\n" ++
-                "'s'et              - to set the maximum number of instances of a given clafer or all clafers (scope)\n" ++                
-                "'m'axint, 'maxint' - to set the bitwidth by providing the largest integer\n" ++                
+                "'s'et              - to set the maximum number of instances of a given clafer or all clafers (scope)\n" ++
+                "'m'axint, 'maxint' - to set the bitwidth by providing the largest integer\n" ++
                 "sa'v'e             - to save all instances displayed so far or a counterexample to files named \n" ++
                 "                     <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                 "'q'uit             - to quit the interactive session\n" ++
@@ -190,8 +190,8 @@ runCommandLine =
                 "'h'elp             - to display this menu options summary\n" ++
                 "'scope'            - to print out the values of the global scope and individual Clafer scopes\n" ++
                 "'saveScopes'       - to generate a '<model>.cfr-scope' file with the current scopes\n" ++
-                "'loadScopes'       - to load scopes from a '<model>.cfr-scope' file\n" ++                
-                "'setUnsatCoreMinimization' - to choose UnSAT core minimization strategy [fastest | medium | best]. Default: fastest\n" ++ 
+                "'loadScopes'       - to load scopes from a '<model>.cfr-scope' file\n" ++
+                "'setUnsatCoreMinimization' - to choose UnSAT core minimization strategy [fastest | medium | best]. Default: fastest\n" ++
                 "'c', 'claferModel' - to print out the original Clafer model verbatim\n" ++
                 "'a', 'alloyModel'  - to print out the output of Clafer translator verbatim\n" ++
                 "'alloyInstance'    - to print out the Alloy xml document of the most recent solution\n" ++
@@ -203,13 +203,13 @@ runCommandLine =
                 "'s <number> [enter]'- to set for the clafers to <number>\n" ++
                 "'s <name> <number>' - to set for the clafer <name> to <number>\n" ++
                 "'f <name>'          - to display a clafer <name>\n" ++
-                "'setUnsatCoreMinimization fastest' - fastest but the worst\n" ++ 
-                "'setUnsatCoreMinimization medium'\n" ++ 
-                "'setUnsatCoreMinimization best' - best but slowest even for modest size cores" 
+                "'setUnsatCoreMinimization fastest' - fastest but the worst\n" ++
+                "'setUnsatCoreMinimization medium'\n" ++
+                "'setUnsatCoreMinimization best' - best but slowest even for modest size cores"
                 )
-                
+
             nextLoop context
-            
+
     loop Save context@Context{saved=saved, unsaved=unsaved} =
         do
             save unsaved (toInteger $ length saved)
@@ -221,7 +221,7 @@ runCommandLine =
             oldBw <- lift getBitwidth
 
             runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
-            
+
             env <- lift getClaferEnv
             let ir = fst3 $ fromJust $ cIr env
             tempScopes <- lift getScopes
@@ -248,7 +248,7 @@ runCommandLine =
 
             oldScopes <- lift getScopes
             mapM ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (max 1 $ val'+inc') (sigToClaferName sigName') sigName') oldScopes
-            lift solve    
+            lift solve
             outputStrLn ("Global scope changed to " ++ show newGlobalScope)
             nextLoop context
     loop (SetGlobalScope newGlobalScope') context =
@@ -261,7 +261,7 @@ runCommandLine =
                 lift $ setBitwidth $ requiredBitwidth newGlobalScope
                 newBw <- lift getBitwidth
                 printBitwidthWarning newBw
-            lift solve    
+            lift solve
             outputStrLn ("Global scope set to " ++ show newGlobalScope)
             nextLoop context
 
@@ -274,7 +274,7 @@ runCommandLine =
                 bitwidth' <- lift $ lift getBitwidth
 
                 lift $ mapM_ (incAlloyScopeAndBitwidth bitwidth' inc' fqName) sigs
-                
+
                 lift $ lift $ solve
             nextLoop context
 
@@ -287,26 +287,26 @@ runCommandLine =
                 bitwidth' <- lift $ lift getBitwidth
 
                 lift $ mapM_ (setAlloyScopeAndBitwidth bitwidth' val' qName) sigs
-                
+
                 lift $ lift $ solve
             nextLoop context
 
     loop (SetBitwidth newBitwidth) context =
-        do 
+        do
             when (newBitwidth >=4) $ do
                 lift $ setBitwidth newBitwidth
                 printBitwidthWarning newBitwidth
-                lift solve    
+                lift solve
                 printBitwidthIntRange newBitwidth
             nextLoop context
 
     loop (SetMaxInt newMaxInt) context =
-        do 
+        do
             when (newMaxInt >= 7) $ do
                 let newBitwidth = requiredBitwidth newMaxInt
                 lift $ setBitwidth newBitwidth
                 printBitwidthWarning newBitwidth
-                lift solve    
+                lift solve
                 printBitwidthIntRange newBitwidth
             nextLoop context
 
@@ -318,15 +318,15 @@ runCommandLine =
             -- remove the "this/" prefix
             mapM_ printScope originalScopes
             nextLoop context
-            
+
             where
             printScope (sigName, value)  =
                 outputStrLn $ "  " ++ (drop 5 sigName) ++ " scope = " ++ show value
-                    
+
     loop SaveScopes context =
         do
             globalScope <- lift getGlobalScope
-            originalScopes <- lift getScopes            
+            originalScopes <- lift getScopes
             claferIGArgs' <- lift getClaferIGArgs
             qNameMaps' <- lift getQNameMaps
             let
@@ -336,7 +336,7 @@ runCommandLine =
             liftIO $ writeCfrScopeFile uidScopes qNameMaps' $ claferModelFile claferIGArgs'
             outputStrLn "Scopes saved to the `.cfr-scope` file."
             nextLoop context
-            
+
     loop LoadScopes context =
         do
             claferIGArgs' <- lift getClaferIGArgs
@@ -346,8 +346,8 @@ runCommandLine =
                 Nothing -> do
                     outputStrLn "The `.cfr-scope` file does not exist. Use the command `saveScopes` to create one."
                     nextLoop context
-                Just uidScopes -> do 
-                    let 
+                Just uidScopes -> do
+                    let
                         (globalScopes, normalScopes) = partition (\(uid', _) -> null uid') uidScopes
                         -- from the globalScopes, take the maximum
                         globalScopeVals = map snd globalScopes
@@ -374,14 +374,14 @@ runCommandLine =
             printBitwidthIntRange bitwidth'
             originalScopes <- lift getScopes
             -- remove the "this/" prefix
-            let 
+            let
                 scopes = map ( \ (uid', val') -> (drop 5 uid', val') ) originalScopes
                 scopesMap = Map.fromList scopes
 
             globalScope' <- lift getGlobalScope
             outputStrLn $ "Global scope  = " ++ show globalScope' ++ "\n"
 
-            env <- lift getClaferEnv 
+            env <- lift getClaferEnv
             constraints' <- lift getConstraints
             AlloyIG.UnsatCore core <- lift $ ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
             let unSATs = map getConstraintInfo $ catMaybes $ findRemovable env core constraints'
@@ -395,18 +395,18 @@ runCommandLine =
             nextLoop context
             where
                 editModel :: String -> [Integer] -> [String] -> (Map.Map Integer String) -> (Map.Map String Integer) -> String
-                editModel model cLines unSATs lineNumMap scopesMap' = 
-                    let 
+                editModel model cLines unSATs lineNumMap scopesMap' =
+                    let
                         claferLines = lines $ removeCommentsAndUnify model
                         maxLineLength = maximum $ map length claferLines
                     in unlines $ editLines cLines unSATs (numberOfDigits $ length claferLines) maxLineLength scopesMap' lineNumMap (zip [1..] claferLines)
 
                 editLines :: [Integer] -> [String] -> Int -> Int -> (Map.Map String Integer) -> (Map.Map Integer String) -> [(Integer, String)] -> [String]
                 editLines _ _ _ _ _ _ [] = []
-                editLines cLines unSATs m1 m2 scopesMap' lineNumMap ((num, l):rest) = 
-                    if (num `elem` cLines && isEmptyLine l) 
-                        then editLines cLines unSATs m1 m2 scopesMap' lineNumMap rest 
-                        else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal scopesMap' (Map.lookup num lineNumMap))) 
+                editLines cLines unSATs m1 m2 scopesMap' lineNumMap ((num, l):rest) =
+                    if (num `elem` cLines && isEmptyLine l)
+                        then editLines cLines unSATs m1 m2 scopesMap' lineNumMap rest
+                        else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal scopesMap' (Map.lookup num lineNumMap)))
                         : editLines cLines unSATs m1 m2 scopesMap' lineNumMap rest
 
                 isUnSAT :: [String] -> String -> Integer -> Bool
@@ -416,7 +416,7 @@ runCommandLine =
 
                 addScopeVal :: (Map.Map String Integer) -> (Maybe String) ->String
                 addScopeVal _       Nothing     = ""
-                addScopeVal scopesMap' (Just name) = "scope = " ++ (fromJustShow $ Map.lookup name scopesMap') 
+                addScopeVal scopesMap' (Just name) = "scope = " ++ (fromJustShow $ Map.lookup name scopesMap')
 
                 getCommentLines :: String -> [Integer]
                 getCommentLines = foldr (\((Span (Pos l1 _) (Pos l2 _)), _) acc -> [l1..l2] ++ acc) [] . getComments
@@ -432,37 +432,37 @@ runCommandLine =
             scopes <- lift getScopes
 
             outputStrLn $ editAlloyModel alloyModel scopes globalScope'
-            nextLoop context    
+            nextLoop context
             where
                 editAlloyModel :: String -> [(String, Integer)] -> Integer      -> String
-                editAlloyModel    model     s                      globalScope' = 
+                editAlloyModel    model     s                      globalScope' =
                     let alloyLines = lines $ removeCommentsAndUnify model
                         splitNum = 1 + (length $ takeWhile (not . isEmptyLine) alloyLines)
                         (alloyInfo, alloyLines') = splitAt splitNum $ alloyLines
                     in unlines $ (("global scope = " ++ show globalScope' ++ "\n") :) $ alloyInfo ++ map (\(num, line) -> show num ++ ('.' : (replicate (1 + (numberOfDigits $ length alloyLines) - (numberOfDigits num)) ' ') ++ ('|' : ' ' : line))) (zip [(1 + splitNum)..] (addScopeVals alloyLines' s (maximum $ map length alloyLines')))
                 addScopeVals :: [String] -> [(String, Integer)] -> Int -> [String]
                 addScopeVals [] _ _ = []
-                addScopeVals (l:ls) ss m = 
-                    let val = Data.List.lookup (takeWhile (`notElem` [' ','\t','\n']) $ tail $ dropWhile (/='_') l) ss 
+                addScopeVals (l:ls) ss m =
+                    let val = Data.List.lookup (takeWhile (`notElem` [' ','\t','\n']) $ tail $ dropWhile (/='_') l) ss
                     in if ("sig" `notElem` words l) then ((l ++ (replicate (3 + m - (length l)) ' ') ++ " |") : addScopeVals ls ss m)
-                        else (l ++ (replicate (3 + m - (length l)) ' ') ++ " | scope = " ++ (fromJustShow val)) : addScopeVals ls ss m  
-   
+                        else (l ++ (replicate (3 + m - (length l)) ' ') ++ " | scope = " ++ (fromJustShow val)) : addScopeVals ls ss m
+
     loop ShowAlloyInstance context =
         do
             case currentAlloyInstance context of
                 Just alloyInstance -> outputStrLn alloyInstance
                 Nothing -> outputStrLn $ "No instance"
             nextLoop context
-            
+
     loop (SetUnsatCoreMinimization level) context =
         do
-            let level' = 
+            let level' =
                     case level of
                         Fastest -> 2
                         Medium  -> 1
                         Best    -> 0
             lift $ setUnsatCoreMinimization level' >> solve
-            
+
             nextLoop context
 
     nextLoop context =
@@ -474,12 +474,12 @@ runCommandLine =
                     case parseCommandLine input of
                         Left msg    -> outputStrLn (show msg) >> nextLoop context
                         Right command -> loop command context
-    
+
     save :: MonadIO m => [ClaferModel] -> Integer -> InputT (ClaferIGT m) ()
     save [] _ = return ()
     save (c:cs) counter = do
         claferIGArgs' <- lift $ getClaferIGArgs
-        let 
+        let
             claferModelFile' = claferModelFile claferIGArgs'
             saveName = claferModelFile' ++ "." ++ (show counter) ++ ".data"
         liftIO $ writeFile saveName (show c)
@@ -491,7 +491,7 @@ try e = either outputStrLn (void . return) =<< runErrorT e
 
 incAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
 incAlloyScopeAndBitwidth                 bitwidth'  inc'       fqName'   sigName' = do
-    scopeValue <- lift $ valueOfScope sigName' 
+    scopeValue <- lift $ valueOfScope sigName'
     setAlloyScopeAndBitwidth bitwidth' (max 1 $ scopeValue+inc') fqName' sigName'
 
 setAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
@@ -502,7 +502,7 @@ setAlloyScopeAndBitwidth                 bitwidth'  newValue'   fqName'   sigNam
         outputStrLn $ "Warning! Requested scope for " ++ fqName' ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
         printBitwidthWarning newBw
     lift $ setAlloyScope newValue' sigName'
-    outputStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") changed to " ++ show newValue'    
+    outputStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") changed to " ++ show newValue'
 
 mergeScopes :: MonadIO m => [(UID, Integer)] -> [(UID, Integer)] -> ClaferIGT m ()
 mergeScopes _ [] = return()
@@ -512,7 +512,7 @@ mergeScopes oldScopes newScopes = do
 
 pickLargerScope :: [(String, Integer)] -> (String, Integer) -> (String, Integer)
 pickLargerScope    oldScopes              (uid', val)        =
-    let 
+    let
         oldScopesMap = SMap.fromList oldScopes
         oldVal = SMap.findWithDefault val uid' oldScopesMap
     in (uid', max val oldVal)
@@ -536,7 +536,7 @@ printBitwidthIntRange    bw       = outputStrLn $ concat [
     "..",
     show $ allowedMaxInt bw,
     " (",
-    "bitwidth = ", 
+    "bitwidth = ",
     show bw,
     ")" ]
 
@@ -553,7 +553,7 @@ isOpen _ (x:_) = isSpace x
 
 
 completeFunc :: MonadIO m => AutoCompleteContext -> CompletionFunc m
-completeFunc context (prev, nxt) = 
+completeFunc context (prev, nxt) =
     if isOpen prev nxt then
         liftIO $ evalComplete context prev
     else
@@ -565,7 +565,7 @@ completePrefix prefix choices = map simpleCompletion $ filter (prefix `isPrefixO
 
 
 evalComplete :: AutoCompleteContext -> String -> IO (String, [Completion])
-evalComplete context prev = 
+evalComplete context prev =
     do
         completion <- autoComplete context word auto
         return (reverseRest, completion)
@@ -574,7 +574,7 @@ evalComplete context prev =
     (reverseWord, reverseRest) = break isSpace prev
     word = reverse reverseWord
     auto = autoCompleteDetect $ parseCommandLineAutoComplete input
-        
+
 
 autoComplete :: AutoCompleteContext -> String -> AutoComplete -> IO [Completion]
 autoComplete _ word Auto_Command = return $ completePrefix word commandStrings
@@ -606,9 +606,9 @@ autoCompleteDetect error'
     messages = errorMessages error'
     unexpectedMessages = mapMaybe unexpectedMessage messages
     expectedMessages   = mapMaybe expectedMessage messages
-    
 
-printError :: ClaferErrs -> [String]    
+
+printError :: ClaferErrs -> [String]
 printError (ClaferErrs errs) =
     map printErr errs
     where
@@ -644,19 +644,19 @@ numberOfDigits :: Int -> Int
 numberOfDigits x = length $ show x
 
 findNecessaryBitwidth :: IModule -> Integer -> [ Integer ] -> Integer
-findNecessaryBitwidth ir oldBw scopeValues = 
+findNecessaryBitwidth ir oldBw scopeValues =
     if (newBw < oldBw) then oldBw else newBw
     where
         newBw = ceiling $ logBase 2 $ (+1) $ (*2) $ maxInModel ir
         maxInModel :: IModule -> Float
         maxInModel ir' = intToFloat $ max (maximum scopeValues) $ foldIR getMax 0 ir'
-        getMax :: Ir -> Integer -> Integer 
+        getMax :: Ir -> Integer -> Integer
         getMax (IRIExp (IInt n)) m = max m $ abs n
         getMax (IRClafer IClafer{_card = Just (_, n)}) m = max m n
         getMax _ m = m
 
 intToFloat :: Integer -> Float
-intToFloat = fromInteger . toInteger 
+intToFloat = fromInteger . toInteger
 
 fromJustShow :: (Maybe Integer) -> String
 fromJustShow (Just x) = show x

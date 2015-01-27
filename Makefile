@@ -21,9 +21,9 @@ cleanEnv:
 	make clean
 	ghc-pkg unregister claferIG
 	rm `which claferIG`
-	make 
+	make
 
-# this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs 
+# this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs
 newVersion:
 	ghc -isrc src/dateVer.hs dist/build/autogen/Paths_claferIG.hs -outputdir dist/build --make -o dateVer
 	./dateVer > src/Language/Clafer/IG/Version.hs
@@ -40,7 +40,7 @@ build: alloyIG.jar
 alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	$(MAKE) -C $(TOOL_DIR)
 	mkdir -p dist/javabuild
-	javac  -source 1.6 -target 1.6 -cp "tools/alloy4.2.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
+	javac  -cp "tools/alloy4.2.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	jar cfm alloyIG.jar src/manifest -C dist/javabuild org/clafer/ig/ -C dist/javabuild edu
 
 lib:
@@ -51,7 +51,7 @@ lib:
 		chmod +x lib/$(LIB); \
 		cp lib/$(LIB) lib; \
 	fi
-	
+
 test:
 	# Only test a subset of the suite. The other cases do not work yet.
 	cabal configure --enable-tests
@@ -65,7 +65,7 @@ test:
 	cp -r lib/ dist/build/claferIG/
 	# On Windows, also need to manually copy glpk_4_52.dll to dist/build/test-suite/
 	cabal test
-	
+
 clean:
 	rm -rf dist
 	rm -f alloyIG.jar

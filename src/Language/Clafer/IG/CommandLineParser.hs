@@ -31,24 +31,24 @@ import Data.Functor.Identity
 
 
 -- | Interactive session commands
-data Command = Next | 
-               IncreaseGlobalScope Integer | 
-               IncreaseScope String Integer | 
-               SetGlobalScope Integer | 
-               SetScope String Integer | 
+data Command = Next |
+               IncreaseGlobalScope Integer |
+               IncreaseScope String Integer |
+               SetGlobalScope Integer |
+               SetScope String Integer |
                SetBitwidth Integer |
-               SetMaxInt Integer | 
-               Save | 
-               Quit | 
-               Reload | 
-               Help | 
-               Find String | 
-               ShowScopes | 
+               SetMaxInt Integer |
+               Save |
+               Quit |
+               Reload |
+               Help |
+               Find String |
+               ShowScopes |
                SaveScopes |
                LoadScopes |
-               ShowClaferModel | 
-               ShowAlloyModel | 
-               ShowAlloyInstance | 
+               ShowClaferModel |
+               ShowAlloyModel |
+               ShowAlloyInstance |
                SetUnsatCoreMinimization UnsatCoreMinimization deriving Show
 
 
@@ -96,7 +96,7 @@ parseCommandLineAutoComplete input =
 
 
 commandLine :: Parser Command
-commandLine = 
+commandLine =
     do
         name <- command
         case lookup name commandMap of
@@ -108,7 +108,7 @@ commandLine =
                 didYouMean = filter (name `isPrefixOf`) commandStrings
                 hint [] = ""
                 hint _ = ", did you mean " ++ intercalate " or " (map quote didYouMean) ++ "?"
-            
+
 
 command :: Parser String
 command = many1 (letter <?> "command")
@@ -193,7 +193,7 @@ increaseGlobalScope =
 setGlobalScope :: Parser Command
 setGlobalScope =
     do
-        try (gap >> explicitSetGlobalScope) 
+        try (gap >> explicitSetGlobalScope)
     <|>
     do
         try (gap >> explicitSetScope)
@@ -206,16 +206,16 @@ explicitIncreaseGlobalScope =
 
 explicitSetGlobalScope :: Parser Command
 explicitSetGlobalScope = fmap SetGlobalScope number
-    
+
 increaseScope :: Parser Command
-increaseScope = 
+increaseScope =
     do
         name <- clafer
         do
             try (gap >> explicitIncreaseScope name)
             <|>
             return (IncreaseScope name 1)
-            
+
 explicitIncreaseScope :: String -> Parser Command
 explicitIncreaseScope name = fmap (IncreaseScope name) signedNumber
 
@@ -242,7 +242,7 @@ setMaxInt =
         return $ SetMaxInt b
 
 number :: Parser Integer
-number = do 
+number = do
             n <- many1 digit
             return $ read n
 
@@ -252,7 +252,7 @@ signedNumber = do
     n <- many1 digit
     return $ read $ s ++ n
 
-clafer :: Parser String        
+clafer :: Parser String
 clafer = many1 ((alphaNum <|> char ':' <|> char '_') <?> "clafer")
 
 

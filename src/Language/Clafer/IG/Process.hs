@@ -45,8 +45,8 @@ pipeProcess exec args =
         (Just stdIn', Just stdOut', _, proceHandle) <- createProcess process
         hSetNewlineMode stdIn' noNewlineTranslation
         return $ Process stdIn' stdOut' proceHandle -- Pipe always has a handle according to docs
-    
-    
+
+
 -- | Wait until the process terminates
 waitFor :: Process -> IO ExitCode
 waitFor proce = waitForProcess (procHandle proce)
@@ -61,7 +61,7 @@ getContentsVerbatim proce =
         mapM_ return contents
         return contents
 
-    
+
 -- | Read the message
 getMessage :: MonadIO m => Process -> m String
 getMessage proce =
@@ -69,7 +69,7 @@ getMessage proce =
         len <- read `liftM` hGetLine (stdOut proce)
         mapM hGetChar $ replicate len (stdOut proce)
 
-readMessage :: (Read r, MonadIO m) => Process -> m r   
+readMessage :: (Read r, MonadIO m) => Process -> m r
 readMessage proce = read `liftM` getMessage proce
 
 -- | Put the message
@@ -79,4 +79,4 @@ putMessage proce message =
         hPutStrLn (stdIn proce) (show $ length message)
         hPutStr (stdIn proce) message
         hFlush (stdIn proce)
-       
+

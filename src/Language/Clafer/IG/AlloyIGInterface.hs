@@ -82,11 +82,11 @@ runAlloyIGT run =
     do
         execPath <- liftIO $ executableDirectory
         proce     <- liftIO $ pipeProcess "java" ["-Djava.library.path=" ++ execPath ++ "lib" , "-jar", execPath ++ "alloyIG.jar"]
-        
+
         runReaderT (evalStateT (unwrap run) Nothing) proce
     where
     unwrap (AlloyIGT a) = a
-            
+
 
 getAlloyModel :: MonadIO m => AlloyIGT m String
 getAlloyModel = fetches alloyModel
@@ -107,7 +107,7 @@ load proce alloyModel' =
         let sigMap' = fromList [(s_name sig, sig) | sig <- sigs]
         let scopes' = Map.empty
         globalScope' <- readMessage proce
-     
+
         return $ AlloyIGEnv alloyModel' sigMap' scopes' globalScope'
     where
     readSig =
@@ -127,7 +127,7 @@ sendLoadCommand alloyModel' =
         proc' <- proc
         env <- liftIO $ load proc' alloyModel'
         set env
-        
+
         sigs <- elems `liftM` fetches sigMap
         mapM_ resetScope sigs
     where
@@ -155,11 +155,11 @@ getScope sig =
         case Map.lookup sig rscopes of
             Just scope -> return scope
             Nothing    -> getGlobalScope
-        
+
 
 getScopes :: MonadIO m => AlloyIGT m [(String, Integer)]
 getScopes = toList `liftM` fetches scopes
-            
+
 
 -- | Tell alloyIG to change the scope of a sig
 sendSetScopeCommand :: MonadIO m => String -> Integer -> AlloyIGT m (Maybe String)
@@ -167,7 +167,7 @@ sendSetScopeCommand sig scope =
     do
         sigMap' <- fetches sigMap
         let Sig{s_multiplicity = multiplicity, s_subset = subset} = sigMap' ! sig
-        
+
         -- Alloy has a fit when trying to set a scope outside its multiplicity
         -- Don't send command if outside its multiplicity but continue the illusion that
         -- the scope was set
@@ -185,7 +185,7 @@ sendSetScopeCommand sig scope =
                     return $ Nothing
             Just sub ->
                 return $ Just sub
-        
+
 
 getGlobalScope :: MonadIO m => AlloyIGT m Integer
 getGlobalScope = fetches globalScope
@@ -197,7 +197,7 @@ sendSetGlobalScopeCommand scope =
     do
         putMsg "setGlobalScope"
         putMsg $ show scope
-        
+
         env <- fetch
         set env {globalScope = scope}
 
@@ -220,15 +220,15 @@ sendRestoreStateCommand = putMsg "restoreState"
 -- | Tell alloyIG to remove the constraint
 sendRemoveConstraintCommand :: MonadIO m => Span -> AlloyIGT m ()
 sendRemoveConstraintCommand s = case s of
-    (Span from to) -> 
+    (Span from to) ->
         do
             putMsg "removeConstraint"
             sendPosition from >> sendPosition to
     where
     sendPosition (Pos line column) =
-        putMsg (show line) >> putMsg (show column)      
+        putMsg (show line) >> putMsg (show column)
 
--- | Tell alloyIG to return the unsat core of the previous operation        
+-- | Tell alloyIG to return the unsat core of the previous operation
 sendUnsatCoreCommand :: MonadIO m => AlloyIGT m UnsatCore
 sendUnsatCoreCommand =
     do
@@ -239,8 +239,8 @@ sendUnsatCoreCommand =
     where
     readPosition   = liftM2 Pos readMsg readMsg
     readConstraint = liftM2 Span readPosition readPosition
-            
-            
+
+
 -- | Tell alloyIG to change the unsat core minimization level.
 --  0 -> Fastest,
 --  1 -> Medium,
@@ -250,9 +250,9 @@ sendSetUnsatCoreMinimizationCommand level =
     do
         putMsg "unsatCoreMinimization"
         putMsg $ show level
-        
 
--- | Tell alloyIG to change the bitwidth        
+
+-- | Tell alloyIG to change the bitwidth
 sendSetBitwidthCommand :: MonadIO m => Integer -> AlloyIGT m ()
 sendSetBitwidthCommand bitwidth =
     do

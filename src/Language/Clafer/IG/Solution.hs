@@ -48,7 +48,7 @@ parseSolution xml =
         rootElem   = CElem root noPos
         sigElems   = tag "alloy" /> tag "instance" /> tag "sig"
         fieldElems = tag "alloy" /> tag "instance" /> tag "field"
-        
+
         sigs = map parseSig $ sigElems rootElem
         fields = map parseField $ fieldElems rootElem
     in
@@ -63,7 +63,7 @@ parseSig content' =
     label = findAttr "label" content'
     id = read $ findAttr "ID" content'
     atoms = map parseAtom $ (keep /> tag "atom") content'
-    
+
 
 parseAtom :: Content i -> Atom
 parseAtom = Atom . findAttr "label"
@@ -77,9 +77,9 @@ parseField content' =
         (read $ findAttr "parentID" content')
         (map parseTuple $ (keep /> tag "tuple") content')
     where
-    
+
     parseType :: Content i -> (Int, Int)
-    parseType content'' = 
+    parseType content'' =
         (toFromType !! 0, toFromType !! 1)
         where toFromType = map (read . findAttr "ID") $ (keep /> tag "types" /> tag "type") content''
 

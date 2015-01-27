@@ -24,65 +24,62 @@ module Language.Clafer.IG.JSONGenerator (generateJSON) where
 
 import qualified Language.Clafer.IG.ClaferModel as M
 import qualified Language.Clafer.Intermediate.Analysis as A
+import Data.Maybe (fromMaybe)
 import Data.Json.Builder
 import Data.String.Conversions
 import Prelude hiding (id)
 
 -- | Generate a representation of the instance in JSON format
 generateJSON :: A.Info -> M.ClaferModel                        -> String
-generateJSON    info      (M.ClaferModel topLevelClafers) = 
-	convertString $ toJsonBS $ constructElements $ map (printClafer info) topLevelClafers 
+generateJSON    info      (M.ClaferModel topLevelClafers) =
+    convertString $ toJsonBS $ constructElements $ map (printClafer info) topLevelClafers
 
 printClafer :: A.Info -> M.Clafer                           -> Object
-printClafer    info      (M.Clafer id value children) = 
-	(map (printClafer info) children) `addElements` completeClaferObject
-	where
-		uid = M.i_name id
-		sclafer = A.runAnalysis (A.claferWithUid $ removeOrdinal uid) info
-		ident = A.uid sclafer
+printClafer    info      (M.Clafer id value children) =
+    (map (printClafer info) children) `addElements` completeClaferObject
+    where
+        uid = M.i_name id
+        sclafer = A.runAnalysis (A.claferWithUid $ removeOrdinal uid) info
+        ident = A.uid sclafer
 
-		getSuper :: Maybe A.SSuper    -> (Bool, String)
-		getSuper    Nothing            = (False, "")
-		getSuper    (Just (A.Ref s))   = (True, s)
-		getSuper    (Just (A.Colon s)) = (False, s)
+        super = fromMaybe "" $ A.super sclafer
+        reference = fromMaybe "" $ A.reference sclafer
+        cardMin = A.low sclafer
+        cardMax = A.high sclafer
+        basicClaferObject = makeBasicClaferObject ident uid super reference cardMin cardMax
 
-		(isOverlapping, super) = getSuper $ A.super sclafer
-		cardMin = A.low sclafer
-		cardMax = A.high sclafer
-		basicClaferObject = makeBasicClaferObject ident uid super isOverlapping cardMin cardMax
+        addValue :: Maybe M.Value         -> Object -> Object
+        addValue    Nothing                  object = object
+        addValue    (Just (M.IntValue i))    object = addIntValue i object
+        addValue    (Just (M.AliasValue a))  object = addStringValue (M.i_name a) object
+        addValue    (Just (M.StringValue _)) _      = error "Function addValue from JSONGenerator does not accept StringValues" -- Should never happen, string values are not generated yet
 
-		addValue :: Maybe M.Value         -> Object -> Object
-		addValue    Nothing                  object = object
-		addValue 	(Just (M.IntValue i))    object = addIntValue i object
-		addValue 	(Just (M.AliasValue a))  object = addStringValue (M.i_name a) object
-		addValue    (Just (M.StringValue _)) _      = error "Function addValue from JSONGenerator does not accept StringValues" -- Should never happen, string values are not generated yet
-	
-		completeClaferObject = addValue value basicClaferObject
+        completeClaferObject = addValue value basicClaferObject
 
-		removeOrdinal :: String -> String 
-		removeOrdinal = takeWhile (/= '$')
+        removeOrdinal :: String -> String
+        removeOrdinal = takeWhile (/= '$')
 
-makeBasicClaferObject :: String -> String -> String -> Bool       -> Integer -> Integer    -> Object
-makeBasicClaferObject    ident     uid       super     isOverlapping cardMin    cardMax =
-	mconcat [ row "ident" ident, 
-			  row "uid" uid,
-			  row "super" super,
-			  row "isOverlapping" isOverlapping,
-			  row "cardMin" cardMin,
-			  row "cardMax" cardMax ]
+makeBasicClaferObject :: String -> String -> String -> String       -> Integer -> Integer    -> Object
+makeBasicClaferObject    ident     uid       super     reference       cardMin    cardMax =
+    mconcat [ row "ident" ident,
+              row "uid" uid,
+              row "super" super,
+              row "reference" reference,
+              row "cardMin" cardMin,
+              row "cardMax" cardMax ]
 
 addIntValue :: Int -> Object      -> Object
-addIntValue    value  claferObject = 
-	claferObject `mappend` (row "value" value)
+addIntValue    value  claferObject =
+    claferObject `mappend` (row "value" value)
 
 addStringValue :: String -> Object      -> Object
-addStringValue    value     claferObject = 
-	claferObject `mappend` (row "value" value)
+addStringValue    value     claferObject =
+    claferObject `mappend` (row "value" value)
 
 addElements :: [ Object ] -> Object      -> Object
-addElements    elements      claferObject = 
-	claferObject `mappend` (constructElements elements)
+addElements    elements      claferObject =
+    claferObject `mappend` (constructElements elements)
 
 constructElements :: [ Object ] -> Object
 constructElements    elements    =
-	row "elements" $ mconcat $ map element elements
+    row "elements" $ mconcat $ map element elements

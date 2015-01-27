@@ -22,7 +22,7 @@
 
 module Language.Clafer.IG.ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), c_name, buildClaferModel, traverse) where
 
-import Data.List 
+import Data.List
 import Data.Either
 import Data.Map as Map hiding (filter, map, foldr, singleton)
 import Data.Maybe
@@ -64,9 +64,9 @@ instance Show Clafer where
             indent ++ i_name id ++ maybe "" displayValue value ++
             "\n" ++ concatMap (displayClafer $ indent ++ "  ") children
         displayValue (AliasValue alias) = " = " ++ i_name alias
-        displayValue (IntValue value) = " = " ++ show value 
+        displayValue (IntValue value) = " = " ++ show value
         displayValue (StringValue value) = " = " ++ value
-            
+
 
 
 traverse :: ClaferModel -> [Clafer]
@@ -110,16 +110,16 @@ renameSolution (Solution sigs fields) =
     renameSigLabel label
         | label `elem` ["univ", "Int", "seq/Int", "String"] = label
         | otherwise = fromMaybe (error $ "Unexpected sig label " ++ label) $ dropDelimiter '/' label
-            
+
     renameField field = field{f_label = renameFieldLabel $ f_label field}
     renameFieldLabel "ref" = "ref"
     renameFieldLabel label = fromMaybe (error $ "Unexpected field label " ++ label) $ dropDelimiter '_' label
-    
+
     dropDelimiter char string =
         case snd $ break (== char) string of
             [] -> Nothing
             x  -> Just $ tail x
--}            
+-}
 
 buildFamilyTree :: Solution -> FamilyTree
 buildFamilyTree (Solution sigs fields) =
@@ -129,7 +129,7 @@ buildFamilyTree (Solution sigs fields) =
     asNodes Sig{s_id = id, s_atoms = atoms} = map (flip ClaferNode id) $ map (labelAsId . a_label) atoms
     rootNodes :: [(Id, Node)]
     rootNodes = [(n_id rootNode, rootNode) | rootNode <- concatMap asNodes sigs]
-    
+
     buildFields fields' = foldr buildField (FamilyTree (fromList rootNodes) Map.empty) fields'
     buildField field tree = foldr (uncurry buildTuple) tree (zip ([0,1..]::[Integer]) $ f_tuples field)
         where
@@ -153,7 +153,7 @@ buildFamilyTree (Solution sigs fields) =
             addChild (labelAsId $ a_label from) (buildNode (labelAsId $ a_label to) toType) tree'
             where
             buildNode = if label == "ref" then ValueNode else ClaferNode
-            
+
     labelAsId :: String -> Id
     labelAsId label =
         case e of
@@ -174,13 +174,13 @@ buildClaferModel solution =
     where
     sigMap = buildSigMap solution
     ftree = buildFamilyTree solution
-    
+
     intType = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
-    
+
     singleton [] = Nothing
     singleton [x] = Just x
     singleton xs = error $ "Received more than one value " ++ show xs
-    
+
     buildClafer :: Node -> Either Clafer Value
     buildClafer (ClaferNode id _) =
         Left $ Clafer id (singleton valueChildren) claferChildren
