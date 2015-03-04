@@ -22,8 +22,8 @@
 
 module Language.Clafer.IG.Sugarer (sugarClaferModel) where
 
+import Language.Clafer.Common
 import Language.Clafer.IG.ClaferModel
-import qualified Language.Clafer.Intermediate.Analysis as Analysis
 import Data.Maybe (fromJust)
 import Data.List as List hiding (map)
 import Data.Map as Map hiding (map, foldr, foldl)
@@ -64,8 +64,8 @@ claferModelCensus (ClaferModel topLevelClafers) =
 
 
 -- | Rewrite the model into a human-friendlier format
-sugarClaferModel:: Bool -> Bool  -> Maybe Analysis.Info -> ClaferModel -> (Map Int String) -> ClaferModel
-sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMap =
+sugarClaferModel:: Bool -> Bool  -> UIDIClaferMap -> ClaferModel                      -> (Map Int String) -> ClaferModel
+sugarClaferModel   useUids addTypes uidIClaferMap'   model@(ClaferModel topLevelClafers) sMap              =
     ClaferModel $ map sugarClafer topLevelClafers
     where
     sugarClafer (Clafer id value children) =
@@ -75,14 +75,16 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
     sugarValue (Clafer _ Nothing _) = Nothing
     sugarValue c  = if (cType c) == "string" then (Just ((StringValue) (getString c))) else (c_value c)
 
-    cType (Clafer id _ _) = cTypeSolve $ (Analysis.super (Analysis.runAnalysis (Analysis.claferWithUid (i_name id)) (fromJust info)))
 
-    cTypeSolve Nothing = ""
-    cTypeSolve (Just "string") = "string"
-    cTypeSolve (Just "integer") = "integer"
-    cTypeSolve (Just "int") = "integer"
-    cTypeSolve (Just "real") = "real"
-    cTypeSolve (Just x) = cType (Clafer (Id x 0) Nothing [])
+    cType (Clafer id _ _) = cTypeSolve $ getReference iclafer
+      where
+        iclafer = fromJust $ findIClafer uidIClaferMap' $ i_name id
+
+    cTypeSolve ["string"]  = "string"
+    cTypeSolve ["integer"] = "integer"
+    cTypeSolve ["int"]     = "integer"
+    cTypeSolve ["real"]    = "real"
+    cTypeSolve _           = ""
 
     getString c = case (Map.lookup strNumber sMap) of
         Nothing -> "\"<text " ++ show strNumber ++ ">\""
@@ -94,33 +96,32 @@ sugarClaferModel   useUids addTypes info model@(ClaferModel topLevelClafers) sMa
 
     sugarId :: Bool -> Bool  -> Bool    -> Id -> Id
     sugarId    useUids' addTypes' addRefDecl id  =
-        Id (finalName ++ ordinalDisplay ++ (refDecl addTypes' addRefDecl info)) 0
+        Id (finalName ++ ordinalDisplay ++ (refDecl addTypes' addRefDecl uidIClaferMap')) 0
         where
         fullName = i_name id
         ordinalDisplay = if (useUids || count > 1)
                          then "$" ++ show ordinal
                          else ""
 
-        refDecl :: Bool -> Bool -> Maybe Analysis.Info -> String
-        refDecl    True    True    (Just info')          = retrieveSuper info' $ i_name id
-        refDecl    _       _       _                    = ""
+        refDecl :: Bool -> Bool ->  UIDIClaferMap -> String
+        refDecl    True    True    uidIClaferMap'' = retrieveSuper uidIClaferMap'' $ i_name id
+        refDecl    _       _       _               = ""
 
         (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample'
         count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts'
         finalName = if useUids' then fullName else simpleName
 
-retrieveSuper :: Analysis.Info -> String -> String
-retrieveSuper info uid =
-    (if (Analysis.isBase sclafer)
-            then ""
-            else sugarSuper (Analysis.super sclafer))
-    ++ sugarReference  (Analysis.reference sclafer)
+retrieveSuper :: UIDIClaferMap -> String -> String
+retrieveSuper uidIClaferMap'      uid =
+    sugarSuper (getSuper iclafer)
+    ++
+    sugarReference  (getReference iclafer)
     where
-        sclafer = Analysis.runAnalysis (Analysis.claferWithUid uid) info
+        iclafer = fromJust $ findIClafer uidIClaferMap' uid
 
-        sugarSuper :: Maybe String -> String
-        sugarSuper (Just s) = " : " ++ s
-        sugarSuper Nothing = ""
-        sugarReference :: Maybe String -> String
-        sugarReference (Just s) = " -> " ++ s
-        sugarReference Nothing = ""
+        sugarSuper :: [String] -> String
+        sugarSuper [s] = " : " ++ s
+        sugarSuper _   = ""
+        sugarReference :: [String] -> String
+        sugarReference [s] = " -> " ++ s
+        sugarReference _   = ""

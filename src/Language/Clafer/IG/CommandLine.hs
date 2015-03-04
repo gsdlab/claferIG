@@ -85,13 +85,13 @@ runCommandLine =
         do
             solution <- lift next
             claferIGArgs' <- lift getClaferIGArgs
-            info <- lift getInfo
+            uidIClaferMap' <- lift $ getUIDIClaferMap
             case solution of
                 Instance claferModel xml -> do
                     liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse claferModel)
 
                     outputStrLn $ if json claferIGArgs'
-                        then generateJSON info claferModel
+                        then generateJSON uidIClaferMap' claferModel
                         else let
                                 iNumber = show $ 1 + (length $ unsaved context)
                              in

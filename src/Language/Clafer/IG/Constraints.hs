@@ -28,7 +28,7 @@ import Data.List
 import Data.Maybe
 import Data.Ord
 import Language.Clafer
-import Language.Clafer.Front.Absclafer (Span(..))
+import Language.Clafer.Front.AbsClafer (Span(..))
 import Language.Clafer.Intermediate.Intclafer
 import qualified Language.Clafer.Intermediate.Intclafer as I
 

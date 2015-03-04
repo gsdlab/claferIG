@@ -22,31 +22,32 @@
 
 module Language.Clafer.IG.JSONGenerator (generateJSON) where
 
+import Language.Clafer.Common
+import Language.Clafer.Intermediate.Intclafer
 import qualified Language.Clafer.IG.ClaferModel as M
-import qualified Language.Clafer.Intermediate.Analysis as A
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromJust)
 import Data.Json.Builder
 import Data.String.Conversions
 import Prelude hiding (id)
 
 -- | Generate a representation of the instance in JSON format
-generateJSON :: A.Info -> M.ClaferModel                        -> String
-generateJSON    info      (M.ClaferModel topLevelClafers) =
-    convertString $ toJsonBS $ constructElements $ map (printClafer info) topLevelClafers
+generateJSON :: UIDIClaferMap -> M.ClaferModel                  -> String
+generateJSON    uidIClaferMap'   (M.ClaferModel topLevelClafers) =
+    convertString $ toJsonBS $ constructElements $ map (printClafer uidIClaferMap') topLevelClafers
 
-printClafer :: A.Info -> M.Clafer                           -> Object
-printClafer    info      (M.Clafer id value children) =
-    (map (printClafer info) children) `addElements` completeClaferObject
+printClafer :: UIDIClaferMap -> M.Clafer                           -> Object
+printClafer    uidIClaferMap'      (M.Clafer id value children) =
+    (map (printClafer uidIClaferMap') children) `addElements` completeClaferObject
     where
-        uid = M.i_name id
-        sclafer = A.runAnalysis (A.claferWithUid $ removeOrdinal uid) info
-        ident = A.uid sclafer
+        uid' = M.i_name id
+        iclafer = fromJust $ findIClafer uidIClaferMap' $ removeOrdinal uid'
+        ident' = _ident iclafer
 
-        super = fromMaybe "" $ A.super sclafer
-        reference = fromMaybe "" $ A.reference sclafer
-        cardMin = A.low sclafer
-        cardMax = A.high sclafer
-        basicClaferObject = makeBasicClaferObject ident uid super reference cardMin cardMax
+        super' = getSuper iclafer
+        reference' = getReference iclafer
+        (Just (cardMin, _)) = _card iclafer
+        (Just (_, cardMax)) = _card iclafer
+        basicClaferObject = makeBasicClaferObject ident' uid' super' reference' cardMin cardMax
 
         addValue :: Maybe M.Value         -> Object -> Object
         addValue    Nothing                  object = object
@@ -59,14 +60,21 @@ printClafer    info      (M.Clafer id value children) =
         removeOrdinal :: String -> String
         removeOrdinal = takeWhile (/= '$')
 
-makeBasicClaferObject :: String -> String -> String -> String       -> Integer -> Integer    -> Object
-makeBasicClaferObject    ident     uid       super     reference       cardMin    cardMax =
-    mconcat [ row "ident" ident,
-              row "uid" uid,
-              row "super" super,
-              row "reference" reference,
+makeBasicClaferObject :: String -> String -> [String] -> [String] -> Integer -> Integer -> Object
+makeBasicClaferObject    ident'    uid'      super'      reference'   cardMin    cardMax  =
+    mconcat [ row "ident" ident',
+              row "uid" uid',
+              superRow,
+              refRow,
               row "cardMin" cardMin,
               row "cardMax" cardMax ]
+    where
+        superRow = case super' of
+            [s] -> row "super" s
+            _   -> mempty
+        refRow = case reference' of
+            [r] -> row "reference" r
+            _   -> mempty
 
 addIntValue :: Int -> Object      -> Object
 addIntValue    value  claferObject =
@@ -77,9 +85,9 @@ addStringValue    value     claferObject =
     claferObject `mappend` (row "value" value)
 
 addElements :: [ Object ] -> Object      -> Object
-addElements    elements      claferObject =
-    claferObject `mappend` (constructElements elements)
+addElements    elements'      claferObject =
+    claferObject `mappend` (constructElements elements')
 
 constructElements :: [ Object ] -> Object
-constructElements    elements    =
-    row "elements" $ mconcat $ map element elements
+constructElements    elements'    =
+    row "elements" $ mconcat $ map element elements'

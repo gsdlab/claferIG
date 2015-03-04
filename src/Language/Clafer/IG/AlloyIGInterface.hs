@@ -31,7 +31,7 @@ import Control.Monad.Reader
 import Control.Monad.Trans.State.Strict
 import Data.Map as Map hiding (null)
 import Data.Maybe
-import Language.Clafer.Front.Absclafer (Span(..), Pos(..))
+import Language.Clafer.Front.AbsClafer (Span(..), Pos(..))
 import Language.Clafer.IG.Process
 import System.Console.Haskeline.MonadException
 
