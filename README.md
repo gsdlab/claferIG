@@ -1,7 +1,7 @@
 Clafer Instance Generator
 =========================
 
-v0.3.8
+v0.3.9
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
 overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
@@ -24,13 +24,13 @@ Clafer can be installed from a binary distribution (preferred), from Hackage, an
 
 Regardless of the installation method, the following are required:
 
-* [Clafer](https://github.com/gsdlab/clafer) v0.3.8
-* [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) v7+, 32bit
+* [Clafer](https://github.com/gsdlab/clafer) v0.3.9
+* [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) v8+, 32bit
 * [Alloy4.2](http://alloy.mit.edu/alloy/download.html)
 
 ### Installation from binaries
 
-Binary distributions of the release 0.3.8 of Clafer Tools for Windows, Mac, and Linux, 
+Binary distributions of the release 0.3.9 of Clafer Tools for Windows, Mac, and Linux, 
 can be downloaded from [Clafer Tools - Binary Distributions](http://http://gsd.uwaterloo.ca/clafer-tools-binary-distributions). 
 
 1. download the binaries and unpack `<target directory>` of your choice
@@ -40,13 +40,14 @@ can be downloaded from [Clafer Tools - Binary Distributions](http://http://gsd.u
 
 Dependencies
 
-* [The Haskell Platform](http://hackage.haskell.org/platform/) v2013.2.0.0
+* [The Haskell Platform](http://hackage.haskell.org/platform/) v2014.2.0.0 
+  * Alternatively GHC >= 7.8.3 and Cabal >= 1.18
 
-ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.3.8/) and it can be installed using
+ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.3.9/) and it can be installed using
 
 1. `cabal update`
 2. `cabal install claferIG`
-3. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\i386-windows-ghc-7.6.3\claferIG-0.3.8` on Windows or `.cabal/share/x86_64-linux-ghc-7.6.3/claferIG-0.3.8/` on Linux)
+3. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\i386-windows-ghc-7.8.3\claferIG-0.3.9` on Windows or `.cabal/share/x86_64-linux-ghc-7.8.3/claferIG-0.3.9/` on Linux)
 3. to automatically download Alloy4.2 jar
   * execute `make` in `tools` 
 4. To get the `minisatproover` library
@@ -60,19 +61,19 @@ ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/clafer
 
 Dependencies
 
+* [The Haskell Platform](http://hackage.haskell.org/platform/) v2014.2.0.0 
+  * Alternatively GHC >= 7.8.3 and Cabal >= 1.18
 * [Clafer compiler](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`)). The version number of the compiler must match the version of the instance generator.
-* Cabal >= 1.18
 * On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
   * on Ubuntu, execute `sudo apt-get install zlib1g-dev libncurses5-dev`
 
 On Windows 
 
-* [MinGW+MSYS](http://mingw.org) 
-  * download [mingw-get-setup.exe](http://sourceforge.net/projects/mingw/files/Installer/mingw-get/)
-  * since the Haskell Platform already contains MinGW, only install MSYS. Installing another MinGW causes problems as it contains different versions of tools as compared to the MinGW in the Haskell Platform
-  * choose the existing MinGW location, e.g., `c:\...\HaskellPlatform\2013.2.0.0\MinGw`
-  * ensure `wget` and `unzip` are selected to be installed 
-  * add the `bin` folder of MSYS (`MinGW\MSYS\1.0\bin`) to your system path
+* [MSYS2](http://msys2.sourceforge.net/) 
+  * download MSYS2 installer
+  * in MSYS2 console, execute
+     * `pacman -Syu` 
+     * `pacman -S make wget unzip diffutils`
 
 ### Important: Branches must correspond
 
@@ -81,6 +82,7 @@ The branch `master` contains releases, whereas the branch `develop` contains cod
 When building the tools, the branches should match.
 Releases from branches 'master` are guaranteed to work well together.
 Development versions from branches `develop` should work well together but this might not always be the case.
+
 ### Building
 
 1. install the [Clafer compiler](https://github.com/gsdlab/clafer)
@@ -92,7 +94,7 @@ Development versions from branches `develop` should work well together but this 
 
 ### Installation
 
-1. execute `make install to=/c/Users/<your user name>/AppData/Roaming/cabal/bin`
+1. execute `make install to=<target directory>`
 
 #### Note: 
 > On Windows, use `/` with the `make` command instead of `\`.
@@ -103,6 +105,11 @@ Integration with Sublime Text 2/3
 
 See [ClaferToolsST](https://github.com/gsdlab/ClaferToolsST)
 
+Integration with VIM
+--------------------
+
+See [clafer-vim](https://github.com/wasowski/clafer-vim)
+
 Usage
 =====
 
@@ -112,9 +119,10 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 
 (As printed by `claferIG --help`)
 
-``` v0.3.8
+``` 
+ClaferIG v0.3.9
 
-igaONS] FILE
+claferIG [OPTIONS] [FILE]
 
 Common flags:
      --all=INT                                 Saves all instances up to the
@@ -145,15 +153,15 @@ Common flags:
   -f --skip-resolver-comp                      Skip name resolution during
                                                compiling
      --ss=SCOPESTRATEGY --scope-strategy-comp  Use scope computation strategy
-                                               during compiling: none, simple
-                                               (default), or full.
+                                               during compiling: none or simple
+                                               (default).
   -? --help                                    Display help message
   -V --version                                 Print version information
 ```
 
 `claferIG <model file name>.cfr`
 
-- opens an interactive session and displays the minimal instance or a counterexample
+- opens an interactive session and displays an instance or a counterexample.
 
 `claferIG <model file name>.cfr -all <scope>`
 
@@ -164,7 +172,7 @@ In the interactive mode, the users can invoke the following commands by pressing
 
 ```
 ------------------
-| ClaferIG 0.3.8 |
+| ClaferIG 0.3.9 |
 ------------------
 
 You can invoke the following commands as indicated by single quotes:
@@ -228,13 +236,13 @@ For a model
 abstract A
     a ?
     b +
-    c : integer ?
+    c -> integer ?
     d -> E 2
     g -> E 2
-        h : integer
+        h -> integer
 
 abstract E
-    f : integer +
+    f ->> integer +
 
 a1 : A
 e1 : E
@@ -261,6 +269,7 @@ e1
     f$1 = 2
     f$2 = 3
     f$3 = 4 
+    f$4 = 2 
 
 --- Instance 1 End ---
 ```
@@ -301,7 +310,7 @@ How it works
 
 The Clafer instance generator:
 
-* translates the input Clafer model (.cfr) to an Alloy model (.als). The compiler's intermediate representation (IR) contains the mapping between Clafer names and Alloy names. The IR also contains the smallest scopes for each Alloy signature to ensure that a valid instance can be found if it exists
+* translates the input Clafer model (.cfr) to an Alloy4.2 model (.als). The compiler's intermediate representation (IR) contains the mapping between Clafer names and Alloy names. The IR also contains the scopes for each Alloy signature to ensure that a valid instance can be found if it exists
 * invokes Alloy Analyzer to produce an instance or find an UnSAT core
 ** given an UnSAT core, removes constraints from the core until an instance is found - that instance represents the counterexample which violates the removed constraints
 * translates the instance or the counterexample data produced by Alloy Analyzer to Clafer instance data format using the name map from IR in a reverse direction,
@@ -309,12 +318,5 @@ The Clafer instance generator:
 
 Need help?
 ==========
-* See [language's website](http://clafer.org) for news, technical reports and more
-  * Check out a [Clafer tutorial](http://t3-necsis.cs.uwaterloo.ca:8091/Tutorial/Intro)
-  * Try a live instance of [ClaferWiki](http://t3-necsis.cs.uwaterloo.ca:8091) which contains a repository of models for various applications
-  * Try a live instance of [ClaferIDE](http://t3-necsis.cs.uwaterloo.ca:8094)
-  * Try a live instance of [ClaferConfigurator](http://t3-necsis.cs.uwaterloo.ca:8093)
-  * Try a live instance of [ClaferMooVisualizer](http://t3-necsis.cs.uwaterloo.ca:8092)
-* Take a look at (incomplete) [Clafer by examples wiki](https://github.com/gsdlab/clafer/wiki)
-* Browse example models in the [test suite](https://github.com/gsdlab/clafer/tree/master/test/positive) and [MOO examples](https://github.com/gsdlab/clafer/tree/master/spl_configurator/dataset)
-* Post questions, report bugs, suggest improvements [GSD Lab Bug Tracker](http://gsd.uwaterloo.ca:8888/questions/). Tag your entries with `clafer` (so that we know what they are related to) and with `jimmy-liang` or `michal` (so that Jimmy or Michał gets a notification).
+* Visit [language's website](http://clafer.org).
+* Report issues to [issue tracker](https://github.com/gsdlab/claferIG/issues)

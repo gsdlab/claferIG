@@ -1,5 +1,24 @@
 TOOL_DIR = tools
 
+ifeq ($(OS),Windows_NT)
+	LIB := x86-windows/minisatprover*
+else
+	UNAME := $(shell uname -s)
+	ifeq ($(UNAME), Linux)
+		ifeq ($(MNAME), i686)
+			LIB := x86-linux/libminisatprover*
+		endif
+		ifeq ($(MNAME), x86_64)
+			# amd64 is a nickname for x86_64
+			LIB := amd64-linux/libminisatprover*
+		endif
+	endif
+	ifeq ($(UNAME),Darwin)
+		WGET_COMMAND := curl -O
+		LIB := x86-mac/libminisatprover*
+	endif
+endif
+
 # Calling `make` should only build
 all: alloyIG.jar lib build
 
@@ -63,7 +82,6 @@ test:
 	cp -r tools/ dist/build/claferIG/
 	cp -r lib/ dist/build/test-suite/
 	cp -r lib/ dist/build/claferIG/
-	# On Windows, also need to manually copy glpk_4_52.dll to dist/build/test-suite/
 	cabal test
 
 clean:

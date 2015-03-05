@@ -24,7 +24,7 @@
 
 module Main where
 
-import Language.Clafer.IG.ClaferIG 
+import Language.Clafer.IG.ClaferIG
 import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLine
 import Language.Clafer.IG.Solution
@@ -32,6 +32,7 @@ import Language.Clafer.IG.Sugarer
 import Language.Clafer.ClaferArgs
 import Language.Clafer.JSONMetaData
 import Language.ClaferT
+import Language.Clafer.Common
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
@@ -50,7 +51,7 @@ claferIGArgsDef = IGArgs {
     saveDir                     = def &= help "Specify the directory for storing saved files." &= typ "FILE",
     bitwidth                    = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER", -- Default bitwidth is 4.
     maxInt                      = 7 &= help "Set the bitwidth for integers based on the largest required number. Overrides --bitwidth argument." &= typ "INTEGER",
-    alloySolution               = False &= help "Convert Alloy solution to a Clafer solution.",
+    alloySolution               = def &= help "Convert Alloy solution to a Clafer solution." &= typ "FILE",
     claferModelFile             = def &= argPos 0 &= typ "FILE",
     useUids                     = False &= help "Use unique clafer names in the Clafer solution.",
     addTypes                    = False &= help "Add colon/reference types to the Clafer solution.",
@@ -75,11 +76,12 @@ main =
                         then args' {bitwidth = requiredBitwidth mi}
                         else args'
 
-        if (alloySolution args'')
-            then
-                runAlloySolution args''
+        if (not $ null $ alloySolution args'')
+            then do
+                _ <- runAlloySolution args''
+                return ()
             else if (json args'')
-                then 
+                then
                     tryClaferIG (args'' { useUids = True })
                 else
                     tryClaferIG args''
@@ -95,7 +97,7 @@ main =
                     void getLine
                     tryClaferIG args3
 
-runClaferIG :: IGArgs -> IO (Either ClaferErrs ())    
+runClaferIG :: IGArgs -> IO (Either ClaferErrs ())
 runClaferIG args' =
     runClaferIGT args' $ do
         let claferModelFileName = claferModelFile args'
@@ -106,7 +108,7 @@ runClaferIG args' =
         let ir = fst3 $ fromJust $ cIr env
         scopes <- getScopes
         setBitwidth $ findNecessaryBitwidth ir oldBw $ map snd scopes
-        
+
         solve
         case all args' of
             Just scope -> do
@@ -117,8 +119,8 @@ runClaferIG args' =
                     Nothing -> do
                         liftIO $ putStrLn "Using the provided global scope as a `.cfr-scope` file does not exist. Use the command `saveScopes` to create one."
                         setGlobalScope scope
-                    Just uidScopes -> do 
-                        let 
+                    Just uidScopes -> do
+                        let
                             (globalScopes, normalScopes) = partition (\(uid, _) -> null uid) uidScopes
                             -- from the globalScopes, take the maximum
                             globalScopeVals = map snd globalScopes
@@ -132,19 +134,30 @@ runClaferIG args' =
                 solve
 
                 counterRef <- liftIO $ newIORef 1
-                
+
                 let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir args'
                 saveAll (savePath claferModelFileName counterRef >>= saveDirectory)
                 quit
             Nothing    -> runCommandLine
 
+
 -- | Convert an Alloy XML file into an instance in Clafer
-runAlloySolution :: IGArgs -> IO () 
+runAlloySolution :: IGArgs -> IO (Either ClaferErrs ())
 runAlloySolution args' =
-    do
-        content <- readFile $ claferModelFile args' -- It's an Alloy XML file in this case
-        let sMap = Map.empty
-        putStrLn $ show $ (sugarClaferModel (useUids args') (addTypes args') Nothing $ buildClaferModel $ parseSolution content) $ sMap
+    runClaferIGT args' $ do
+        let claferModelFileName = claferModelFile args'
+        cModel <- liftIO $ strictReadFile claferModelFileName
+        when (cModel == "") $ error $ "Cannot convert Alloy solution without the Clafer model from which the instance was created.\n"
+                                   ++ "Usage: claferIG [OPTIONS] <model.cfr> --alloy-solution=<instance.xml>\n"
+        alloyInstance <- liftIO $ strictReadFile $ alloySolution args' -- It's an Alloy XML file in this case
+        when (null alloyInstance) $ error $ "Provide an Alloy solution Alloy file name.\n"
+                                         ++ "Usage: claferIG [OPTIONS] <model.cfr> --alloy-solution=<instance.xml>\n"
+        env <- getClaferEnv
+        let (_, genv', _) = fromJust $ cIr env
+        let
+            sMap = Map.empty
+            uidIClaferMap' = uidClaferMap genv'
+        liftIO $ putStrLn $ show $ (sugarClaferModel (useUids args') (addTypes args') uidIClaferMap' $ buildClaferModel $ parseSolution alloyInstance) $ sMap
 
 savePath :: FilePath -> IORef Int -> IO FilePath
 savePath file' counterRef =
@@ -152,7 +165,7 @@ savePath file' counterRef =
         counter <- readIORef counterRef
         writeIORef counterRef (counter + 1)
         return $ file' ++ "." ++ (show counter) ++ ".data"
-        
+
 
 underDirectory :: FilePath -> FilePath -> IO FilePath
 underDirectory dir file' =
@@ -171,4 +184,4 @@ saveAll nextFile =
             Instance{modelInstance = modelInstance'} -> do
                 liftIO $ writeFile file' (show modelInstance')
                 saveAll nextFile
-            _ -> return ()  
+            _ -> return ()

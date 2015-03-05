@@ -30,8 +30,8 @@ module Language.Clafer.IG.ClaferIG (
     getClaferIGArgs,
     getConstraints,
     getClaferModel,
-    getInfo,
     getStrMap,
+    getUIDIClaferMap,
     ClaferIGT(..),
     Instance(..),
     Counterexample(..),
@@ -61,10 +61,10 @@ module Language.Clafer.IG.ClaferIG (
     sigToClaferName) where
 
 import Language.Clafer
+import Language.Clafer.Common
 import Language.Clafer.QNameUID
 import Language.ClaferT
 import Language.Clafer.Intermediate.Intclafer
-import qualified Language.Clafer.Intermediate.Analysis as Analysis
 import Language.Clafer.IG.AlloyIGInterface (AlloyIGT)
 import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
 import Language.Clafer.IG.ClaferModel
@@ -93,7 +93,7 @@ data IGArgs = IGArgs {
     all :: Maybe Integer,
     saveDir :: Maybe FilePath,
     claferModelFile :: FilePath,
-    alloySolution :: Bool,
+    alloySolution :: FilePath,
     bitwidth :: Integer,
     maxInt :: Integer,
     useUids :: Bool,
@@ -121,6 +121,9 @@ fetch = ClaferIGT get
 fetches :: Monad m => (ClaferIGEnv -> a) -> ClaferIGT m a
 fetches = ClaferIGT . gets
 
+getUIDIClaferMap :: Monad m => ClaferIGT m UIDIClaferMap
+getUIDIClaferMap = fetches info
+
 set :: Monad m => ClaferIGEnv -> ClaferIGT m ()
 set = ClaferIGT . put
 
@@ -139,7 +142,7 @@ data ClaferIGEnv = ClaferIGEnv{
     constraints:: [Constraint],
     claferModel:: String,
     qNameMaps :: QNameMaps,
-    info :: Analysis.Info,
+    info :: UIDIClaferMap,
     strMap :: Map Int String,
     lineNumMap :: Map Integer String
 }
@@ -170,9 +173,6 @@ getClaferModel = fetches claferModel
 getStrMap :: Monad m => ClaferIGT m (Map Int String)
 getStrMap = fetches strMap
 
-getInfo :: Monad m => ClaferIGT m Analysis.Info
-getInfo = fetches info
-
 load :: MonadIO m => IGArgs -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
 load                 igArgs    =
     runErrorT $ do
@@ -180,7 +180,8 @@ load                 igArgs    =
 
         (claferEnv', alloyModel, mapping, sMap) <- ErrorT $ return $ callClaferTranslator claferModel
 
-        let ir = fst3 $ fromJust $ cIr claferEnv'
+        let
+            (ir, genv', _) = fromJust $ cIr claferEnv'
         let constraints = parseConstraints claferModel ir mapping
 
         lift $ AlloyIG.sendLoadCommand alloyModel
@@ -188,10 +189,10 @@ load                 igArgs    =
 
         let qNameMaps = deriveQNameMaps ir
 
-        let info = Analysis.gatherInfo ir
+        let uidIClaferMap' = uidClaferMap genv'
         let irTrace = editMap $ irModuleTrace claferEnv'
 
-        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel qNameMaps info sMap irTrace
+        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel qNameMaps uidIClaferMap' sMap irTrace
     where
     editMap :: (Map.Map Span [Ir]) -> (Map.Map Integer String) -- Map Line Number to Clafer Name
     editMap =
@@ -291,27 +292,27 @@ next :: MonadIO m => ClaferIGT m Instance
 next = do
     env <- getClaferEnv
     claferIGArgs' <- getClaferIGArgs
+    uidIClaferMap' <- getUIDIClaferMap
     let
         useUids' = useUids claferIGArgs'
         addTypes' = addTypes claferIGArgs'
     constraints' <- getConstraints
-    info' <- getInfo
     xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
     sMap <- getStrMap
     case xmlSolution of
-        Just xml -> return $ Instance (xmlToModel useUids' addTypes' info' xml sMap) xml
+        Just xml -> return $ Instance (xmlToModel useUids' addTypes' uidIClaferMap' xml sMap) xml
         Nothing  -> do
             ClaferIGT $ lift AlloyIG.sendSaveStateCommand
             -- Generating counterexample modifies the state. If we ever want to
             -- rerun the original model, we need to restore the state.
             AlloyIG.UnsatCore core <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-            c <- counterexample env core useUids' addTypes' info' constraints' sMap
+            c <- counterexample env core useUids' addTypes' uidIClaferMap' constraints' sMap
             ClaferIGT $ lift AlloyIG.sendRestoreStateCommand
             return c
     where
-    counterexample env' originalCore useUids'' addTypes'' info'' constraints' sMap = counterexample' env' originalCore [] useUids'' addTypes'' info'' constraints' sMap
+    counterexample env' originalCore useUids'' addTypes'' uidIClaferMap'' constraints' sMap = counterexample' env' originalCore [] useUids'' addTypes'' uidIClaferMap'' constraints' sMap
         where
-        counterexample' env'' core removed useUids''' addTypes''' info''' constraints'' sMap' =
+        counterexample' env'' core removed useUids''' addTypes''' uidIClaferMap''' constraints'' sMap' =
             case msum $ findRemovable env'' core constraints'' of
                 Just remove -> do
                     ClaferIGT $ lift $ AlloyIG.sendRemoveConstraintCommand $ range remove
@@ -319,16 +320,16 @@ next = do
                     xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
                     case xmlSolution of
                         Just xml -> return $
-                            UnsatCore (catMaybes $ findRemovable env'' core constraints'') (Just $ Counterexample (reverse $ remove : removed) (xmlToModel useUids''' addTypes''' info''' xml sMap') xml)
+                            UnsatCore (catMaybes $ findRemovable env'' core constraints'') (Just $ Counterexample (reverse $ remove : removed) (xmlToModel useUids''' addTypes''' uidIClaferMap''' xml sMap') xml)
                         Nothing ->
                             do
                                 AlloyIG.UnsatCore core' <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-                                counterexample' env'' core' (remove : removed) useUids''' addTypes''' info''' constraints' sMap'
+                                counterexample' env'' core' (remove : removed) useUids''' addTypes''' uidIClaferMap''' constraints' sMap'
                 Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
 
-    xmlToModel :: Bool -> Bool -> Analysis.Info -> String -> (Map Int String) -> ClaferModel
-    xmlToModel  useUids' addTypes' info' xml sMap = (sugarClaferModel useUids' addTypes' (Just info') $ buildClaferModel $ parseSolution xml) sMap
+    xmlToModel :: Bool -> Bool -> UIDIClaferMap -> String -> (Map Int String) -> ClaferModel
+    xmlToModel  useUids' addTypes' uidIClaferMap' xml sMap = (sugarClaferModel useUids' addTypes' uidIClaferMap' $ buildClaferModel $ parseSolution xml) sMap
 
 reload :: MonadIO m => ClaferIGT m (Either ClaferErrs ())
 reload  =
@@ -364,7 +365,7 @@ sigToClaferName n =
 
 findRemovable :: ClaferEnv -> [Span] -> [Constraint] -> [Maybe Constraint]
 findRemovable env core constraints' =
-    let absIDs = foldMapIR getId $ fst3 $ fromJust $ cIr env
+    let absIDs = foldMapIR getId $ getIMod $ fromJust $ cIr env
     in  Data.List.filter (removeAbsZero absIDs ) $ map (\c -> find ((== c) . range) constraints') core
     where
         removeAbsZero :: (Seq.Seq String) -> Maybe Constraint -> Bool
@@ -374,5 +375,5 @@ findRemovable env core constraints' =
         getId (IRClafer (IClafer _ True _ uID _ _ _ _ _ _ _)) = Seq.singleton uID
         getId _ = mempty
 
-fst3 :: (IModule, GEnv, Bool) -> IModule
-fst3 (imod, _, _) = imod
+getIMod :: (IModule, GEnv, Bool) -> IModule
+getIMod (imod, _, _) = imod
