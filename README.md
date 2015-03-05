@@ -40,8 +40,8 @@ can be downloaded from [Clafer Tools - Binary Distributions](http://http://gsd.u
 
 Dependencies
 
-* [The Haskell Platform](http://hackage.haskell.org/platform/) v2014.2.0.0 64bit
-  * on Windows, use 32bit
+* [The Haskell Platform](http://hackage.haskell.org/platform/) v2014.2.0.0 
+  * Alternatively GHC >= 7.8.3 and Cabal >= 1.18
 
 ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.3.9/) and it can be installed using
 
@@ -61,8 +61,9 @@ ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/clafer
 
 Dependencies
 
+* [The Haskell Platform](http://hackage.haskell.org/platform/) v2014.2.0.0 
+  * Alternatively GHC >= 7.8.3 and Cabal >= 1.18
 * [Clafer compiler](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`)). The version number of the compiler must match the version of the instance generator.
-* Cabal >= 1.18
 * On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
   * on Ubuntu, execute `sudo apt-get install zlib1g-dev libncurses5-dev`
 
