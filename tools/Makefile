@@ -1,5 +1,4 @@
 WGET_COMMAND := wget
-MNAME := $(shell uname -m | tr "A-Z" "a-z")
 
 ifneq ($(OS),Windows_NT)
 	UNAME := $(shell uname -s)
