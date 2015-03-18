@@ -34,6 +34,7 @@ import Data.Maybe
 import Language.Clafer.Front.AbsClafer (Span(..), Pos(..))
 import Language.Clafer.IG.Process
 import System.Console.Haskeline.MonadException
+import Prelude
 
 -- | An interface to the Alloy Analyzer
 

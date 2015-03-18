@@ -36,21 +36,20 @@ import Language.Clafer.Comments
 import Language.Clafer.JSONMetaData
 import Language.Clafer.QNameUID
 import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
-import Control.Monad
-import Control.Monad.Error
+import Control.Monad.Except
 import Data.Char
 import Data.IORef
 import Data.List
 import Data.Monoid
-import Data.Foldable (foldMap)
+import Data.Foldable hiding (mapM_, maximum, find, elem, notElem, foldr, any, concat)
 import qualified Data.StringMap as SMap
 import qualified Data.Map as Map
 import Data.Maybe
 import System.Console.Haskeline
 import System.IO
 import GHC.Float
-import Prelude hiding (id)
 import qualified Text.Parsec.Error as E
+import Prelude
 
 data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_UnsatCoreMinimization | Auto_Space | Auto_Digit | No_Auto deriving Show
 
@@ -88,7 +87,7 @@ runCommandLine =
             uidIClaferMap' <- lift $ getUIDIClaferMap
             case solution of
                 Instance claferModel xml -> do
-                    liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverse claferModel)
+                    liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverseModel claferModel)
 
                     outputStrLn $ if json claferIGArgs'
                         then generateJSON uidIClaferMap' claferModel
@@ -155,18 +154,18 @@ runCommandLine =
             setUpper info@ClaferInfo{cardinality = c} upper = info{cardinality = c{upper = upper}}
 
             deleteLower :: String -> [Constraint] -> Maybe [Constraint]
-            deleteLower id ys =
-                findAndDelete id (filter isLowerCardinalityConstraint ys)
+            deleteLower id' ys =
+                findAndDelete id' (filter isLowerCardinalityConstraint ys)
 
             deleteUpper :: String -> [Constraint] -> Maybe [Constraint]
-            deleteUpper id ys =
-                findAndDelete id (filter isUpperCardinalityConstraint ys)
+            deleteUpper id' ys =
+                findAndDelete id' (filter isUpperCardinalityConstraint ys)
 
             findAndDelete :: String -> [Constraint] -> Maybe [Constraint]
             findAndDelete _ [] = Nothing
-            findAndDelete id (c:cs)
-                | id == uniqueId (claferInfo c) = Just cs
-                | otherwise                     = (c :) `fmap` findAndDelete id cs
+            findAndDelete id' (c:cs)
+                | id' == uniqueId (claferInfo c) = Just cs
+                | otherwise                     = (c :) `fmap` findAndDelete id' cs
 
 
     loop Help context =
@@ -220,7 +219,7 @@ runCommandLine =
             oldScopes <- lift getScopes
             oldBw <- lift getBitwidth
 
-            runErrorT $ ErrorT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
+            runExceptT $ ExceptT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
 
             env <- lift getClaferEnv
             let ir = fst3 $ fromJust $ cIr env
@@ -362,7 +361,7 @@ runCommandLine =
         do
             case (unsaved context ++ saved context) of
                 model:_ ->
-                    case find ((name ==) . c_name) $ traverse model of
+                    case find ((name ==) . c_name) $ traverseModel model of
                         Just clafer' -> outputStrLn $ show clafer'
                         Nothing -> outputStrLn $ "\"" ++ name ++ "\" not found in the model."
                 []  -> outputStrLn $ "No instance"
@@ -486,8 +485,8 @@ runCommandLine =
         outputStrLn $ "Saved to " ++ saveName
         save cs (counter + 1)
 
-try :: MonadIO m => ErrorT String (InputT m) a -> InputT m ()
-try e = either outputStrLn (void . return) =<< runErrorT e
+try :: MonadIO m => ExceptT String (InputT m) a -> InputT m ()
+try e = either outputStrLn (void . return) =<< runExceptT e
 
 incAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
 incAlloyScopeAndBitwidth                 bitwidth'  inc'       fqName'   sigName' = do

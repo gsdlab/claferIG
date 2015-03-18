@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), c_name, buildClaferModel, traverse) where
+module Language.Clafer.IG.ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), c_name, buildClaferModel, traverseModel) where
 
 import Data.List
 import Data.Either
@@ -69,8 +69,8 @@ instance Show Clafer where
 
 
 
-traverse :: ClaferModel -> [Clafer]
-traverse (ClaferModel clafers) =
+traverseModel :: ClaferModel -> [Clafer]
+traverseModel (ClaferModel clafers) =
     traverseClafers clafers
     where
     traverseClafers :: [Clafer] -> [Clafer]
