@@ -219,7 +219,7 @@ runCommandLine =
             oldScopes <- lift getScopes
             oldBw <- lift getBitwidth
 
-            runExceptT $ ExceptT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
+            _ <- runExceptT $ ExceptT (lift reload) `catchError` (liftIO . mapM_ (hPutStrLn stderr) . printError)
 
             env <- lift getClaferEnv
             let ir = fst3 $ fromJust $ cIr env
@@ -246,7 +246,7 @@ runCommandLine =
                 printBitwidthWarning newBw
 
             oldScopes <- lift getScopes
-            mapM ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (max 1 $ val'+inc') (sigToClaferName sigName') sigName') oldScopes
+            mapM_ ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (max 1 $ val'+inc') (sigToClaferName sigName') sigName') oldScopes
             lift solve
             outputStrLn ("Global scope changed to " ++ show newGlobalScope)
             nextLoop context
@@ -500,7 +500,7 @@ setAlloyScopeAndBitwidth                 bitwidth'  newValue'   fqName'   sigNam
         newBw <- lift $ getBitwidth
         outputStrLn $ "Warning! Requested scope for " ++ fqName' ++ " is larger than maximum allowed by bitwidth ... increasing bitwidth"
         printBitwidthWarning newBw
-    lift $ setAlloyScope newValue' sigName'
+    _ <- lift $ setAlloyScope newValue' sigName'
     outputStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") changed to " ++ show newValue'
 
 mergeScopes :: MonadIO m => [(UID, Integer)] -> [(UID, Integer)] -> ClaferIGT m ()

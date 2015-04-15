@@ -1,5 +1,5 @@
 Name:                   claferIG
-Version:                0.3.9
+Version:                0.3.10
 Synopsis:               claferIG is an interactive tool that generates instances of Clafer models.
 Description:            Clafer is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. Clafer instance generator (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
 Homepage:               https://github.com/gsdlab/claferIG
@@ -23,7 +23,6 @@ source-repository head
 Executable claferIG
     build-tools:        ghc >= 7.8.3
     default-language:   Haskell2010
-    default-extensions: DeriveDataTypeable
     Main-is:            Main.hs
     Build-depends:      base >= 4.7.0.1 && < 5
                       , containers >= 0.5.5.1
@@ -37,16 +36,15 @@ Executable claferIG
                       , executable-path >= 0.0.3
                       , haskeline >= 0.7.1.2
 
-                      , clafer == 0.3.9
-                      , claferIG == 0.3.9
+                      , clafer == 0.3.10
+                      , claferIG == 0.3.10
     other-modules:      Paths_claferIG
     Hs-Source-Dirs:     src-cmd
-    ghc-options:        -Wall -fno-warn-unused-do-bind -fno-warn-orphans -rtsopts
+    ghc-options:        -Wall -fno-warn-orphans
 
 library
     build-tools:        ghc >= 7.8.3
     default-language:   Haskell2010
-    default-extensions: DeriveDataTypeable
     build-depends:      array >= 0.5.0
                       , base >= 4.7.0.1 && < 5
                       , containers >= 0.5.5.1
@@ -65,9 +63,9 @@ library
                       , json-builder >= 0.3
                       , string-conversions >= 0.3.0.2
 
-                      , clafer == 0.3.9
+                      , clafer == 0.3.10
     hs-source-dirs:     src
-    ghc-options:        -Wall -fno-warn-unused-do-bind -fno-warn-orphans -rtsopts
+    ghc-options:        -Wall -fno-warn-orphans
     exposed-modules:    Language.Clafer.IG.AlloyIGInterface
                       , Language.Clafer.IG.ClaferIG
                       , Language.Clafer.IG.ClaferModel
@@ -97,7 +95,7 @@ Test-Suite test-suite
                       , tasty-hunit >= 0.9
                       , tasty-th >= 0.1.2
 
-                      , clafer == 0.3.9
-                      , claferIG == 0.3.9
+                      , clafer == 0.3.10
+                      , claferIG == 0.3.10
     other-modules:      Paths_claferIG
-    ghc-options:        -Wall -fno-warn-unused-do-bind -fno-warn-orphans
+    ghc-options:        -Wall -fno-warn-orphans

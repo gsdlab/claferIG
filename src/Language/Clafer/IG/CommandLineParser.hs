@@ -90,7 +90,7 @@ parseCommandLineAutoComplete input =
     doParse =
         do
             skipMany (space <?> "")
-            commandLine
+            _ <-commandLine
             -- Force the parse to fail to gather expected/unexpected messages
             fail "reached end"
 

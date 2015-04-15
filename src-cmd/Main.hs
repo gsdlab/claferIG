@@ -92,7 +92,7 @@ main =
             case try of
                 Right r -> return r
                 Left l  -> do
-                    mapM putStrLn $ printError l
+                    mapM_ putStrLn $ printError l
                     putStrLn "Press enter to retry."
                     void getLine
                     tryClaferIG args3
