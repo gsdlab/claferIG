@@ -5,6 +5,7 @@ ifeq ($(OS),Windows_NT)
 else
 	UNAME := $(shell uname -s)
 	ifeq ($(UNAME), Linux)
+		MNAME := $(shell uname -m | tr "A-Z" "a-z")
 		ifeq ($(MNAME), i686)
 			LIB := x86-linux/libminisatprover*
 		endif
