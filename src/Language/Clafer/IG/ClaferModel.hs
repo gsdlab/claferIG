@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2012-2013 Jimmy Liang <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2015 Jimmy Liang, Michal Antkiewicz, Luke Michael Brown <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), c_name, buildClaferModel, traverse) where
+module Language.Clafer.IG.ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), c_name, buildClaferModel, traverseModel) where
 
 import Data.List
 import Data.Either
@@ -31,8 +31,8 @@ import Prelude hiding (id)
 
 -- | Clafer model instance
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
-data Clafer = Clafer {c_id::Id, c_value::Maybe Value, c_children::[Clafer]}
-data Value = AliasValue {c_alias::Id} | IntValue {v_value::Int} | StringValue {v_str ::String} deriving Show
+data Clafer = Clafer {c_id::Id, c_value::Maybe Value, c_children::[Clafer]} deriving Eq
+data Value = AliasValue {c_alias::Id} | IntValue {v_value::Int} | StringValue {v_str ::String} deriving (Show, Eq)
 
 c_name :: Clafer -> String
 c_name = i_name . c_id
@@ -69,8 +69,8 @@ instance Show Clafer where
 
 
 
-traverse :: ClaferModel -> [Clafer]
-traverse (ClaferModel clafers) =
+traverseModel :: ClaferModel -> [Clafer]
+traverseModel (ClaferModel clafers) =
     traverseClafers clafers
     where
     traverseClafers :: [Clafer] -> [Clafer]
@@ -170,10 +170,15 @@ buildSigMap (Solution sigs _) = Map.fromList $ zip (map s_label sigs) sigs
 
 buildClaferModel :: Solution -> ClaferModel
 buildClaferModel solution =
-    ClaferModel $ lefts $ map buildClafer (getRoots ftree)
+    ClaferModel $ removeDups [] $ lefts $ map buildClafer (getRoots ftree)
     where
     sigMap = buildSigMap solution
     ftree = buildFamilyTree solution
+
+    removeDups :: [Clafer] -> [Clafer] -> [Clafer]
+    removeDups acc [] = acc
+    removeDups acc (m:ms) = if (m `elem` ms) then removeDups acc ms
+        else removeDups (m{c_children = (removeDups [] $ c_children m)} : acc) ms
 
     intType = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
 

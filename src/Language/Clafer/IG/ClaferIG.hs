@@ -73,7 +73,7 @@ import Language.Clafer.IG.Solution
 import Language.Clafer.IG.Sugarer
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.Trans.State.Strict
 import Data.List
 import Data.Monoid
@@ -85,6 +85,7 @@ import Data.Data
 import System.Console.Haskeline.MonadException
 import Paths_claferIG (version)
 import Data.Version (showVersion)
+import Prelude 
 
 claferIGVersion :: String
 claferIGVersion = "ClaferIG " ++ showVersion Paths_claferIG.version
@@ -129,8 +130,8 @@ set = ClaferIGT . put
 
 runClaferIGT :: MonadIO m => IGArgs -> ClaferIGT m a -> m (Either ClaferErrs a)
 runClaferIGT                 args      run =
-    AlloyIG.runAlloyIGT $ runErrorT $ do
-        env <- (ErrorT $ load args) `catchError` (\x -> lift AlloyIG.sendQuitCommand >> throwError x)
+    AlloyIG.runAlloyIGT $ runExceptT $ do
+        env <- (ExceptT $ load args) `catchError` (\x -> lift AlloyIG.sendQuitCommand >> throwError x)
         lift $ evalStateT (unwrap run) env
     where
     unwrap (ClaferIGT c) = c
@@ -175,10 +176,10 @@ getStrMap = fetches strMap
 
 load :: MonadIO m => IGArgs -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
 load                 igArgs    =
-    runErrorT $ do
+    runExceptT $ do
         claferModel <- liftIO $ strictReadFile claferFile'
 
-        (claferEnv', alloyModel, mapping, sMap) <- ErrorT $ return $ callClaferTranslator claferModel
+        (claferEnv', alloyModel, mapping, sMap) <- ExceptT $ return $ callClaferTranslator claferModel
 
         let
             (ir, genv', _) = fromJust $ cIr claferEnv'
@@ -285,7 +286,7 @@ setAlloyScope :: MonadIO m => Integer -> String -> ClaferIGT m (Either String ()
 setAlloyScope value sigName =
     do
         subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName value
-        runErrorT $ maybe (return ()) throwError $ sigToClaferName <$> subset
+        runExceptT $ maybe (return ()) throwError $ sigToClaferName <$> subset
 
 
 next :: MonadIO m => ClaferIGT m Instance
@@ -333,10 +334,10 @@ next = do
 
 reload :: MonadIO m => ClaferIGT m (Either ClaferErrs ())
 reload  =
-    runErrorT $ do
+    runExceptT $ do
         globalScope <- lift $ getGlobalScope
         claferIGArgs' <- lift $ getClaferIGArgs
-        env <- ErrorT $ ClaferIGT $ lift $ load claferIGArgs'
+        env <- ExceptT $ ClaferIGT $ lift $ load claferIGArgs'
         lift $ set env
         lift $ setGlobalScope globalScope
 
