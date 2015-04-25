@@ -52,7 +52,7 @@ ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/clafer
 3. to automatically download Alloy4.2 jar
   * execute `make` in `tools`
 4. To get the `minisatproover` library
-  * execute `make lib`
+  * execute `make lib -B`
 5. copy the following into the Cabal's `bin` folder
   * the file `alloyIG.jar`
   * the folder `tools`
@@ -305,6 +305,23 @@ a1
 ```
 
 Here, `C1` and `C3` are satisfied but `C2` is not. To resolve the conflict and assuming that the counter example is actually a correct instance data, the user has to modify the model by removing `C2`. However, should the counter example actually represent incorrect instance data, the user can remove `C3` to resolve the inconsistency.
+
+Troubleshooting
+---------------
+
+If you get an error:
+
+```
+Exception in thread "main" java.lang.UnsatisfiedLinkError: no minisatproverx1 in java.library.path
+ at java.lang.ClassLoader.loadLibrary(Unknown Source)
+ at java.lang.Runtime.loadLibrary0(Unknown Source)
+ at java.lang.System.loadLibrary(Unknown Source)
+ at org.clafer.ig.AlloyIG.main(AlloyIG.java:275)
+```
+
+it means that you have a 64bit Java on Windows instead of the required 32bit one.
+On Windows, Alloy only supports Minisat with UnSAT core on 32bit Java.
+There's nothing we can do.
 
 How it works
 ------------
