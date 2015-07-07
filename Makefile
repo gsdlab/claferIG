@@ -49,11 +49,11 @@ newVersion:
 
 init:
 	cabal sandbox init --sandbox=../.clafertools-cabal-sandbox
-	cabal install --only-dependencies --enable-tests
+	cabal install --only-dependencies --enable-tests --enable-optimization=2
 
 # Build takes less time. For ease of development.
 build: alloyIG.jar
-	cabal configure
+	cabal configure --enable-tests
 	cabal build
 
 alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
@@ -72,9 +72,6 @@ lib:
 	fi
 
 test:
-	# Only test a subset of the suite. The other cases do not work yet.
-	cabal configure --enable-tests
-	cabal build
 	# Install what's needed for running the tests
 	cp alloyIG.jar dist/build/test-suite/
 	cp alloyIG.jar dist/build/claferIG/
