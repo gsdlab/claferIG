@@ -145,7 +145,7 @@ Common flags:
   -j --json                                    Render solution as JSON
                                                (forces 'addUids').
   -i --flatten-inheritance-comp                Flatten inheritance during
-                                               compiling ('alloy' and 'alloy42'
+                                               compiling ('alloy' and 'Alloy'
                                                modes only)
   -l --no-layout-comp                          Don't resolve off-side rule
                                                layout during compiling
