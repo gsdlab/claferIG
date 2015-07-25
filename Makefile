@@ -33,8 +33,8 @@ install:
 	cp -f alloyIG.jar $(to)
 	cp -f LICENSE $(to)/
 	cp -f CHANGES.md $(to)/claferIG-CHANGES.md
-	cp -f README.md $(to)/claferIG-README.mds
-	cabal install --bindir=$(to) --ghc-option="-O"
+	cp -f README.md $(to)/claferIG-README.md
+	cabal install --bindir=$(to)
 
 # Removes current build and makes a clean new one (Don't use if starting from scratch!)
 cleanEnv:
@@ -50,7 +50,7 @@ newVersion:
 
 init:
 	cabal sandbox init --sandbox=../.clafertools-cabal-sandbox
-	cabal install --only-dependencies --enable-tests --enable-optimization=2
+	cabal install --only-dependencies --enable-tests
 
 # Build takes less time. For ease of development.
 build: alloyIG.jar
@@ -90,3 +90,10 @@ clean:
 	rm -rf tools/amd64-linux
 	rm -rf tools/x86-windows
 	rm -rf tools/x86-mac
+
+tags:
+	hasktags --ctags --extendedctag .
+
+codex:
+	codex update
+	mv codex.tags tags
