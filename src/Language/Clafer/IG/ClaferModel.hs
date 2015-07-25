@@ -152,7 +152,7 @@ buildFamilyTree (Solution sigs fields) =
         buildTuple _ Tuple{t_from = from, t_to = to, t_toType = toType} tree' =
             addChild (labelAsId $ a_label from) (buildNode (labelAsId $ a_label to) toType) tree'
             where
-            buildNode = if label == "ref" then ValueNode else ClaferNode
+            buildNode = if "_ref" `isSuffixOf` label then ValueNode else ClaferNode
 
     labelAsId :: String -> Id
     labelAsId label =
@@ -188,7 +188,7 @@ buildClaferModel solution =
 
     buildClafer :: Node -> Either Clafer Value
     buildClafer (ClaferNode id _) =
-        Left $ Clafer id (singleton valueChildren) claferChildren
+        Left $ Clafer id (singleton $ nub valueChildren) claferChildren
         where
         (claferChildren, valueChildren) = partitionEithers $ map buildClafer children
         children = getChildren id ftree
