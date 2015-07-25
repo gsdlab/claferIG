@@ -9,10 +9,10 @@ Fred : Person
 Genny : Person
 
 Team
-	Leader -> Person
-	Member -> Person 2..*
-	Contractor -> Person *
-	[ Leader in Member ]
-	[ no Contractor & Member ]
-	[ Leader not in Contractor]
-	[ # Member <=3 => no Contractor ]
+    Leader -> Person
+    Member -> Person 2..*
+    Contractor -> Person *
+    [ Leader in Member ]
+    [ no Contractor ** Member ]
+    [ Leader not in Contractor]
+    [ # Member <= 3 => no Contractor ]
