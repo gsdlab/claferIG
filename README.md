@@ -1,22 +1,19 @@
-Clafer Instance Generator
-=========================
+# Clafer Instance Generator
 
-v0.3.10
+v0.4.0
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
 overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
 
 For more information, see [technical report](http://gsd.uwaterloo.ca/node/462).
 
-Contributors
-------------
+## Contributors
 
-* [Jimmy Liang](http://gsd.uwaterloo.ca/jliang), Main developer.
-* [Michał Antkiewicz](http://gsd.uwaterloo.ca/mantkiew), Requirements, development, architecture, testing, technology transfer.
+* [Michał Antkiewicz](http://gsd.uwaterloo.ca/mantkiew), Main developer.
+* [Jimmy Liang](http://gsd.uwaterloo.ca/jliang), Original developer.
 * Luke Michael Brown, co-op student May-Aug 2013. Many improvements.
 
-Getting the Clafer Instance Generator
--------------------------------------
+## Getting the Clafer Instance Generator
 
 Clafer can be installed from a binary distribution (preferred), from Hackage, and from the source code.
 
@@ -24,14 +21,14 @@ Clafer can be installed from a binary distribution (preferred), from Hackage, an
 
 Regardless of the installation method, the following are required:
 
-* [Clafer](https://github.com/gsdlab/clafer) v0.3.10
+* [Clafer](https://github.com/gsdlab/clafer) v0.4.0
 * [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) v8+, 64bit
-  * On Windows, Java must be 32bit because of Alloy
+  * On Windows, Java must be 32bit because of Alloy, 64bit otherwise
 * [Alloy4.2](http://alloy.mit.edu/alloy/download.html)
 
 ### Installation from binaries
 
-Binary distributions of the release 0.3.10 of Clafer Tools for Windows, Mac, and Linux,
+Binary distributions of the release 0.4.0 of Clafer Tools for Windows, Mac, and Linux,
 can be downloaded from [Clafer Tools - Binary Distributions](http://gsd.uwaterloo.ca/clafer-tools-binary-distributions).
 
 1. download the binaries and unpack `<target directory>` of your choice
@@ -41,14 +38,13 @@ can be downloaded from [Clafer Tools - Binary Distributions](http://gsd.uwaterlo
 
 Dependencies
 
-* [The Haskell Platform](http://hackage.haskell.org/platform/) v2014.2.0.0
-  * Alternatively GHC >= 7.8.3 and Cabal >= 1.18
+* [GHC](https://www.haskell.org/downloads) v7.10.*
 
-ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.3.10/) and it can be installed using
+ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.4.0/) and it can be installed using
 
 1. `cabal update`
 2. `cabal install claferIG`
-3. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\i386-windows-ghc-7.8.3\claferIG-0.3.10` on Windows or `.cabal/share/x86_64-linux-ghc-7.8.3/claferIG-0.3.10/` on Linux)
+3. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\i386-windows-ghc-7.10.1\claferIG-0.4.0` on Windows or `.cabal/share/x86_64-linux-ghc-7.10.1/claferIG-0.4.0/` on Linux)
 3. to automatically download Alloy4.2 jar
   * execute `make` in `tools`
 4. To get the `minisatproover` library
@@ -62,8 +58,7 @@ ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/clafer
 
 Dependencies
 
-* [The Haskell Platform](http://hackage.haskell.org/platform/) v2014.2.0.0
-  * Alternatively GHC >= 7.8.3 and Cabal >= 1.18
+* [GHC](https://www.haskell.org/downloads) v7.10.*
 * [Clafer compiler](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`)). The version number of the compiler must match the version of the instance generator.
 * On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
   * on Ubuntu, execute `sudo apt-get install zlib1g-dev libncurses5-dev`
@@ -101,13 +96,13 @@ Development versions from branches `develop` should work well together but this 
 > On Windows, use `/` with the `make` command instead of `\`.
 
 
-Integration with Sublime Text 2/3
--------------------------------
+## Integration with Sublime Text 2/3
+
 
 See [ClaferToolsST](https://github.com/gsdlab/ClaferToolsST)
 
-Integration with VIM
---------------------
+## Integration with VIM
+
 
 See [clafer-vim](https://github.com/wasowski/clafer-vim)
 
@@ -121,7 +116,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG v0.3.10
+ClaferIG v0.4.0
 
 claferIG [OPTIONS] [FILE]
 
@@ -145,7 +140,7 @@ Common flags:
   -j --json                                    Render solution as JSON
                                                (forces 'addUids').
   -i --flatten-inheritance-comp                Flatten inheritance during
-                                               compiling ('alloy' and 'alloy42'
+                                               compiling ('alloy' and 'Alloy'
                                                modes only)
   -l --no-layout-comp                          Don't resolve off-side rule
                                                layout during compiling
@@ -171,10 +166,10 @@ Common flags:
 ### Interactive Session Usage
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
-```
-------------------
-| ClaferIG 0.3.10 |
-------------------
+## ```
+
+## | ClaferIG 0.4.0 |
+
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands
@@ -211,10 +206,11 @@ Parameterized command usage:
 ```
 
 
-Output format
--------------
+## Output format
 
-### Instance data
+There are two output formats: native (plain text, default) and JSON (`--json`).
+
+### Instance data (native)
 
 The instance data notation is very similar to a regular Clafer notation for concrete clafers with a few differences:
 
@@ -306,8 +302,8 @@ a1
 
 Here, `C1` and `C3` are satisfied but `C2` is not. To resolve the conflict and assuming that the counter example is actually a correct instance data, the user has to modify the model by removing `C2`. However, should the counter example actually represent incorrect instance data, the user can remove `C3` to resolve the inconsistency.
 
-Troubleshooting
----------------
+## Troubleshooting
+
 
 If you get an error:
 
@@ -323,8 +319,8 @@ it means that you have a 64bit Java on Windows instead of the required 32bit one
 On Windows, Alloy only supports Minisat with UnSAT core on 32bit Java.
 There's nothing we can do.
 
-How it works
-------------
+## How it works
+
 
 The Clafer instance generator:
 
@@ -334,7 +330,8 @@ The Clafer instance generator:
 * translates the instance or the counterexample data produced by Alloy Analyzer to Clafer instance data format using the name map from IR in a reverse direction,
 * for a counterexample, translates the counter example in Alloy to Claefr instance data and constraint violations in Alloy into constraint violations in Clafer model
 
-Need help?
-==========
+# Need help?
+
+
 * Visit [language's website](http://clafer.org).
 * Report issues to [issue tracker](https://github.com/gsdlab/claferIG/issues)

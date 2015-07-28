@@ -33,8 +33,8 @@ install:
 	cp -f alloyIG.jar $(to)
 	cp -f LICENSE $(to)/
 	cp -f CHANGES.md $(to)/claferIG-CHANGES.md
-	cp -f README.md $(to)/claferIG-README.mds
-	cabal install --bindir=$(to) --ghc-option="-O"
+	cp -f README.md $(to)/claferIG-README.md
+	cabal install --bindir=$(to)
 
 # Removes current build and makes a clean new one (Don't use if starting from scratch!)
 cleanEnv:
@@ -54,7 +54,7 @@ init:
 
 # Build takes less time. For ease of development.
 build: alloyIG.jar
-	cabal configure
+	cabal configure --enable-tests
 	cabal build
 
 alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
@@ -73,9 +73,6 @@ lib:
 	fi
 
 test:
-	# Only test a subset of the suite. The other cases do not work yet.
-	cabal configure --enable-tests
-	cabal build
 	# Install what's needed for running the tests
 	cp alloyIG.jar dist/build/test-suite/
 	cp alloyIG.jar dist/build/claferIG/
@@ -93,3 +90,10 @@ clean:
 	rm -rf tools/amd64-linux
 	rm -rf tools/x86-windows
 	rm -rf tools/x86-mac
+
+tags:
+	hasktags --ctags --extendedctag .
+
+codex:
+	codex update
+	mv codex.tags tags

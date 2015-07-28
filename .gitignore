@@ -13,4 +13,6 @@ tools
 *.sublime-project
 *.sublime-workspace
 .cabal-sandbox
+.stack-work
 cabal.sandbox.config
+tags
