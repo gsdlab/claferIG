@@ -1,6 +1,6 @@
 # Clafer Instance Generator
 
-v0.4.1
+v0.4.0
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
 overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
@@ -21,14 +21,14 @@ Clafer can be installed from a binary distribution (preferred), from Hackage, an
 
 Regardless of the installation method, the following are required:
 
-* [Clafer](https://github.com/gsdlab/clafer) v0.4.1
+* [Clafer](https://github.com/gsdlab/clafer) v0.4.0
 * [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) v8+, 64bit
   * On Windows, Java must be 32bit because of Alloy, 64bit otherwise
 * [Alloy4.2](http://alloy.mit.edu/alloy/download.html)
 
 ### Installation from binaries
 
-Binary distributions of the release 0.4.1 of Clafer Tools for Windows, Mac, and Linux,
+Binary distributions of the release 0.4.0 of Clafer Tools for Windows, Mac, and Linux,
 can be downloaded from [Clafer Tools - Binary Distributions](http://gsd.uwaterloo.ca/clafer-tools-binary-distributions).
 
 1. download the binaries and unpack `<target directory>` of your choice
@@ -40,11 +40,11 @@ Dependencies
 
 * [GHC](https://www.haskell.org/downloads) v7.10.*
 
-ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.4.1/) and it can be installed using
+ClaferIG is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.4.0/) and it can be installed using
 
 1. `cabal update`
 2. `cabal install claferIG`
-3. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\i386-windows-ghc-7.10.2\claferIG-0.4.1` on Windows or `.cabal/share/x86_64-linux-ghc-7.10.2/claferIG-0.4.1/` on Linux)
+3. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\i386-windows-ghc-7.10.1\claferIG-0.4.0` on Windows or `.cabal/share/x86_64-linux-ghc-7.10.1/claferIG-0.4.0/` on Linux)
 3. to automatically download Alloy4.2 jar
   * execute `make` in `tools`
 4. To get the `minisatproover` library
@@ -116,7 +116,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG v0.4.1
+ClaferIG v0.4.0
 
 claferIG [OPTIONS] [FILE]
 
@@ -168,7 +168,7 @@ In the interactive mode, the users can invoke the following commands by pressing
 
 ## ```
 
-## | ClaferIG 0.4.1 |
+## | ClaferIG 0.4.0 |
 
 
 You can invoke the following commands as indicated by single quotes:
