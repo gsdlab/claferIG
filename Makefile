@@ -43,11 +43,6 @@ cleanEnv:
 	rm `which claferIG`
 	make
 
-# this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs
-newVersion:
-	ghc -isrc src/dateVer.hs dist/build/autogen/Paths_claferIG.hs -outputdir dist/build --make -o dateVer
-	./dateVer > src/Language/Clafer/IG/Version.hs
-
 init:
 	cabal sandbox init --sandbox=../.clafertools-cabal-sandbox
 	cabal install --only-dependencies --enable-tests
