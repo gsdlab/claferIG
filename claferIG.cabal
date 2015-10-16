@@ -19,8 +19,8 @@ data-files:             README.md
                       , alloyIG.jar
                       , CHANGES.md
                       , Makefile
-                      , tools/Makefile
                       , lib/minisatprover.md
+                      , stack.yaml
 source-repository head
     type:               git
     location:           git://github.com/gsdlab/claferIG.git

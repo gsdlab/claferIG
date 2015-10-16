@@ -68,7 +68,7 @@ expectedMessage _ = Nothing
 parseCommandLine :: String -> Either ParseError Command
 parseCommandLine input =
     if null input then Right Next
-    else parse doParse "claferIG" input
+    else parse doParse "ClaferAlloyIG" input
     where
     doParse =
         do
@@ -83,7 +83,7 @@ parseCommandLine input =
 --   Any unexpected character means parse did not reach the end of the input, hence cannot autocomplete.
 parseCommandLineAutoComplete :: String -> ParseError
 parseCommandLineAutoComplete input =
-    case parse doParse "claferIG autocomplete" input of
+    case parse doParse "ClaferAlloyIG autocomplete" input of
         Left e  -> e
         Right _ -> error "Failed at failing."
     where
