@@ -1,0 +1,10 @@
+# for GHC-7.10.2
+extra-deps:
+  [ data-stringmap-1.0.1.1
+  , HaXml-1.24
+  ]
+resolver: lts-3.9
+
+packages:
+- '../clafer'
+- '.'

@@ -1,4 +1,6 @@
-TOOL_DIR = tools
+ifeq ($(OS),Windows_NT)
+EXE := .exe
+endif
 
 ifeq ($(OS),Windows_NT)
 	LIB := x86-windows/minisatprover*
@@ -27,69 +29,47 @@ all: alloyIG.jar lib build
 install:
 	mkdir -p $(to)
 	mkdir -p $(to)/lib
-	mkdir -p $(to)/tools
 	cp -f lib/*minisatprover* $(to)/lib
-	cp -f tools/alloy4.2.jar $(to)/tools
+	cp -f alloy4.2.jar $(to)
 	cp -f alloyIG.jar $(to)
 	cp -f LICENSE $(to)/
 	cp -f CHANGES.md $(to)/claferIG-CHANGES.md
 	cp -f README.md $(to)/claferIG-README.md
-	cabal install --bindir=$(to)
-
-# Removes current build and makes a clean new one (Don't use if starting from scratch!)
-cleanEnv:
-	make clean
-	ghc-pkg unregister claferIG
-	rm `which claferIG`
-	make
-
-# this takes the version from the .cabal file. Need to run install first to produce Paths_claferIG.hs
-newVersion:
-	ghc -isrc src/dateVer.hs dist/build/autogen/Paths_claferIG.hs -outputdir dist/build --make -o dateVer
-	./dateVer > src/Language/Clafer/IG/Version.hs
-
-init:
-	cabal sandbox init --sandbox=../.clafertools-cabal-sandbox
-	cabal install --only-dependencies --enable-tests
+	cp `stack path --local-install-root`/bin/claferIG$(EXE) $(to)
 
 # Build takes less time. For ease of development.
 build: alloyIG.jar
-	cabal configure --enable-tests
-	cabal build
+	stack build
 
-alloyIG.jar: src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
-	$(MAKE) -C $(TOOL_DIR)
+alloyIG.jar: alloy4.2.jar src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	mkdir -p dist/javabuild
-	javac  -cp "tools/alloy4.2.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
+	javac  -cp "alloy4.2.jar" -d dist/javabuild src/org/clafer/ig/AlloyIG.java src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	jar cfm alloyIG.jar src/manifest -C dist/javabuild org/clafer/ig/ -C dist/javabuild edu
 
-lib:
+.PHONY : test lib
+
+lib: alloy4.2.jar
 	@if test -z $(LIB); then \
 		echo "[WARNING] Did not find a minisat prover binary suitable for your system. You may need to build the binary yourself."; \
 	else \
-		unzip tools/alloy4.2.jar $(LIB) -d lib; \
+		unzip alloy4.2.jar $(LIB) -d lib; \
 		chmod +x lib/$(LIB); \
 		cp lib/$(LIB) lib; \
 	fi
 
 test:
-	# Install what's needed for running the tests
-	cp alloyIG.jar dist/build/test-suite/
-	cp alloyIG.jar dist/build/claferIG/
-	cp -r tools/ dist/build/test-suite/
-	cp -r tools/ dist/build/claferIG/
-	cp -r lib/ dist/build/test-suite/
-	cp -r lib/ dist/build/claferIG/
-	cabal test
+	cp alloyIG.jar `stack path --dist-dir`/build/test-suite/
+	cp alloy4.2.jar `stack path --dist-dir`/build/test-suite/
+	cp -R lib  `stack path --dist-dir`/build/test-suite/
+	cp alloyIG.jar `stack path --dist-dir`/build/claferIG/
+	cp alloy4.2.jar `stack path --dist-dir`/build/claferIG/
+	cp -R lib  `stack path --dist-dir`/build/claferIG/
+	stack test
 
 clean:
-	rm -rf dist
+	stack clean
 	rm -f alloyIG.jar
-	rm -f claferIG
-	rm -rf tools/x86-linux
-	rm -rf tools/amd64-linux
-	rm -rf tools/x86-windows
-	rm -rf tools/x86-mac
+	rm -rf tools
 
 tags:
 	hasktags --ctags --extendedctag .
@@ -97,3 +77,22 @@ tags:
 codex:
 	codex update
 	mv codex.tags tags
+
+WGET_COMMAND := wget
+ifeq ($(OS),Windows_NT)
+	ifeq ($(shell which wget), which: wget: unkown command)
+		pacman -S make wget
+	endif
+else
+	UNAME_S := $(shell uname -s)
+	ifeq ($(UNAME_S),Darwin)
+		WGET_COMMAND := curl -O
+	endif
+endif
+
+alloy4.2.jar:
+	@if test ! -f "alloy4.2.jar"; then \
+		echo "[WARNING] Missing alloy4.2.jar. Downloading...";  \
+		$(WGET_COMMAND) http://alloy.mit.edu/alloy/downloads/alloy4.2_2015-02-22.jar; \
+		mv alloy4.2_2015-02-22.jar alloy4.2.jar; \
+	fi
