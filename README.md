@@ -2,6 +2,7 @@
 
 v0.4.2
 
+
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model. **Clafer instance generator** (ClaferIG) is an interactive tool that generates instances and counter examples of concrete clafers in a Clafer model. If the concrete clafers do not have contradicting constraints, the generator produces valid instance data. Otherwise, the generator produces an unsatisfiable core which included all contradicting constraints and generates a counter example by removing one constraint from the core. The generator can potentially produce many instances if the concrete clafers are not fully specialized. The generator produces different instances on-demand. With these capabilities, the instance generator can be used for debugging models: checking the consistency of the model and detecting under- and
 overconstraining of the model. The instance generator can also be used programmatically via API (the command line and interactive session interfaces only use the API).
 
@@ -106,12 +107,11 @@ See [ClaferToolsST](https://github.com/gsdlab/ClaferToolsST)
 
 See [clafer-vim](https://github.com/wasowski/clafer-vim)
 
-Usage
-=====
+# Usage
 
 Clafer Instance Generator can be used in interactive and batch modes, as well as, an API.
 
-### Command-line Usage
+## Command-line Usage
 
 (As printed by `claferIG --help`)
 
@@ -163,13 +163,12 @@ Common flags:
 
 - opens a non-interactive session and saves all instances up to the provided scope or a counterexample to files named `<model file name>.cfr.<instance number>.data`, one instance per file.
 
-### Interactive Session Usage
+## Interactive Session Usage
+
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
-## ```
-
-## | ClaferIG 0.4.2 |
-
+```
+ClaferIG v0.4.2
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands
@@ -205,7 +204,6 @@ Parameterized command usage:
 'setUnsatCoreMinimization best' - best but slowest even for modest size cores
 ```
 
-
 ## Output format
 
 There are two output formats: native (plain text, default) and JSON (`--json`).
@@ -229,7 +227,7 @@ Additionally, the data notation contains concrete values of the clafers and suff
 
 For a model
 
-```clafer
+```
 abstract A
     a ?
     b +
@@ -248,7 +246,7 @@ e2 : E
 
 A possible instance data looks as follows:
 
-```clafer
+```
 === Instance 1 Begin ===
 
 a1
@@ -279,7 +277,7 @@ Near-miss instance notation is the same as the instance data notation. Additiona
 
 For a model
 
-```clafer
+```
 abstract A
     a ?
     b ?
@@ -294,7 +292,7 @@ Constraints C1, C2, and C3 form an UnSAT Core. Removal of any of them will make 
 
 On possible near-miss instance:
 
-```clafer
+```
 a1
     a
     b
@@ -321,7 +319,6 @@ There's nothing we can do.
 
 ## How it works
 
-
 The Clafer instance generator:
 
 * translates the input Clafer model (.cfr) to an Alloy4.2 model (.als). The compiler's intermediate representation (IR) contains the mapping between Clafer names and Alloy names. The IR also contains the scopes for each Alloy signature to ensure that a valid instance can be found if it exists
@@ -331,7 +328,6 @@ The Clafer instance generator:
 * for a counterexample, translates the counter example in Alloy to Claefr instance data and constraint violations in Alloy into constraint violations in Clafer model
 
 # Need help?
-
 
 * Visit [language's website](http://clafer.org).
 * Report issues to [issue tracker](https://github.com/gsdlab/claferIG/issues)
