@@ -1,3 +1,7 @@
+ClaferIG Version 0.4.2.1 released on Oct 19, 2015
+
+* Fixed Java manifest file, added stack instructions to README
+
 ClaferIG Version 0.4.2 released on Oct 16, 2015
 
 * [Release](https://github.com/gsdlab/claferIG/pull/28)

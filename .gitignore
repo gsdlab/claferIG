@@ -1,6 +1,4 @@
 dist
-lib
-!lib/minisatprover.md
 tools
 .dist-buildwrapper
 .project
@@ -9,7 +7,6 @@ tools
 *.lkshw
 *.jar
 !alloyIG.jar
-*.dll
 *.sublime-project
 *.sublime-workspace
 .cabal-sandbox
