@@ -102,7 +102,10 @@ runClaferIG args' =
     runClaferIGT args' $ do
         let claferModelFileName = claferModelFile args'
         cModel <- liftIO $ strictReadFile claferModelFileName
-        when (cModel == "") $ error "Cannot instantiate an empty model."
+        if null cModel
+        then error "Cannot instantiate an empty model."
+        else liftIO $ putStrLn "Compiling the Clafer model..."
+
         oldBw <- getBitwidth
         env <- getClaferEnv
         let ir = fst3 $ fromJust $ cIr env
@@ -138,7 +141,9 @@ runClaferIG args' =
                 let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir args'
                 saveAll (savePath claferModelFileName counterRef >>= saveDirectory)
                 quit
-            Nothing    -> runCommandLine
+            Nothing    -> do
+                liftIO $ putStrLn "Type 'h' for the list of available REPL commands\n"
+                runCommandLine
 
 
 -- | Convert an Alloy XML file into an instance in Clafer
