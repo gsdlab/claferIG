@@ -48,11 +48,12 @@ poll id (Census sample' counts') =
     counts'' = insertWith (+) name 1 counts'
     ordinal' = findWithDefault (error $ "Did not find " ++ name ++ " in counts.") name counts''
     sample'' = insertWith (error $ "Polled " ++ fullName ++ " twice in the census.") id (ordinal', name) sample'
-    -- Transforms c2_name -> name
-    makeSimpleName :: String -> String
-    makeSimpleName name' = case dropWhile (/='_') name' of
-        "" ->  error "Unexpected Clafer name " ++ name'
-        x -> tail x
+
+-- Transforms c2_name -> name
+makeSimpleName :: String -> String
+makeSimpleName name' = case dropWhile (/='_') name' of
+    "" ->  error "Unexpected Clafer name " ++ name'
+    x -> tail x
 
 -- | Count the number of each clafer
 claferModelCensus :: ClaferModel -> Census
@@ -104,24 +105,24 @@ sugarClaferModel   useUids addTypes uidIClaferMap'   model@(ClaferModel topLevel
                          else ""
 
         refDecl :: Bool -> Bool ->  UIDIClaferMap -> String
-        refDecl    True    True    uidIClaferMap'' = retrieveSuper uidIClaferMap'' $ i_name id
+        refDecl    True    True    uidIClaferMap'' = retrieveSuper useUids' uidIClaferMap'' $ i_name id
         refDecl    _       _       _               = ""
 
         (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample'
         count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts'
         finalName = if useUids' then fullName else simpleName
 
-retrieveSuper :: UIDIClaferMap -> String -> String
-retrieveSuper uidIClaferMap'      uid =
+retrieveSuper :: Bool -> UIDIClaferMap -> String -> String
+retrieveSuper useUids' uidIClaferMap'      uid =
     sugarSuper (getSuper iclafer)
-    ++
-    sugarReference  (getReference iclafer)
+    -- ++
+    -- sugarReference  (getReference iclafer)
     where
         iclafer = fromJust $ findIClafer uidIClaferMap' uid
 
         sugarSuper :: [String] -> String
-        sugarSuper [s] = " : " ++ s
+        sugarSuper [s] = " : " ++ if useUids' then s else makeSimpleName s
         sugarSuper _   = ""
-        sugarReference :: [String] -> String
-        sugarReference [s] = " -> " ++ s
-        sugarReference _   = ""
+        -- sugarReference :: [String] -> String
+        -- sugarReference [s] = " -> " ++ s
+        -- sugarReference _   = ""

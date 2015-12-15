@@ -1,9 +1,9 @@
 # for GHC-7.10.2
 extra-deps:
   [ data-stringmap-1.0.1.1
-#  , HaXml-1.24         # only for Windows, comment out for other OSs
+  , HaXml-1.24         # only for Windows, comment out for other OSs
   ]
-resolver: lts-3.15
+resolver: lts-3.18
 
 packages:
 - '../clafer'
