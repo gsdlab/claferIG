@@ -87,12 +87,14 @@ Dependencies
 On Windows
 
 * [MSYS2](http://msys2.sourceforge.net/)
-  * download MSYS2 installer
-  * in MSYS2 console, execute
-     * `pacman -Syu`
-     * `pacman -S make wget unzip diffutils`
+* it is installed automatically by `stack setup` (see Building below)
+* to open MinGW64 shell, execute `mingw64_shell.bat` in `C:\Users\<user>\AppData\Local\Programs\stack\x86_64-windows\msys2-<date>`, where `<date>` is the release date of your MSYS installation
+* update MSYS2 packages
+   * follow [III. Updating packages](http://sourceforge.net/p/msys2/wiki/MSYS2%20installation/)
+* execute
+   * `pacman -S make wget unzip diffutils`
 
-### Important: Branches must correspond
+### Important: branches must correspond
 
 All related projects are following the *simultaneous release model*.
 The branch `master` contains releases, whereas the branch `develop` contains code under development.
@@ -105,15 +107,7 @@ Development versions from branches `develop` should work well together but this 
 1. install the [Clafer compiler](https://github.com/gsdlab/clafer)
 2. in some `<source directory>`, execute `git clone git://github.com/gsdlab/claferIG.git`
 3. in `<source directory>/claferIG`, execute `stack setup`. This will install all dependencies, build tools, and MSYS2 (on Windows).
-4. first time only on Windows
-  * open `MinGW64 Shell` using `C:\Users\<user>\AppData\Local\Programs\stack\i386-windows\msys2-20150512\mingw64_shell.bat`
-  * update MSYS2 following the [update procedure](http://sourceforge.net/p/msys2/wiki/MSYS2%20installation/):
-    * `pacman -Sy`
-    * `pacman --needed -S bash pacman pacman-mirrors msys2-runtime`
-    * restart shell if the runtime was updated
-    * `pacman -Su`
-  * `pacman -S make wget unzip diffutils`
-5. `cd <source directory>/claferIG`
+4. `cd <source directory>/claferIG`
   * `make`
 
 ### Installation
@@ -121,7 +115,7 @@ Development versions from branches `develop` should work well together but this 
 1. execute `make install to=<target directory>`
 
 #### Note:
-> On Windows, use `/` with the `make` command instead of `\`.
+> On Windows, use `/` with the `make` command instead of `\`, e.g., `make install to=/c/clafer-tools-0.4.3/`
 
 
 ## Integration with Sublime Text 2/3
@@ -241,11 +235,11 @@ The instance data notation is very similar to a regular Clafer notation for conc
 
 * no constraints
 * no types and super types
-    * except when `--adduidsandtypes` parameter is used
+    * except when `--useuids --addtypes` parameters are used
 * no clafer and group cardinalities (each clafer has the default group `(0..*)` and clafer `(1..1)` cardinality)
 * no clafers not present in the instance
 
-Additionally, the data notation contains concrete values of the clafers and suffix numbers to distinguish among multipe instances of the same clafer.
+Additionally, the data notation contains concrete values of the clafers and suffix numbers to distinguish among multiple instances of the same clafer.
 
 ### Note:
 > The instance data models could be read by the Clafer translator if the translator had simple type inference support.
@@ -279,19 +273,19 @@ A possible instance data looks as follows:
 a1
     b$1
     b$2
-    c = 10
-    d$1 = e1
-    d$2 = e2
-    g1 = e1
-        h$1 = 5
-    g2 = e2
-        h$2 = 2
+    c -> 10
+    d$1 -> e1
+    d$2 -> e2
+    g1 -> e1
+        h$1 -> 5
+    g2 -> e2
+        h$2 -> 2
 
 e1
-    f$1 = 2
-    f$2 = 3
-    f$3 = 4
-    f$4 = 2
+    f$1 -> 2
+    f$2 -> 3
+    f$3 -> 4
+    f$4 -> 2
 
 --- Instance 1 End ---
 ```

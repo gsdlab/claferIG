@@ -2,9 +2,9 @@
 extra-deps:
   [ data-stringmap-1.0.1.1
   , HaXml-1.24         # only for Windows, comment out for other OSs
+  , clafer-0.4.3
   ]
-resolver: lts-3.18
+resolver: lts-3.19
 
 packages:
-- '../clafer'
 - '.'
