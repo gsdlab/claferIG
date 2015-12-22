@@ -63,9 +63,9 @@ instance Show Clafer where
         displayClafer indent (Clafer id value children) =
             indent ++ i_name id ++ maybe "" displayValue value ++
             "\n" ++ concatMap (displayClafer $ indent ++ "  ") children
-        displayValue (AliasValue alias) = " = " ++ i_name alias
-        displayValue (IntValue value) = " = " ++ show value
-        displayValue (StringValue value) = " = " ++ value
+        displayValue (AliasValue alias) = " -> " ++ i_name alias
+        displayValue (IntValue value) = " -> " ++ show value
+        displayValue (StringValue value) = " -> " ++ value
 
 
 

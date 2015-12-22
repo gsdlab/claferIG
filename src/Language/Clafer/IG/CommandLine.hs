@@ -99,9 +99,12 @@ runCommandLine =
                                 "\n--- Instance " ++ iNumber ++ " End ---\n\n"
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 UnsatCore core counterexample -> do
-                    liftIO $ hPutStrLn stderr "No more instances found. Try increasing scope to get more instances."
+                    liftIO $ hPutStrLn stderr "No instances found."
                     liftIO $ hPutStrLn stderr "The following set of constraints cannot be satisfied in the current scope."
-                    liftIO $ hPutStrLn stderr "(Hint: use the setUnsatCoreMinimization command to minimize the set of constraints below)"
+                    liftIO $ hPutStrLn stderr "Consider removing one of the constraints from the model."
+                    liftIO $ hPutStrLn stderr "Use the setUnsatCoreMinimization command to minimize the set of constraints below."
+                    liftIO $ hPutStrLn stderr "Try increasing the scopes to get an instance (type 'h' for help)."
+
                     printConstraints core
                     case counterexample of
                         Just (Counterexample removed claferModel _) -> do
@@ -111,7 +114,7 @@ runCommandLine =
                         Nothing -> return ()
                     nextLoop context
                 NoInstance -> do
-                    liftIO $ hPutStrLn stderr "No more instances found. Try increasing scope to get more instances."
+                    liftIO $ hPutStrLn stderr "No more instances found. Try increasing the scopes to get more instances (type 'h' for help)."
                     nextLoop context
             where
             printTransformation :: Constraint -> [Constraint] -> (String, [Constraint])
@@ -171,9 +174,9 @@ runCommandLine =
     loop Help context =
         do
             outputStrLn (
-                "--------------------\n" ++
+                "------------------\n" ++
                 "| " ++ claferIGVersion ++ " |\n" ++
-                "--------------------\n\n" ++
+                "------------------\n\n" ++
                 "You can invoke the following commands as indicated by single quotes:\n" ++
                 "[tab]              - print the available commands\n" ++
                 "                   - auto-complete command name, a clafer name, or clafer instance name in a given context\n" ++
