@@ -1,6 +1,6 @@
 # Clafer Instance Generator
 
-##### v0.4.3
+##### v0.4.4
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model.
 
@@ -22,14 +22,14 @@ Clafer can be installed from a binary distribution (preferred), from Hackage, an
 
 Regardless of the installation method, the following are required:
 
-* [Clafer](https://github.com/gsdlab/clafer) v0.4.3
+* [Clafer](https://github.com/gsdlab/clafer) v0.4.4
 * [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) v8+, 64bit
   * On Windows, Java must be 32bit because of Alloy, 64bit otherwise
 * [Alloy4.2](http://alloy.mit.edu/alloy/download.html)
 
 ### Installation from binaries
 
-Binary distributions of the release 0.4.3 of Clafer Tools for Windows, Mac, and Linux,
+Binary distributions of the release 0.4.4 of Clafer Tools for Windows, Mac, and Linux,
 can be downloaded from [Clafer Tools - Binary Distributions](http://gsd.uwaterloo.ca/clafer-tools-binary-distributions).
 
 1. download the binaries and unpack `<target directory>` of your choice,
@@ -37,14 +37,14 @@ can be downloaded from [Clafer Tools - Binary Distributions](http://gsd.uwaterlo
 
 ### Installation From Hackage
 
-Clafer is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.4.3/) and it can be installed using either [`stack`](https://github.com/commercialhaskell/stack) or [`cabal-install`](https://hackage.haskell.org/package/cabal-install).
+Clafer is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.4.4/) and it can be installed using either [`stack`](https://github.com/commercialhaskell/stack) or [`cabal-install`](https://hackage.haskell.org/package/cabal-install).
 
 #### Installation using `stack`
 
 Stack is the only requirement: no other Haskell tooling needs to be installed because stack will automatically install the needed Haskell build tools.
 
 1. [install `stack`](https://github.com/commercialhaskell/stack#how-to-install)
-2. execute
+2. Execute
   * `stack install claferIG`
   * ``` cd `stack --local-bin-path` ```
   * `wget http://alloy.mit.edu/alloy/downloads/alloy4.2_2015-02-22.jar`
@@ -53,7 +53,7 @@ Stack is the only requirement: no other Haskell tooling needs to be installed be
   * `mkdir lib`
   * `cd lib`
   * Depending on your OS:
-    * for Win, `wget https://github.com/gsdlab/claferIG/raw/master/lib/libminisatprover.dll`
+    * for Win, `stack exec wget --  https://github.com/gsdlab/claferIG/raw/master/lib/libminisatprover.dll`
     * for Linux, `wget https://github.com/gsdlab/claferIG/raw/master/lib/libminisatprover.so`
     * for Mac, `wget https://github.com/gsdlab/claferIG/raw/master/lib/libminisatprover.dylib`
 
@@ -61,13 +61,13 @@ Stack is the only requirement: no other Haskell tooling needs to be installed be
 
 Dependencies
 
-* [GHC](https://www.haskell.org/downloads) >= 7.8.3. 7.10.2 is recommended,
+* [GHC](https://www.haskell.org/downloads) >= 7.10.3 and 8.0.1 are recommended,
 * `cabal-install` >= 1.18, should be installed together with a GHC distribution,
 
 1. Install GHC
 2. `cabal update`
 3. `cabal install claferIG`
-4. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\i386-windows-ghc-7.10.2\claferIG-0.4.3` on Windows or `.cabal/share/x86_64-linux-ghc-7.10.2/claferIG-0.4.3/` on Linux)
+4. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\x86_64-windows-ghc-8.0.1\claferIG-0.4.4` on Windows or `.cabal/share/x86_64-linux-ghc-8.0.1/claferIG-0.4.4/` on Linux)
 5. to automatically download alloy4.2.jar
   * execute `make alloy4.2.jar`
 7. copy the following into the Cabal's `bin` folder
@@ -79,7 +79,7 @@ Dependencies
 
 Dependencies
 
-* [GHC](https://www.haskell.org/downloads) v7.10.*
+* [GHC](https://www.haskell.org/downloads) >= v7.10.3
 * [Clafer compiler](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`)).
 * On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
   * on Ubuntu, execute `sudo apt-get install zlib1g-dev libncurses5-dev`
@@ -88,11 +88,10 @@ On Windows
 
 * [MSYS2](http://msys2.sourceforge.net/)
 * it is installed automatically by `stack setup` (see Building below)
-* to open MinGW64 shell, execute `mingw64_shell.bat` in `C:\Users\<user>\AppData\Local\Programs\stack\x86_64-windows\msys2-<date>`, where `<date>` is the release date of your MSYS installation
 * update MSYS2 packages
-   * follow [III. Updating packages](http://sourceforge.net/p/msys2/wiki/MSYS2%20installation/)
+   * follow [III. Updating packages](http://sourceforge.net/p/msys2/wiki/MSYS2%20installation/) but always execute `stack exec pacman -- <arguments for pacman>`
 * execute
-   * `pacman -S make wget unzip diffutils`
+   * `stack exec pacman -- -S make wget unzip diffutils`
 
 ### Important: branches must correspond
 
@@ -115,7 +114,7 @@ Development versions from branches `develop` should work well together but this 
 1. execute `make install to=<target directory>`
 
 #### Note:
-> On Windows, use `/` with the `make` command instead of `\`, e.g., `make install to=/c/clafer-tools-0.4.3/`
+> On Windows, use `/` with the `make` command instead of `\`, e.g., `make install to=/c/clafer-tools-0.4.4/`
 
 
 ## Integration with Sublime Text 2/3
@@ -137,7 +136,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG v0.4.3
+ClaferIG v0.4.4
 
 claferIG [OPTIONS] [FILE]
 
@@ -189,7 +188,7 @@ Common flags:
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
 ```
-ClaferIG v0.4.3
+ClaferIG v0.4.4
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands
