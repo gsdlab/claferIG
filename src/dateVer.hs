@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2012-2013 Kacper Bak <http://gsd.uwaterloo.ca>
+ Copyright (C) 2012-2017 Generative Software Development Lab <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -29,7 +29,7 @@ import Data.Version (showVersion)
 header :: String
 header = unlines
  [ "{-"
- , "Copyright (C) 2012-2013 Kacper Bak <http://gsd.uwaterloo.ca>"
+ , "Copyright (C) 2012-2017 Kacper Bak, Michal Antkiewicz <http://gsd.uwaterloo.ca>"
  , ""
  , "Permission is hereby granted, free of charge, to any person obtaining a copy of"
  , "this software and associated documentation files (the \"Software\"), to deal in"

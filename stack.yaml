@@ -4,7 +4,7 @@ extra-deps:
   - json-builder-0.3
   - HaXml-1.25.3
   # - HaXml-1.24  # for Windows
-resolver: lts-8.0
+resolver: lts-8.5
 
 packages:
 - '../clafer'
