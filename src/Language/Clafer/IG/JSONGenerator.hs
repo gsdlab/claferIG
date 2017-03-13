@@ -1,5 +1,5 @@
 {-
- Copyright (C) 2013 Michal Antkiewicz <http://gsd.uwaterloo.ca>
+ Copyright (C) 2013-2017 Michal Antkiewicz <http://gsd.uwaterloo.ca>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -37,7 +37,7 @@ generateJSON    uidIClaferMap'   (M.ClaferModel topLevelClafers) =
 
 printClafer :: UIDIClaferMap -> M.Clafer                           -> Object
 printClafer    uidIClaferMap'      (M.Clafer id value children) =
-    (map (printClafer uidIClaferMap') children) `addElements` completeClaferObject
+    map (printClafer uidIClaferMap') children `addElements` completeClaferObject
     where
         uid' = M.i_name id
         iclafer = fromJust $ findIClafer uidIClaferMap' $ removeOrdinal uid'
@@ -78,15 +78,15 @@ makeBasicClaferObject    ident'    uid'      super'      reference'   cardMin   
 
 addIntValue :: Int -> Object      -> Object
 addIntValue    value  claferObject =
-    claferObject `mappend` (row "value" value)
+    claferObject `mappend` row "value" value
 
 addStringValue :: String -> Object      -> Object
 addStringValue    value     claferObject =
-    claferObject `mappend` (row "value" value)
+    claferObject `mappend` row "value" value
 
 addElements :: [ Object ] -> Object      -> Object
 addElements    elements'      claferObject =
-    claferObject `mappend` (constructElements elements')
+    claferObject `mappend` constructElements elements'
 
 constructElements :: [ Object ] -> Object
 constructElements    elements'    =

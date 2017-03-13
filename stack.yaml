@@ -1,10 +1,10 @@
-# for GHC-8.0.1
+# for GHC-8.0.2
 extra-deps:
   - data-stringmap-1.0.1.1
   - json-builder-0.3
-  - HaXml-1.25.3    # Use HaXml-1.24 for Windows
-
-resolver: lts-7.0
+  - HaXml-1.25.3
+  # - HaXml-1.24  # for Windows
+resolver: lts-8.5
 
 packages:
 - '../clafer'
