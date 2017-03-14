@@ -3,6 +3,7 @@ extra-deps:
   - data-stringmap-1.0.1.1
   - json-builder-0.3
   - HaXml-1.25.3
+  - cond-0.4.1.1
   # - HaXml-1.24  # for Windows
 resolver: lts-8.5
 

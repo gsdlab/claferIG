@@ -215,7 +215,9 @@ load                 igArgs    =
             compile iModule
             results <- generate
             let (Just alloyResult) = Map.lookup Alloy results
-            return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult)
+            if extension alloyResult == "tmp.als"
+            then throwErr (ClaferErr "Instance generation currently not supported for behavioral Clafer.\nRemove temporal constructs or press <ctrl>+c to exit." :: ClaferSErr)
+            else return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
     claferArgs = defaultClaferArgs{mode = [Alloy], keep_unused = True, no_stats = True,flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
@@ -373,7 +375,7 @@ findRemovable env core constraints' =
         removeAbsZero absIDs (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) = ((Seq.elemIndexL uID absIDs)==Nothing)
         removeAbsZero _ _ = True
         getId :: Ir -> (Seq.Seq String)
-        getId (IRClafer (IClafer _ True _ uID _ _ _ _ _ _ _)) = Seq.singleton uID
+        getId (IRClafer (IClafer _ IClaferModifiers{_abstract=True} _ uID _ _ _ _ _ _ _)) = Seq.singleton uID
         getId _ = mempty
 
 getIMod :: (IModule, GEnv, Bool) -> IModule
