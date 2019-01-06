@@ -13,3 +13,4 @@ tools
 .stack-work
 cabal.sandbox.config
 tags
+lib/amd64-linux/
