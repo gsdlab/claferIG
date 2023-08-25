@@ -1,4 +1,5 @@
-{-# LANGUAGE NamedFieldPuns #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 {-
  Copyright (C) 2012-2017 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
@@ -51,7 +52,14 @@ import GHC.Float
 import qualified Text.Parsec.Error as E
 import Prelude
 
-data AutoComplete = Auto_Command | Auto_Clafer | Auto_ClaferInstance | Auto_UnsatCoreMinimization | Auto_Space | Auto_Digit | No_Auto deriving Show
+data AutoComplete
+    = Auto_Command
+    | Auto_Clafer
+    | Auto_ClaferInstance
+    | Auto_UnsatCoreMinimization
+    | Auto_Space
+    | Auto_Digit
+    | No_Auto deriving Show
 
 data AutoCompleteContext = AutoCompleteContext {clafers::IORef [String], claferInstances::IORef [String]}
 
@@ -84,7 +92,7 @@ runCommandLine =
         do
             solution <- lift next
             claferIGArgs' <- lift getClaferIGArgs
-            uidIClaferMap' <- lift $ getUIDIClaferMap
+            uidIClaferMap' <- lift getUIDIClaferMap
             case solution of
                 Instance claferModel xml -> do
                     liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverseModel claferModel)
@@ -95,7 +103,7 @@ runCommandLine =
                                 iNumber = show $ 1 + (length $ unsaved context)
                              in
                                 "=== Instance " ++ iNumber ++ " Begin ===\n\n" ++
-                                (show claferModel) ++
+                                show claferModel ++
                                 "\n--- Instance " ++ iNumber ++ " End ---\n\n"
                     nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
                 UnsatCore core counterexample -> do
@@ -507,7 +515,7 @@ setAlloyScopeAndBitwidth                 bitwidth'  newValue'   fqName'   sigNam
     outputStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") changed to " ++ show newValue'
 
 mergeScopes :: MonadIO m => [(UID, Integer)] -> [(UID, Integer)] -> ClaferIGT m ()
-mergeScopes _ [] = return()
+mergeScopes _ [] = return ()
 mergeScopes oldScopes newScopes = do
     let mergedScopes = map (pickLargerScope oldScopes) newScopes
     mapM_ (\(uid', val) -> setAlloyScope val uid') mergedScopes
@@ -660,6 +668,6 @@ findNecessaryBitwidth ir oldBw scopeValues =
 intToFloat :: Integer -> Float
 intToFloat = fromInteger . toInteger
 
-fromJustShow :: (Maybe Integer) -> String
+fromJustShow :: Maybe Integer -> String
 fromJustShow (Just x) = show x
 fromJustShow Nothing = "Nothing"

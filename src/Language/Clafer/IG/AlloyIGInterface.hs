@@ -33,7 +33,6 @@ import Data.Map as Map hiding (null)
 import Data.Maybe
 import Language.Clafer.Front.AbsClafer (Span(..), Pos(..))
 import Language.Clafer.IG.Process
-import System.Console.Haskeline.MonadException
 import Prelude
 
 -- | An interface to the Alloy Analyzer
@@ -42,8 +41,6 @@ newtype AlloyIGT m a = AlloyIGT (StateT (Maybe AlloyIGEnv) (ReaderT Process m) a
 
 instance MonadTrans AlloyIGT where
     lift = AlloyIGT . lift . lift
-
-deriving instance MonadException m => MonadException (AlloyIGT m)
 
 fetch :: Monad m => AlloyIGT m AlloyIGEnv
 fetch = fromMaybe (error "AlloyIG not loaded.") `liftM` AlloyIGT get
@@ -67,7 +64,7 @@ data Sig = Sig{s_name::String, s_multiplicity::Multiplicity, s_subset::Maybe Str
 data Multiplicity = One | Lone | Some | Any deriving (Eq, Read, Show)
 
 
-data UnsatCore = UnsatCore{core::[Span]} deriving Show
+newtype UnsatCore = UnsatCore{core::[Span]} deriving Show
 
 
 
@@ -257,7 +254,7 @@ sendSetUnsatCoreMinimizationCommand level =
 sendSetBitwidthCommand :: MonadIO m => Integer -> AlloyIGT m ()
 sendSetBitwidthCommand bitwidth =
     do
-        when (bitwidth < 0) $ fail (show bitwidth ++ " is not a valid bitwidth.")
+        when (bitwidth < 0) $ error (show bitwidth ++ " is not a valid bitwidth.")
         putMsg "setBitwidth"
         putMsg $ show bitwidth
 

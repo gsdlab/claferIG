@@ -1,12 +1,11 @@
-# for GHC-8.4.4
+# for GHC-9.6.4
 extra-deps:
-  - data-stringmap-1.0.1.1
-  - HaXml-1.25.5
-  - polyparse-1.12.1@sha256:9364d96a33713549c8aae3b74c6980780c9a8a63fc9e4ef4c82216669fb8f714
   - github: nikomi/json-builder
     commit: fef4700b53da502f8d70d2106c9f4b65e1a69b3f
-  # - HaXml-1.24  # for Windows
-resolver: lts-12.26
+  - github: gsdlab/StringMap
+    commit: 2ce0adb947adaa5581d347ce8555ec76db44d815
+
+resolver: lts-21.9
 
 packages:
 - '../clafer'

@@ -177,18 +177,18 @@ buildClaferModel solution =
 
     removeDups :: [Clafer] -> [Clafer] -> [Clafer]
     removeDups acc [] = acc
-    removeDups acc (m:ms) = if (m `elem` ms) then removeDups acc ms
-        else removeDups (m{c_children = (removeDups [] $ c_children m)} : acc) ms
+    removeDups acc (m:ms) = if m `elem` ms then removeDups acc ms
+        else removeDups (m{c_children = removeDups [] $ c_children m} : acc) ms
 
     intType = s_id $ findWithDefault (error "Missing Int sig") "Int" sigMap
 
-    singleton [] = Nothing
-    singleton [x] = Just x
-    singleton xs = error $ "Received more than one value " ++ show xs
+    checkSingle [] = Nothing
+    checkSingle [x] = Just x
+    checkSingle xs = error $ "Received more than one value " ++ show xs
 
     buildClafer :: Node -> Either Clafer Value
     buildClafer (ClaferNode id _) =
-        Left $ Clafer id (singleton $ nub valueChildren) claferChildren
+        Left $ Clafer id (checkSingle $ nub valueChildren) claferChildren
         where
         (claferChildren, valueChildren) = partitionEithers $ map buildClafer children
         children = getChildren id ftree
