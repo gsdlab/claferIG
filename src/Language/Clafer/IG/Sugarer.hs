@@ -24,7 +24,7 @@ module Language.Clafer.IG.Sugarer (sugarClaferModel) where
 
 import Language.Clafer.Common
 import Language.Clafer.IG.ClaferModel
-import Data.Maybe (fromJust)
+import Data.Maybe (fromMaybe, fromJust)
 import Data.List as List hiding (map)
 import Data.Map as Map hiding (map, foldr, foldl)
 import Prelude hiding (id)
@@ -51,8 +51,10 @@ poll id (Census sample' counts') =
 
 -- Transforms c2_name -> name
 makeSimpleName :: String -> String
+makeSimpleName "" = ""
+makeSimpleName "root" = "root"
 makeSimpleName name' = case dropWhile (/='_') name' of
-    "" ->  error "Unexpected Clafer name " ++ name'
+    "" ->  "" -- error "Unexpected Clafer name: " ++ name'
     x -> tail x
 
 -- | Count the number of each clafer
@@ -65,8 +67,8 @@ claferModelCensus (ClaferModel topLevelClafers) =
 
 
 -- | Rewrite the model into a human-friendlier format
-sugarClaferModel:: Bool -> Bool  -> UIDIClaferMap -> ClaferModel                      -> (Map Int String) -> ClaferModel
-sugarClaferModel   useUids addTypes uidIClaferMap'   model@(ClaferModel topLevelClafers) sMap              =
+sugarClaferModel:: Bool -> Bool  -> UIDIClaferMap -> ClaferModel                      -> Map Int String -> ClaferModel
+sugarClaferModel   useUids addTypes uidIClaferMap'   model@(ClaferModel topLevelClafers) sMap            =
     ClaferModel $ map sugarClafer topLevelClafers
     where
     sugarClafer (Clafer id value children) =
@@ -74,12 +76,12 @@ sugarClaferModel   useUids addTypes uidIClaferMap'   model@(ClaferModel topLevel
 
     sugarValue (Clafer _ (Just (AliasValue alias)) _) = Just $ AliasValue $ sugarId useUids addTypes False alias
     sugarValue (Clafer _ Nothing _) = Nothing
-    sugarValue c  = if (cType c) == "string" then (Just ((StringValue) (getString c))) else (c_value c)
+    sugarValue c  = if cType c == "string" then Just (StringValue (getString c)) else c_value c
 
 
     cType (Clafer id _ _) = cTypeSolve $ getReference iclafer
       where
-        iclafer = fromJust $ findIClafer uidIClaferMap' $ i_name id
+        iclafer = fromMaybe (error $ "IClafer not found:" ++ i_name id) $ findIClafer uidIClaferMap' $ i_name id
 
     cTypeSolve ["string"]  = "string"
     cTypeSolve ["integer"] = "integer"
@@ -87,7 +89,7 @@ sugarClaferModel   useUids addTypes uidIClaferMap'   model@(ClaferModel topLevel
     cTypeSolve ["real"]    = "real"
     cTypeSolve _           = ""
 
-    getString c = case (Map.lookup strNumber sMap) of
+    getString c = case Map.lookup strNumber sMap of
         Nothing -> "\"<text " ++ show strNumber ++ ">\""
         Just s -> s
         where strNumber = v_value  $ fromJust  $ c_value c
@@ -97,10 +99,10 @@ sugarClaferModel   useUids addTypes uidIClaferMap'   model@(ClaferModel topLevel
 
     sugarId :: Bool -> Bool  -> Bool    -> Id -> Id
     sugarId    useUids' addTypes' addRefDecl id  =
-        Id (finalName ++ ordinalDisplay ++ (refDecl addTypes' addRefDecl uidIClaferMap')) 0
+        Id (finalName ++ ordinalDisplay ++ refDecl addTypes' addRefDecl uidIClaferMap') 0
         where
         fullName = i_name id
-        ordinalDisplay = if (useUids || count > 1)
+        ordinalDisplay = if useUids || count > 1
                          then "$" ++ show ordinal
                          else ""
 
@@ -118,7 +120,7 @@ retrieveSuper useUids' uidIClaferMap'      uid =
     -- ++
     -- sugarReference  (getReference iclafer)
     where
-        iclafer = fromJust $ findIClafer uidIClaferMap' uid
+        iclafer = fromMaybe (error $ "IClafer not found: " ++ uid) $ findIClafer uidIClaferMap' uid
 
         sugarSuper :: [String] -> String
         sugarSuper [s] = " : " ++ if useUids' then s else makeSimpleName s

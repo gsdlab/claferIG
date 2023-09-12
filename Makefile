@@ -40,6 +40,9 @@ install:
 # Build takes less time. For ease of development.
 build: alloyIG.jar
 	stack build
+	cp alloyIG.jar `stack path --local-install-root`/bin/
+	cp alloy4.2.jar `stack path --local-install-root`/bin/
+	cp -R lib  `stack path --local-install-root`/bin/
 
 alloyIG.jar: alloy4.2.jar src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	mkdir -p dist/javabuild
@@ -58,6 +61,7 @@ lib: alloy4.2.jar
 	fi
 
 test:
+	stack test --no-run-tests  
 	cp alloyIG.jar `stack path --dist-dir`/build/test-suite/
 	cp alloy4.2.jar `stack path --dist-dir`/build/test-suite/
 	cp -R lib  `stack path --dist-dir`/build/test-suite/
@@ -93,6 +97,6 @@ endif
 alloy4.2.jar:
 	@if test ! -f "alloy4.2.jar"; then \
 		echo "[WARNING] Missing alloy4.2.jar. Downloading...";  \
-		$(WGET_COMMAND) http://alloy.mit.edu/alloy/downloads/alloy4.2_2015-02-22.jar; \
+		$(WGET_COMMAND) http://alloytools.org/download/alloy4.2_2015-02-22.jar; \
 		mv alloy4.2_2015-02-22.jar alloy4.2.jar; \
 	fi

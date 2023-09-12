@@ -27,6 +27,7 @@ module Main where
 import Language.Clafer.IG.ClaferIG
 import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLine
+import Language.Clafer.IG.JSONGenerator
 import Language.Clafer.IG.Solution
 import Language.Clafer.IG.Sugarer
 import Language.Clafer.ClaferArgs
@@ -185,8 +186,13 @@ saveAll nextFile =
         file' <- liftIO nextFile
         liftIO $ createDirectoryIfMissing True $ takeDirectory file'
         solution <- next
+        claferIGArgs' <- getClaferIGArgs
+        uidIClaferMap' <- getUIDIClaferMap
         case solution of
             Instance{modelInstance = modelInstance'} -> do
-                liftIO $ writeFile file' (show modelInstance')
+                let output' = if json claferIGArgs'
+                              then generateJSON uidIClaferMap' modelInstance'
+                              else show modelInstance'
+                liftIO $ writeFile file' output'
                 saveAll nextFile
             _ -> return ()

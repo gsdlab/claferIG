@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, GeneralizedNewtypeDeriving, StandaloneDeriving, DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
 
 {-
  Copyright (C) 2012-2017 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
@@ -73,6 +73,7 @@ import Language.Clafer.IG.Solution
 import Language.Clafer.IG.Sugarer
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Catch
 import Control.Monad.Except
 import Control.Monad.Trans.State.Strict
 import Data.List
@@ -82,7 +83,6 @@ import Data.Map as Map hiding (map, null)
 import qualified Data.Sequence as Seq
 import Data.Maybe
 import Data.Data
-import System.Console.Haskeline.MonadException
 import Paths_claferIG (version)
 import Data.Version (showVersion)
 import Prelude
@@ -109,9 +109,7 @@ data IGArgs = IGArgs {
 } deriving (Show, Data, Typeable)
 
 newtype ClaferIGT m a = ClaferIGT (StateT ClaferIGEnv (AlloyIGT m) a)
-    deriving (Applicative, Functor, Monad, MonadIO)
-
-deriving instance MonadException m => MonadException (ClaferIGT m)
+    deriving (Applicative, Functor, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
 
 instance MonadTrans ClaferIGT where
     lift = ClaferIGT . lift . lift
@@ -129,9 +127,9 @@ set :: Monad m => ClaferIGEnv -> ClaferIGT m ()
 set = ClaferIGT . put
 
 runClaferIGT :: MonadIO m => IGArgs -> ClaferIGT m a -> m (Either ClaferErrs a)
-runClaferIGT                 args      run =
+runClaferIGT                 igArgs      run =
     AlloyIG.runAlloyIGT $ runExceptT $ do
-        env <- (ExceptT $ load args) `catchError` (\x -> lift AlloyIG.sendQuitCommand >> throwError x)
+        env <- ExceptT (load igArgs) `catchError` (\x -> lift AlloyIG.sendQuitCommand >> throwError x)
         lift $ evalStateT (unwrap run) env
     where
     unwrap (ClaferIGT c) = c
@@ -195,9 +193,9 @@ load                 igArgs    =
 
         return $ ClaferIGEnv claferEnv' igArgs constraints claferModel qNameMaps uidIClaferMap' sMap irTrace
     where
-    editMap :: (Map.Map Span [Ir]) -> (Map.Map Integer String) -- Map Line Number to Clafer Name
+    editMap :: Map.Map Span [Ir] -> Map.Map Integer String -- Map Line Number to Clafer Name
     editMap =
-        fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case (getIClafer ir) of
+        fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case getIClafer ir of
             Just (IClafer _ _ _ _ uid' _ _ _ _ _ _) -> (num, uid') : acc
             _ -> acc) [] . tail . (Data.List.foldr (\((Span (Pos l1 _) (Pos l2 _)), irs) acc -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc) []) . toList
     getIClafer :: [Ir] -> Maybe IClafer
@@ -214,8 +212,13 @@ load                 igArgs    =
             iModule <- desugar Nothing
             compile iModule
             results <- generate
-            let (Just alloyResult) = Map.lookup Alloy results
-            return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult)
+            case Map.lookup Alloy results of
+                Nothing            ->
+                    throwErr (ClaferErr "No Alloy compilation result." :: ClaferSErr)
+                (Just alloyResult) ->
+                    if extension alloyResult == "tmp.als"
+                    then throwErr (ClaferErr "Instance generation currently not supported for behavioral Clafer.\nRemove temporal constructs or press <ctrl>+c to exit." :: ClaferSErr)
+                    else return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
     claferArgs = defaultClaferArgs{mode = [Alloy], keep_unused = True, no_stats = True,flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
@@ -253,8 +256,7 @@ getGlobalScope = ClaferIGT $ lift AlloyIG.getGlobalScope
 getBitwidth :: MonadIO m => ClaferIGT m Integer
 getBitwidth =
     do
-        claferIGArgs' <- getClaferIGArgs
-        return $ bitwidth claferIGArgs'
+        bitwidth <$> getClaferIGArgs
 
 setGlobalScope :: MonadIO m => Integer -> ClaferIGT m ()
 setGlobalScope scope = ClaferIGT $ lift $ AlloyIG.sendSetGlobalScopeCommand scope
@@ -286,8 +288,7 @@ setAlloyScope :: MonadIO m => Integer -> String -> ClaferIGT m (Either String ()
 setAlloyScope value sigName =
     do
         subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName value
-        runExceptT $ maybe (return ()) throwError $ sigToClaferName <$> subset
-
+        runExceptT $ maybe (return ()) (throwError . sigToClaferName) subset
 
 next :: MonadIO m => ClaferIGT m Instance
 next = do
@@ -329,14 +330,14 @@ next = do
                 Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
 
-    xmlToModel :: Bool -> Bool -> UIDIClaferMap -> String -> (Map Int String) -> ClaferModel
+    xmlToModel :: Bool -> Bool -> UIDIClaferMap -> String -> Map Int String -> ClaferModel
     xmlToModel  useUids' addTypes' uidIClaferMap' xml sMap = (sugarClaferModel useUids' addTypes' uidIClaferMap' $ buildClaferModel $ parseSolution xml) sMap
 
 reload :: MonadIO m => ClaferIGT m (Either ClaferErrs ())
 reload  =
     runExceptT $ do
-        globalScope <- lift $ getGlobalScope
-        claferIGArgs' <- lift $ getClaferIGArgs
+        globalScope <- lift getGlobalScope
+        claferIGArgs' <- lift getClaferIGArgs
         env <- ExceptT $ ClaferIGT $ lift $ load claferIGArgs'
         lift $ set env
         lift $ setGlobalScope globalScope
@@ -369,11 +370,11 @@ findRemovable env core constraints' =
     let absIDs = foldMapIR getId $ getIMod $ fromJust $ cIr env
     in  Data.List.filter (removeAbsZero absIDs ) $ map (\c -> find ((== c) . range) constraints') core
     where
-        removeAbsZero :: (Seq.Seq String) -> Maybe Constraint -> Bool
+        removeAbsZero :: Seq.Seq String -> Maybe Constraint -> Bool
         removeAbsZero absIDs (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) = ((Seq.elemIndexL uID absIDs)==Nothing)
         removeAbsZero _ _ = True
-        getId :: Ir -> (Seq.Seq String)
-        getId (IRClafer (IClafer _ True _ uID _ _ _ _ _ _ _)) = Seq.singleton uID
+        getId :: Ir -> Seq.Seq String
+        getId (IRClafer (IClafer _ IClaferModifiers{_abstract=True} _ uID _ _ _ _ _ _ _)) = Seq.singleton uID
         getId _ = mempty
 
 getIMod :: (IModule, GEnv, Bool) -> IModule

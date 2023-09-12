@@ -1,3 +1,4 @@
+alloyIG.jar
 dist
 tools
 .dist-buildwrapper
@@ -11,5 +12,7 @@ tools
 *.sublime-workspace
 .cabal-sandbox
 .stack-work
+stack.yaml.lock
 cabal.sandbox.config
 tags
+lib/amd64-linux/
