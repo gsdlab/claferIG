@@ -1,5 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, DeriveDataTypeable, StandaloneDeriving #-}
-{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
 
 {-
  Copyright (C) 2012-2017 Jimmy Liang, Michal Antkiewicz <http://gsd.uwaterloo.ca>
@@ -337,8 +336,8 @@ next = do
 reload :: MonadIO m => ClaferIGT m (Either ClaferErrs ())
 reload  =
     runExceptT $ do
-        globalScope <- lift $ getGlobalScope
-        claferIGArgs' <- lift $ getClaferIGArgs
+        globalScope <- lift getGlobalScope
+        claferIGArgs' <- lift getClaferIGArgs
         env <- ExceptT $ ClaferIGT $ lift $ load claferIGArgs'
         lift $ set env
         lift $ setGlobalScope globalScope

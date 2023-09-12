@@ -40,6 +40,9 @@ install:
 # Build takes less time. For ease of development.
 build: alloyIG.jar
 	stack build
+	cp alloyIG.jar `stack path --local-install-root`/bin/
+	cp alloy4.2.jar `stack path --local-install-root`/bin/
+	cp -R lib  `stack path --local-install-root`/bin/
 
 alloyIG.jar: alloy4.2.jar src/manifest src/org/clafer/ig/AlloyIG.java src/manifest src/org/clafer/ig/Util.java src/org/clafer/ig/AlloyIGException.java src/edu/mit/csail/sdg/alloy4compiler/parser/AlloyCompiler.java
 	mkdir -p dist/javabuild

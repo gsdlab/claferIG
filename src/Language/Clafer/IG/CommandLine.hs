@@ -100,7 +100,7 @@ runCommandLine =
                     outputStrLn $ if json claferIGArgs'
                         then generateJSON uidIClaferMap' claferModel
                         else let
-                                iNumber = show $ 1 + (length $ unsaved context)
+                                iNumber = show $ 1 + length (unsaved context)
                              in
                                 "=== Instance " ++ iNumber ++ " Begin ===\n\n" ++
                                 show claferModel ++
