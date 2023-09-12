@@ -74,6 +74,7 @@ import Language.Clafer.IG.Solution
 import Language.Clafer.IG.Sugarer
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Catch
 import Control.Monad.Except
 import Control.Monad.Trans.State.Strict
 import Data.List
@@ -109,7 +110,7 @@ data IGArgs = IGArgs {
 } deriving (Show, Data, Typeable)
 
 newtype ClaferIGT m a = ClaferIGT (StateT ClaferIGEnv (AlloyIGT m) a)
-    deriving (Applicative, Functor, Monad, MonadIO)
+    deriving (Applicative, Functor, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
 
 instance MonadTrans ClaferIGT where
     lift = ClaferIGT . lift . lift

@@ -26,6 +26,7 @@ module Language.Clafer.IG.AlloyIGInterface where
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.State.Strict
@@ -37,7 +38,7 @@ import Prelude
 
 -- | An interface to the Alloy Analyzer
 
-newtype AlloyIGT m a = AlloyIGT (StateT (Maybe AlloyIGEnv) (ReaderT Process m) a) deriving (Applicative, Functor, Monad, MonadIO)
+newtype AlloyIGT m a = AlloyIGT (StateT (Maybe AlloyIGEnv) (ReaderT Process m) a) deriving (Applicative, Functor, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
 
 instance MonadTrans AlloyIGT where
     lift = AlloyIGT . lift . lift
