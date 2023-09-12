@@ -58,6 +58,7 @@ lib: alloy4.2.jar
 	fi
 
 test:
+	stack test --no-run-tests  
 	cp alloyIG.jar `stack path --dist-dir`/build/test-suite/
 	cp alloy4.2.jar `stack path --dist-dir`/build/test-suite/
 	cp -R lib  `stack path --dist-dir`/build/test-suite/
