@@ -12,7 +12,7 @@ Stability:              Experimental
 Category:               Model
 Build-type:             Simple
 Tested-with:            GHC == 9.2.8
-                      , GHC == 9.4.6
+                      , GHC == 9.4.8
 data-files:             README.md
                       , alloyIG.jar
                       , CHANGES.md
