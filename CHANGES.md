@@ -1,3 +1,7 @@
+##### ClaferIG Version 0.5.2 released on Oct 9, 2026
+
+* [Release](https://github.com/gsdlab/claferIG/pull/36)
+
 ##### ClaferIG Version 0.5.1 released on Sep 12, 2023
 
 * [Release](https://github.com/gsdlab/claferIG/pull/35)
