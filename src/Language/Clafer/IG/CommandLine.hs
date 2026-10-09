@@ -37,6 +37,9 @@ import Language.Clafer.Comments
 import Language.Clafer.JSONMetaData
 import Language.Clafer.QNameUID
 import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
+import Control.Monad
+import Control.Monad.Trans
+import Control.Monad.IO.Class
 import Control.Monad.Except
 import Data.Char
 import Data.IORef

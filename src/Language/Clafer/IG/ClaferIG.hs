@@ -75,6 +75,8 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.Except
+import Control.Monad.IO.Class
+import Control.Monad.Trans
 import Control.Monad.Trans.State.Strict
 import Data.List
 import Data.Monoid
