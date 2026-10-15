@@ -62,9 +62,9 @@ lib: alloy4.2.jar
 
 test:
 	stack test --no-run-tests  
-	cp alloyIG.jar `stack path --dist-dir`/build/test-suite/
-	cp alloy4.2.jar `stack path --dist-dir`/build/test-suite/
-	cp -R lib  `stack path --dist-dir`/build/test-suite/
+	cp alloyIG.jar `stack path --dist-dir`/build/model-tests/
+	cp alloy4.2.jar `stack path --dist-dir`/build/model-tests/
+	cp -R lib  `stack path --dist-dir`/build/model-tests/
 	cp alloyIG.jar `stack path --dist-dir`/build/claferIG/
 	cp alloy4.2.jar `stack path --dist-dir`/build/claferIG/
 	cp -R lib  `stack path --dist-dir`/build/claferIG/
