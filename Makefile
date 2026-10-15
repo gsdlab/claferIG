@@ -12,6 +12,8 @@ ifeq ($(shell uname -s),Darwin)
 	MINISATPROVER := lib/libminisatprover.dylib
 else
 	MINISATPROVER := lib/libminisatprover.so
+	# CMake looks for the JNI headers in JAVA_HOME, which Linux distributions often leave unset.
+	JAVA_HOME ?= $(shell dirname $$(dirname $$(readlink -f $$(command -v javac))))
 endif
 
 # Calling `make` should only build
@@ -45,7 +47,7 @@ $(MINISATPROVER): native/minisatprover/CMakeLists.txt native/minisatprover/MiniS
 	rm -rf native/minisatprover/repo dist/minisatprover
 	git clone -q $(MINISATPROVER_REPO) native/minisatprover/repo
 	git -C native/minisatprover/repo checkout -q $(MINISATPROVER_COMMIT)
-	cmake -S native/minisatprover -B dist/minisatprover
+	cmake -S native/minisatprover -B dist/minisatprover $(if $(JAVA_HOME),-DJAVA_HOME=$(JAVA_HOME))
 	cmake --build dist/minisatprover
 	mkdir -p lib
 	cp dist/minisatprover/$(notdir $(MINISATPROVER)) $@

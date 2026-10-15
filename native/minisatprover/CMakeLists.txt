@@ -2,7 +2,7 @@
 # Alloy's own build of this library has no optimization, which makes it several
 # times slower (https://github.com/AlloyTools/org.alloytools.alloy/issues/352).
 # The solver sources are cloned into `repo` by the Makefile.
-cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
 
 project(minisatprover CXX)
 
@@ -13,7 +13,8 @@ endif()
 # The solver uses dynamic exception specifications, which C++17 removed.
 set(CMAKE_CXX_STANDARD 14)
 
-find_package(JNI REQUIRED)
+# Only the headers are needed; a headless JDK has no AWT.
+find_package(JNI REQUIRED COMPONENTS JVM)
 
 add_library(libminisatprover SHARED
     MiniSatProver.cpp
