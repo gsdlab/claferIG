@@ -1,7 +1,10 @@
 ##### ClaferIG Version 0.5.3, unreleased
 
-Minor release with Clafer 0.5.3.
+Minor release with Clafer 0.5.3 and Alloy 6.2.0.
 
+* Uses Alloy 6.2.0 (`alloy6.2.0.jar`, Java 17+) instead of Alloy 4.2. The MiniSat solver with UnSAT cores is part of the Alloy jar on Linux and macOS (Intel and ARM); on Windows there is none, so instances come from SAT4J and there are no UnSAT cores.
+* The MiniSat solver in Alloy 6.2.0 is built without optimization and is several times slower ([AlloyTools/org.alloytools.alloy#352](https://github.com/AlloyTools/org.alloytools.alloy/issues/352)). `make` builds it with optimization into `lib/` (needs `cmake`), and ClaferIG uses that build when it is next to the executable.
+* Works around an Alloy 6.2.0 bug that made every UnSAT core empty (the MiniSat prover is freed before its proof is read; fixed in Alloy after 6.2.0).
 * The tests that need the example models and Alloy run in the `model-tests` suite (flag `model-tests`, off by default) and are not part of the package.
 * [Release](https://github.com/gsdlab/claferIG/pull/37)
 

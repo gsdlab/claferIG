@@ -2,12 +2,12 @@ package org.clafer.ig;
 
 import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
-import edu.mit.csail.sdg.alloy4compiler.ast.Command;
-import edu.mit.csail.sdg.alloy4compiler.ast.Expr;
-import edu.mit.csail.sdg.alloy4compiler.ast.ExprLet;
-import edu.mit.csail.sdg.alloy4compiler.ast.ExprList;
-import edu.mit.csail.sdg.alloy4compiler.ast.ExprUnary;
-import edu.mit.csail.sdg.alloy4compiler.ast.Sig;
+import edu.mit.csail.sdg.ast.Command;
+import edu.mit.csail.sdg.ast.Expr;
+import edu.mit.csail.sdg.ast.ExprLet;
+import edu.mit.csail.sdg.ast.ExprList;
+import edu.mit.csail.sdg.ast.ExprUnary;
+import edu.mit.csail.sdg.ast.Sig;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.IOException;
@@ -156,7 +156,7 @@ public class Util {
             return null;
         }
 
-        return new Command(c.pos, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.expects, c.scope, c.additionalExactScopes, newFormula, c.parent);
+        return new Command(c.pos, c.nameExpr, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.minprefix, c.maxprefix, c.expects, c.scope, c.additionalExactScopes, c.commandKeyword, newFormula, c.parent);
     }
 
     private static <T> List<T> asList(Iterable<T> iterable) {

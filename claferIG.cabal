@@ -15,9 +15,6 @@ Tested-with:            GHC == 9.6.7
 data-files:             README.md
                       , alloyIG.jar
                       , Makefile
-                      , lib/libminisatprover.dylib
-                      , lib/libminisatprover.so
-                      , lib/minisatprover.dll
                       , stack.yaml
 extra-doc-files:        CHANGES.md
 source-repository head
@@ -26,7 +23,7 @@ source-repository head
 
 flag model-tests
     description:        Build the model-tests test suite, which generates instances of the models in
-                        test/positive with Alloy. The models and alloy4.2.jar are not part of the
+                        test/positive with Alloy. The models and alloy6.2.0.jar are not part of the
                         package, so it can only be built in a checkout of the repository.
     default:            False
     manual:             True

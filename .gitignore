@@ -15,4 +15,5 @@ tools
 stack.yaml.lock
 cabal.sandbox.config
 tags
-lib/amd64-linux/
+native/minisatprover/repo
+lib

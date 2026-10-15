@@ -22,7 +22,7 @@
  -}
 -- Generates instances of the models in test/positive with Alloy. Built only with
 -- the model-tests flag, in a checkout of the repository: it needs the models, and
--- alloyIG.jar, alloy4.2.jar and lib/ next to the test executable (see `make test`).
+-- alloyIG.jar and alloy6.2.0.jar next to the test executable (see `make test`).
 import Language.Clafer.IG.ClaferIG
 import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLine

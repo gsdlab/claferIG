@@ -35,6 +35,8 @@ import Data.Maybe
 import Language.Clafer.Front.AbsClafer (Span(..), Pos(..))
 import Language.Clafer.IG.Process
 import Prelude
+import System.Directory (doesFileExist)
+import System.Info (os)
 
 -- | An interface to the Alloy Analyzer
 
@@ -80,7 +82,12 @@ runAlloyIGT :: MonadIO m => AlloyIGT m a -> m a
 runAlloyIGT run =
     do
         execPath <- liftIO $ executableDirectory
-        proce     <- liftIO $ pipeProcess "java" ["-Djava.library.path=" ++ execPath ++ "lib" , "-jar", execPath ++ "alloyIG.jar"]
+        -- The minisat prover built with optimization, if it is installed next to claferIG;
+        -- otherwise Alloy uses its own build, which is much slower.
+        let prover = execPath ++ "lib/" ++ (if os == "darwin" then "libminisatprover.dylib" else "libminisatprover.so")
+        hasProver <- liftIO $ doesFileExist prover
+        let proverArg = ["-Dalloy.native.lib.minisatprover=" ++ prover | hasProver]
+        proce     <- liftIO $ pipeProcess "java" (["--enable-native-access=ALL-UNNAMED"] ++ proverArg ++ ["-jar", execPath ++ "alloyIG.jar"])
 
         runReaderT (evalStateT (unwrap run) Nothing) proce
     where

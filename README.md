@@ -23,9 +23,10 @@ Clafer can be installed from a binary distribution (preferred), from Hackage, an
 Regardless of the installation method, the following are required:
 
 * [Clafer](https://github.com/gsdlab/clafer) v0.5.3
-* [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) v8+, 64bit
-  * On Windows, Java must be 32bit because of Alloy, 64bit otherwise
-* [Alloy4.2](http://alloytools.org/download)
+* [Java Platform (JDK)](https://adoptium.net) v17+, 64bit
+* [Alloy 6.2.0](https://github.com/AlloyTools/org.alloytools.alloy/releases/tag/v6.2.0) (`alloy6.2.0.jar`)
+  * it includes the MiniSat solver with UnSAT cores for Linux and macOS; on Windows, ClaferIG generates instances but cannot compute UnSAT cores and near-miss instances
+  * the MiniSat build in Alloy 6.2.0 is several times slower than the one in Alloy 4.2 because it is compiled without optimization ([AlloyTools/org.alloytools.alloy#352](https://github.com/AlloyTools/org.alloytools.alloy/issues/352)); ClaferIG uses `lib/libminisatprover.so` (`.dylib` on macOS) next to its executable instead, if present. `make` builds it from source.
 
 ### Installation from binaries
 
@@ -47,15 +48,8 @@ Stack is the only requirement: no other Haskell tooling needs to be installed be
 2. Execute
   * `stack install claferIG`
   * ``` cd `stack --local-bin-path` ```
-  * `wget http://alloytools.org/download/alloy4.2_2015-02-22.jar`
-  * `mv alloy4.2_2015-02-22.jar alloy4.2.jar`
-  * `wget https://github.com/gsdlab/claferIG/raw/master/alloyIG.jar`
-  * `mkdir lib`
-  * `cd lib`
-  * Depending on your OS:
-    * for Win, `stack exec wget --  https://github.com/gsdlab/claferIG/raw/master/lib/libminisatprover.dll`
-    * for Linux, `wget https://github.com/gsdlab/claferIG/raw/master/lib/libminisatprover.so`
-    * for Mac, `wget https://github.com/gsdlab/claferIG/raw/master/lib/libminisatprover.dylib`
+  * `curl -fsSL -o alloy6.2.0.jar https://github.com/AlloyTools/org.alloytools.alloy/releases/download/v6.2.0/org.alloytools.alloy.dist.jar`
+  * `curl -fsSL -O https://github.com/gsdlab/claferIG/raw/master/alloyIG.jar`
 
 #### Installation using `cabal-install`
 
@@ -68,12 +62,11 @@ Dependencies
 2. `cabal update`
 3. `cabal install claferIG`
 4. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\x86_64-windows-ghc-9.6.7\claferIG-0.5.3` on Windows or `.cabal/share/x86_64-linux-ghc-9.6.7/claferIG-0.5.3/` on Linux)
-5. to automatically download alloy4.2.jar
-  * execute `make alloy4.2.jar`
-7. copy the following into the Cabal's `bin` folder
+5. to automatically download alloy6.2.0.jar
+  * execute `make alloy6.2.0.jar`
+6. copy the following into the Cabal's `bin` folder
   * the file `alloyIG.jar`
-  * the file `alloy4.2.jar`
-  * the folder `lib`
+  * the file `alloy6.2.0.jar`
 
 ### Installation from the source code
 
@@ -91,7 +84,7 @@ On Windows
 * update MSYS2 packages
    * follow [III. Updating packages](http://sourceforge.net/p/msys2/wiki/MSYS2%20installation/) but always execute `stack exec pacman -- <arguments for pacman>`
 * execute
-   * `stack exec pacman -- -S make wget unzip diffutils`
+   * `stack exec pacman -- -S make diffutils`
 
 ### Important: branches must correspond
 
@@ -108,6 +101,7 @@ Development versions from branches `develop` should work well together but this 
 3. in `<source directory>/claferIG`, execute `stack setup`. This will install all dependencies, build tools, and MSYS2 (on Windows).
 4. `cd <source directory>/claferIG`
   * `make`
+  * this also builds the optimized MiniSat solver with UnSAT cores in `lib/`, which needs `git`, `cmake`, a C++ compiler and a JDK
 
 ### Installation
 
@@ -323,26 +317,15 @@ Here, `C1` and `C3` are satisfied but `C2` is not. To resolve the conflict and a
 ## Troubleshooting
 
 
-If you get an error:
-
-```
-Exception in thread "main" java.lang.UnsatisfiedLinkError: no minisatproverx1 in java.library.path
- at java.lang.ClassLoader.loadLibrary(Unknown Source)
- at java.lang.Runtime.loadLibrary0(Unknown Source)
- at java.lang.System.loadLibrary(Unknown Source)
- at org.clafer.ig.AlloyIG.main(AlloyIG.java:275)
-```
-
-it means that you have a 64bit Java on Windows instead of the required 32bit one.
-On Windows, Alloy only supports Minisat with UnSAT core on 32bit Java.
-There's nothing we can do.
+If ClaferIG reports `No more instances found` for an inconsistent model instead of an UnSAT core,
+the MiniSat solver with UnSAT cores is not available on your platform (Windows); see the dependencies above.
 
 ## How it works
 
 The Clafer instance generator:
 
-* translates the input Clafer model (.cfr) to an Alloy4.2 model (.als). The compiler's intermediate representation (IR) contains the mapping between Clafer names and Alloy names. The IR also contains the scopes for each Alloy signature to ensure that a valid instance can be found if it exists
-* invokes Alloy Analyzer to produce an instance or find an UnSAT core
+* translates the input Clafer model (.cfr) to an Alloy 6 model (.als). The compiler's intermediate representation (IR) contains the mapping between Clafer names and Alloy names. The IR also contains the scopes for each Alloy signature to ensure that a valid instance can be found if it exists
+* invokes Alloy Analyzer with the MiniSat solver with UnSAT cores to produce an instance or find an UnSAT core
 ** given an UnSAT core, removes constraints from the core until an instance is found - that instance represents the counterexample which violates the removed constraints
 * translates the instance or the counterexample data produced by Alloy Analyzer to Clafer instance data format using the name map from IR in a reverse direction,
 * for a counterexample, translates the counter example in Alloy to Claefr instance data and constraint violations in Alloy into constraint violations in Clafer model
