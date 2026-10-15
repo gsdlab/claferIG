@@ -1,3 +1,10 @@
+##### ClaferIG Version 0.5.3, unreleased
+
+Minor release with Clafer 0.5.3.
+
+* The tests that need the example models and Alloy run in the `model-tests` suite (flag `model-tests`, off by default) and are not part of the package.
+* [Release](https://github.com/gsdlab/claferIG/pull/37)
+
 ##### ClaferIG Version 0.5.2 released on Oct 9, 2026
 
 * [Release](https://github.com/gsdlab/claferIG/pull/36)

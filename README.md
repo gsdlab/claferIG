@@ -1,6 +1,6 @@
 # Clafer Instance Generator
 
-##### v0.5.2
+##### v0.5.3
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model.
 
@@ -22,14 +22,14 @@ Clafer can be installed from a binary distribution (preferred), from Hackage, an
 
 Regardless of the installation method, the following are required:
 
-* [Clafer](https://github.com/gsdlab/clafer) v0.5.2
+* [Clafer](https://github.com/gsdlab/clafer) v0.5.3
 * [Java Platform (JDK)](http://www.oracle.com/technetwork/java/javase/downloads/index.html) v8+, 64bit
   * On Windows, Java must be 32bit because of Alloy, 64bit otherwise
 * [Alloy4.2](http://alloytools.org/download)
 
 ### Installation from binaries
 
-Binary distributions of the release 0.5.2 of Clafer Tools for Windows, Mac, and Linux,
+Binary distributions of the release 0.5.3 of Clafer Tools for Windows, Mac, and Linux,
 can be downloaded from [Clafer Tools - Binary Distributions](http://wiselab.uwaterloo.ca/clafer-tools-binary-distributions).
 
 1. download the binaries and unpack `<target directory>` of your choice,
@@ -37,7 +37,7 @@ can be downloaded from [Clafer Tools - Binary Distributions](http://wiselab.uwat
 
 ### Installation From Hackage
 
-Clafer is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.5.2/) and it can be installed using either [`stack`](https://github.com/commercialhaskell/stack) or [`cabal-install`](https://hackage.haskell.org/package/cabal-install).
+Clafer is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.5.3/) and it can be installed using either [`stack`](https://github.com/commercialhaskell/stack) or [`cabal-install`](https://hackage.haskell.org/package/cabal-install).
 
 #### Installation using `stack`
 
@@ -67,7 +67,7 @@ Dependencies
 1. Install GHC
 2. `cabal update`
 3. `cabal install claferIG`
-4. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\x86_64-windows-ghc-9.6.7\claferIG-0.5.2` on Windows or `.cabal/share/x86_64-linux-ghc-9.6.7/claferIG-0.5.2/` on Linux)
+4. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\x86_64-windows-ghc-9.6.7\claferIG-0.5.3` on Windows or `.cabal/share/x86_64-linux-ghc-9.6.7/claferIG-0.5.3/` on Linux)
 5. to automatically download alloy4.2.jar
   * execute `make alloy4.2.jar`
 7. copy the following into the Cabal's `bin` folder
@@ -114,7 +114,7 @@ Development versions from branches `develop` should work well together but this 
 1. execute `make install to=<target directory>`
 
 #### Note:
-> On Windows, use `/` with the `make` command instead of `\`, e.g., `make install to=/c/clafer-tools-0.5.2/`
+> On Windows, use `/` with the `make` command instead of `\`, e.g., `make install to=/c/clafer-tools-0.5.3/`
 
 
 ## Integration with Sublime Text 2/3
@@ -136,7 +136,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG v0.5.2
+ClaferIG v0.5.3
 
 claferIG [OPTIONS] [FILE]
 
@@ -188,7 +188,7 @@ Common flags:
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
 ```
-ClaferIG v0.5.2
+ClaferIG v0.5.3
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands
