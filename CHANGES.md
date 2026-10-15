@@ -1,4 +1,4 @@
-##### ClaferIG Version 0.5.3, unreleased
+##### ClaferIG Version 0.5.3, Oct 15, 2026
 
 Minor release with Clafer 0.5.3 and Alloy 6.2.0.
 
