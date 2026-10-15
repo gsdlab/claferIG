@@ -7,6 +7,13 @@ extra-deps:
   - github: gsdlab/StringMap
     commit: 2ce0adb947adaa5581d347ce8555ec76db44d815
 
+flags:
+  # The test suites that need the models in the repositories (and Alloy for claferIG).
+  clafer:
+    model-tests: true
+  claferIG:
+    model-tests: true
+
 packages:
 - '../clafer'
 - '.'
