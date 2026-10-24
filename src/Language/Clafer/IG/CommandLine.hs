@@ -260,7 +260,9 @@ runCommandLine =
                 printBitwidthWarning newBw
 
             oldScopes <- lift getScopes
-            mapM_ ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (max 1 $ val'+inc') (sigToClaferName sigName') sigName') oldScopes
+            mapM_ ( \(sigName', val') -> do
+                        claferName' <- lift $ claferNameOfSig sigName'
+                        setAlloyScopeAndBitwidth bitwidth' (max 1 $ val'+inc') claferName' sigName') oldScopes
             lift solve
             outputStrLn ("Global scope changed to " ++ show newGlobalScope)
             nextLoop context

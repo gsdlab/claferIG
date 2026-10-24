@@ -58,7 +58,8 @@ module Language.Clafer.IG.ClaferIG (
     fst3,
     getlineNumMap,
     strictReadFile,
-    sigToClaferName) where
+    sigToClaferName,
+    claferNameOfSig) where
 
 import Language.Clafer
 import Language.Clafer.Common
@@ -249,7 +250,7 @@ getClafers :: MonadIO m => ClaferIGT m [String]
 getClafers =
     do
         sigs <- ClaferIGT $ lift AlloyIG.getSigs
-        return $ map sigToClaferName sigs
+        mapM claferNameOfSig sigs
 
 
 getGlobalScope :: MonadIO m => ClaferIGT m Integer
@@ -290,7 +291,8 @@ setAlloyScope :: MonadIO m => Integer -> String -> ClaferIGT m (Either String ()
 setAlloyScope value sigName =
     do
         subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName value
-        runExceptT $ maybe (return ()) (throwError . sigToClaferName) subset
+        subsetName <- traverse claferNameOfSig subset
+        runExceptT $ maybe (return ()) throwError subsetName
 
 next :: MonadIO m => ClaferIGT m Instance
 next = do
@@ -360,6 +362,14 @@ setBitwidth bitwidth' = do
 quit :: MonadIO m => ClaferIGT m ()
 quit = ClaferIGT $ lift AlloyIG.sendQuitCommand
 
+
+-- | The clafer's name for an Alloy signature (this/c0_name). UIDs are not always
+-- cN_name: an apostrophe in a name is replaced in the UID (name' -> c0_name__prime__).
+claferNameOfSig :: MonadIO m => String -> ClaferIGT m String
+claferNameOfSig sig = do
+    uidIClaferMap' <- getUIDIClaferMap
+    let uid = fromMaybe sig $ stripPrefix "this/" sig
+    return $ maybe (sigToClaferName sig) _ident $ findIClafer uidIClaferMap' uid
 
 sigToClaferName :: String -> String
 sigToClaferName n =

@@ -1,3 +1,7 @@
+##### ClaferIG Version 0.5.4, unreleased
+
+* Instances show the clafers' names from the model instead of names derived from their UIDs, which differ for names with apostrophes (`same'` has the UID `c0_same__prime__`). This also applies to the clafer names in scope messages.
+
 ##### ClaferIG Version 0.5.3, Oct 15, 2026
 
 Minor release with Clafer 0.5.3 and Alloy 6.2.0.
