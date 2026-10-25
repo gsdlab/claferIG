@@ -193,9 +193,9 @@ getStrMap = fetches strMap
 load :: MonadIO m => IGArgs -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
 load                 igArgs    =
     runExceptT $ do
-        when (null claferFile') $ throwError $ ClaferErrs [ClaferErr "Provide the file name or URL of a Clafer model."]
+        when (null claferFile') $ throwError $ inFiles [] $ ClaferErrs [ClaferErr "Provide the file name or URL of a Clafer model."]
         -- the model, the files it imports, and the options of all of them
-        (claferArgs', modelFiles') <- ExceptT $ liftIO $ either (Left . ClaferErrs . (:[]) . ClaferErr) Right <$> readModel claferArgs
+        (claferArgs', modelFiles') <- ExceptT $ liftIO $ either (Left . inFiles [] . ClaferErrs . (:[]) . ClaferErr) Right <$> readModel claferArgs
         let claferModel = modelText modelFiles'
             -- the integer range of the options (--maxint, --minint) raises the bitwidth
             bitwidth' = maximum $ bitwidth igArgs : map requiredBitwidth (catMaybes [maxint claferArgs', (\n -> -n - 1) <$> minint claferArgs'])
@@ -204,7 +204,7 @@ load                 igArgs    =
 
         let
             (ir, genv', _) = fromJust $ cIr claferEnv'
-        let constraints = parseConstraints claferModel ir mapping
+        let constraints = parseConstraints modelFiles' ir mapping
 
         lift $ AlloyIG.sendLoadCommand alloyModel
         lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
@@ -251,14 +251,14 @@ load                 igArgs    =
     requiredBitwidth :: Integer -> Integer
     requiredBitwidth n = ceiling $ logBase (2 :: Double) $ fromInteger $ 2 * n + 1
 
--- | In a model with imports, the errors give the file and the position in it (@a.cfr:3:5@).
+-- | The errors as the compiler reports them, with the file and the position in it:
+--   @Parse failed at a.cfr:3:5...@, @Compile error at a.cfr:3:5...@, or @Error...@, then the message.
 inFiles :: [ModelFile] -> ClaferErrs -> ClaferErrs
-inFiles [_] errs = errs
-inFiles files (ClaferErrs errs) = ClaferErrs $ map inFile errs
+inFiles files (ClaferErrs errs') = ClaferErrs $ map inFile errs'
     where
-    inFile (ParseErr ErrPos{modelPos = Pos l c} msg') = ClaferErr $ "Parse error at " ++ at l c ++ ":\n    " ++ msg'
-    inFile (SemanticErr ErrPos{modelPos = Pos l c} msg') = ClaferErr $ "Error at " ++ at l c ++ ":\n    " ++ msg'
-    inFile err = err
+    inFile (ParseErr ErrPos{modelPos = Pos l c} msg') = ClaferErr $ "Parse failed at " ++ at l c ++ "...\n" ++ msg'
+    inFile (SemanticErr ErrPos{modelPos = Pos l c} msg') = ClaferErr $ "Compile error at " ++ at l c ++ "...\n" ++ msg'
+    inFile (ClaferErr msg') = ClaferErr $ "Error...\n" ++ msg'
     at l c = let (path, l') = modelPosition files l in path ++ ":" ++ show l' ++ ":" ++ show c
 
 

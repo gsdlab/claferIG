@@ -28,7 +28,8 @@ import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLine
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.List (isInfixOf)
+import Data.List (isInfixOf, isPrefixOf, isSuffixOf)
+import Language.Clafer.IG.Constraints
 import Data.Maybe
 import Data.IORef
 import System.Directory
@@ -123,3 +124,18 @@ case_Imports = do
         case result of
             Left errs -> ("lib.cfr:3:11" `isInfixOf` show errs) @? ("The error names the imported file: " ++ show errs)
             Right _   -> assertFailure "The error in the imported file is not reported"
+
+-- The constraints of an unsatisfiable core name the files that they are in.
+case_ImportsUnsatCore :: Assertion
+case_ImportsUnsatCore = do
+        dir <- (</> "claferIG-test-imports") <$> getTemporaryDirectory
+        createDirectoryIfMissing True dir
+        writeFile (dir </> "lib2.cfr") "B\n    y : integer\n    [ y > 2 ]\n"
+        writeFile (dir </> "unsat.cfr") "//# OPTIONS --import=lib2.cfr\n[ B.y < 2 ]\n"
+        result <- getModel $ dir </> "unsat.cfr"
+        case result of
+            Right UnsatCore{unsatConstraints = core} -> do
+                let shown = map show [ info | UserConstraint{constraintInfo = info} <- core ]
+                any ("y > 2 (" `isPrefixOf`) shown && any ("lib2.cfr:3:7)" `isSuffixOf`) shown @? ("The core names lib2.cfr: " ++ show shown)
+                any ("B.y < 2 (" `isPrefixOf`) shown && any ("unsat.cfr:2:3)" `isSuffixOf`) shown @? ("The core names unsat.cfr: " ++ show shown)
+            _ -> assertFailure "The model has no unsatisfiable core"

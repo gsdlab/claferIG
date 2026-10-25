@@ -4,7 +4,7 @@ Minor release with Clafer 0.5.4.
 
 * Models in several files: `--import=FILE`, in the model's `//# OPTIONS` or on the command line, generates instances of the model together with the imported files, as with the Clafer compiler ([gsdlab/clafer#100](https://github.com/gsdlab/clafer/issues/100)). The model and its imports can be URLs; the saved files are named after a URL's last segment.
 * The options in the model's `//# OPTIONS` directive apply, as they do with the compiler: the layout, the scope strategy, and the other options of the compilation. The integer range of `--maxint` and `--minint` raises the bitwidth when it needs a larger one.
-* In a model with imports, an error gives the file and the position in it (`lib.cfr:3:11`).
+* Positions are given as `file.cfr:line:column`, the file in which they are, also in a model of one file: errors are reported as by the compiler (`Parse failed at model.cfr:3:5...`, `Compile error at ...`, `Error...`, then the message), and the constraints of an unsatisfiable core give their position (`x < 2 (model.cfr:4:7)`, previously `(line 4, column 7)`). The command `c` (`claferModel`) shows each file under its name, with the numbers of its lines.
 * Instances show the clafers' names from the model instead of names derived from their UIDs, which differ for names with apostrophes (`same'` has the UID `c0_same__prime__`). This also applies to the clafer names in scope messages.
 
 ##### ClaferIG Version 0.5.3, Oct 15, 2026
