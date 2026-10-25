@@ -1,4 +1,4 @@
-##### ClaferIG Version 0.5.4, unreleased
+##### ClaferIG Version 0.5.4, Oct 25, 2026
 
 Minor release with Clafer 0.5.4.
 
@@ -8,6 +8,7 @@ Minor release with Clafer 0.5.4.
 * Positions are given as `file.cfr:line:column`, the file in which they are, also in a model of one file: errors are reported as by the compiler (`Parse failed at model.cfr:3:5...`, `Compile error at ...`, `Error...`, then the message), and the constraints of an unsatisfiable core give their position (`x < 2 (model.cfr:4:7)`, previously `(line 4, column 7)`). The command `c` (`claferModel`) shows each file under its name, with the numbers of its lines.
 * The command `c` (`claferModel`) shows the scope of the model's first clafer; its line had no scope, and the line of its first child showed the first clafer's scope instead of the child's.
 * Instances show the clafers' names from the model instead of names derived from their UIDs, which differ for names with apostrophes (`same'` has the UID `c0_same__prime__`). This also applies to the clafer names in scope messages.
+* [Release](https://github.com/gsdlab/claferIG/pull/38)
 
 ##### ClaferIG Version 0.5.3, Oct 15, 2026
 
