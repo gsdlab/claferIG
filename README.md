@@ -144,6 +144,17 @@ Common flags:
                                                files with --import in its //#
                                                OPTIONS directive, relative to
                                                its own folder or URL.
+     --import-root=DIR                         Allow only local imports
+                                               inside DIR, after resolving '..'
+                                               and symbolic links (command line
+                                               only). Can be repeated.
+     --public-imports                          Allow only URL imports from
+                                               public addresses (command line
+                                               only).
+     --import-base=URL                         The URL from which the model's
+                                               text was read: its imports are
+                                               relative to the URL (command
+                                               line only).
      --alloysolution=FILE                      Convert Alloy solution to a
                                                Clafer solution.
   -b --bitwidth=INTEGER                        Set the bitwidth for integers.

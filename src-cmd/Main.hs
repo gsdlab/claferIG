@@ -52,6 +52,9 @@ claferIGArgsDef = IGArgs {
     saveDir                     = def &= help "Specify the directory for storing saved files." &= typ "FILE",
     bitwidth                    = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER", -- Default bitwidth is 4.
     maxInt                      = 7 &= help "Set the bitwidth for integers based on the largest required number. Overrides --bitwidth argument." &= typ "INTEGER",
+    import_root_comp            = def &= help "Allow only local imports inside DIR, after resolving '..' and symbolic links (command line only). Can be repeated." &= typDir &= explicit &= name "import-root",
+    public_imports_comp         = def &= help "Allow only URL imports from public addresses (command line only)." &= explicit &= name "public-imports",
+    import_base_comp            = def &= help "The URL from which the model's text was read: its imports are relative to the URL (command line only)." &= typ "URL" &= explicit &= name "import-base",
     alloySolution               = def &= help "Convert Alloy solution to a Clafer solution." &= typ "FILE",
     claferModelFile             = def &= argPos 0 &= typ "FILE",
     imports_comp                = def &= help "Compile the model together with the given file or URL, which is relative to the current directory. A model also imports files with --import in its //# OPTIONS directive, relative to its own folder or URL." &= typFile &= explicit &= name "import",

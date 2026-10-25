@@ -101,6 +101,9 @@ data IGArgs = IGArgs {
     saveDir :: Maybe FilePath,
     claferModelFile :: FilePath,
     imports_comp :: [FilePath],
+    import_root_comp :: [FilePath],
+    public_imports_comp :: Bool,
+    import_base_comp :: String,
     alloySolution :: FilePath,
     bitwidth :: Integer,
     maxInt :: Integer,
@@ -245,7 +248,7 @@ load                 igArgs    =
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
     -- the options given to claferIG take precedence over the files' options
-    claferArgs = defaultClaferArgs{file = claferFile', imports = imports_comp igArgs, flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
+    claferArgs = defaultClaferArgs{file = claferFile', imports = imports_comp igArgs, import_root = import_root_comp igArgs, public_imports = public_imports_comp igArgs, import_base = import_base_comp igArgs, flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
     claferFile' = claferModelFile igArgs
     -- the bitwidth required to store the given integer
     requiredBitwidth :: Integer -> Integer
