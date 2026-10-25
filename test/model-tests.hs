@@ -28,6 +28,7 @@ import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLine
 import Control.Monad
 import Control.Monad.IO.Class
+import Data.List (isInfixOf)
 import Data.Maybe
 import Data.IORef
 import System.Directory
@@ -49,6 +50,7 @@ claferIGArgsDef = IGArgs {
     all             = def,
     saveDir         = def,
     claferModelFile = def,
+    imports_comp    = def,
     alloySolution   = def,
     bitwidth        = 4,
     maxInt          = 7,
@@ -105,3 +107,19 @@ case_strMapCheck = do
             valueCheck (Just (AliasValue _)) = False
             valueCheck (Just (IntValue _)) = False
             valueCheck (Just (StringValue _)) = True
+
+-- A model importing a file with --import in its //# OPTIONS directive; an error in the
+-- imported file names it.
+case_Imports :: Assertion
+case_Imports = do
+        dir <- (</> "claferIG-test-imports") <$> getTemporaryDirectory
+        createDirectoryIfMissing True dir
+        writeFile (dir </> "lib.cfr") "abstract Lib\n    x : integer\n    [ x = 3 ]\n"
+        writeFile (dir </> "model.cfr") "//# OPTIONS --import=lib.cfr\nA : Lib\n"
+        instance' <- getModel $ dir </> "model.cfr"
+        ("x -> 3" `isInfixOf` show (modelInstance $ fromRight instance')) @? "The instance has the imported clafer's value"
+        writeFile (dir </> "lib.cfr") "abstract Lib\n    x : integer\n    [ x = y ]\n"
+        result <- getModel $ dir </> "model.cfr"
+        case result of
+            Left errs -> ("lib.cfr:3:11" `isInfixOf` show errs) @? ("The error names the imported file: " ++ show errs)
+            Right _   -> assertFailure "The error in the imported file is not reported"

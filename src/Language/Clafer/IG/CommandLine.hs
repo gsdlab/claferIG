@@ -342,21 +342,21 @@ runCommandLine =
         do
             globalScope <- lift getGlobalScope
             originalScopes <- lift getScopes
-            claferIGArgs' <- lift getClaferIGArgs
+            modelFileName <- lift getModelFileName
             qNameMaps' <- lift getQNameMaps
             let
                 globalScopeTuple = ("", globalScope)
                 -- remove the "this/" prefix
                 uidScopes = globalScopeTuple : (map (\(sigName, value) -> (drop 5 sigName, value)) originalScopes)
-            liftIO $ writeCfrScopeFile uidScopes qNameMaps' $ claferModelFile claferIGArgs'
+            liftIO $ writeCfrScopeFile uidScopes qNameMaps' modelFileName
             outputStrLn "Scopes saved to the `.cfr-scope` file."
             nextLoop context
 
     loop LoadScopes context =
         do
-            claferIGArgs' <- lift getClaferIGArgs
+            modelFileName <- lift getModelFileName
             qNameMaps' <- lift getQNameMaps
-            maybeUidScopes <- liftIO $ readCfrScopeFile qNameMaps' $ claferModelFile claferIGArgs'
+            maybeUidScopes <- liftIO $ readCfrScopeFile qNameMaps' modelFileName
             case maybeUidScopes of
                 Nothing -> do
                     outputStrLn "The `.cfr-scope` file does not exist. Use the command `saveScopes` to create one."
@@ -493,9 +493,8 @@ runCommandLine =
     save :: MonadIO m => [ClaferModel] -> Integer -> InputT (ClaferIGT m) ()
     save [] _ = return ()
     save (c:cs) counter = do
-        claferIGArgs' <- lift $ getClaferIGArgs
+        claferModelFile' <- lift getModelFileName
         let
-            claferModelFile' = claferModelFile claferIGArgs'
             saveName = claferModelFile' ++ "." ++ (show counter) ++ ".data"
         liftIO $ writeFile saveName (show c)
         outputStrLn $ "Saved to " ++ saveName

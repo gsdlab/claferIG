@@ -54,6 +54,7 @@ claferIGArgsDef = IGArgs {
     maxInt                      = 7 &= help "Set the bitwidth for integers based on the largest required number. Overrides --bitwidth argument." &= typ "INTEGER",
     alloySolution               = def &= help "Convert Alloy solution to a Clafer solution." &= typ "FILE",
     claferModelFile             = def &= argPos 0 &= typ "FILE",
+    imports_comp                = def &= help "Compile the model together with the given file or URL, which is relative to the current directory. A model also imports files with --import in its //# OPTIONS directive, relative to its own folder or URL." &= typFile &= explicit &= name "import",
     useUids                     = False &= help "Use unique clafer names in the Clafer solution.",
     addTypes                    = False &= help "Add colon/reference types to the Clafer solution.",
     json                        = False &= help "Render solution as JSON (forces 'addUids').",
@@ -101,8 +102,8 @@ main =
 runClaferIG :: IGArgs -> IO (Either ClaferErrs ())
 runClaferIG args' =
     runClaferIGT args' $ do
-        let claferModelFileName = claferModelFile args'
-        cModel <- liftIO $ strictReadFile claferModelFileName
+        claferModelFileName <- getModelFileName
+        cModel <- getClaferModel
         if null cModel
         then error "Cannot instantiate an empty model."
         else liftIO $ putStrLn "Compiling the Clafer model..."
@@ -151,8 +152,7 @@ runClaferIG args' =
 runAlloySolution :: IGArgs -> IO (Either ClaferErrs ())
 runAlloySolution args' =
     runClaferIGT args' $ do
-        let claferModelFileName = claferModelFile args'
-        cModel <- liftIO $ strictReadFile claferModelFileName
+        cModel <- getClaferModel
         when (cModel == "") $ error $ "Cannot convert Alloy solution without the Clafer model from which the instance was created.\n"
                                    ++ "Usage: claferIG [OPTIONS] <model.cfr> --alloy-solution=<instance.xml>\n"
         alloyInstance <- liftIO $ strictReadFile $ alloySolution args' -- It's an Alloy XML file in this case

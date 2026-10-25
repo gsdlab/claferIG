@@ -126,17 +126,25 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG v0.5.4
+ClaferIG 0.5.4
 
-claferIG [OPTIONS] [FILE]
+claferig [OPTIONS] FILE
 
 Common flags:
-     --all=INT                                 Saves all instances up to the
-                                               provided scope or a
-                                               counterexample.
+     --all[=INTEGER]                           Saves all instances or a
+                                               counterexample. Reads scopes
+                                               from a `.cfr.scope` file or uses
+                                               the provided global scope.
      --savedir=FILE                            Specify the directory for
                                                storing saved files.
-     --alloysolution                           Convert Alloy solution to a
+     --import=FILE                             Compile the model together
+                                               with the given file or URL,
+                                               which is relative to the current
+                                               directory. A model also imports
+                                               files with --import in its //#
+                                               OPTIONS directive, relative to
+                                               its own folder or URL.
+     --alloysolution=FILE                      Convert Alloy solution to a
                                                Clafer solution.
   -b --bitwidth=INTEGER                        Set the bitwidth for integers.
   -m --maxint=INTEGER                          Set the bitwidth for integers
@@ -150,8 +158,7 @@ Common flags:
   -j --json                                    Render solution as JSON
                                                (forces 'addUids').
   -i --flatten-inheritance-comp                Flatten inheritance during
-                                               compiling ('alloy' and 'Alloy'
-                                               modes only)
+                                               compiling ('alloy' mode only)
   -l --no-layout-comp                          Don't resolve off-side rule
                                                layout during compiling
   -c --check-duplicates-comp                   Check duplicated clafer names
@@ -159,10 +166,11 @@ Common flags:
   -f --skip-resolver-comp                      Skip name resolution during
                                                compiling
      --ss=SCOPESTRATEGY --scope-strategy-comp  Use scope computation strategy
-                                               during compiling: none or simple
-                                               (default).
+                                               during compiling: none, simple
+                                               (default), or full.
   -? --help                                    Display help message
   -V --version                                 Print version information
+     --numeric-version                         Print just the version number
 ```
 
 `claferIG <model file name>.cfr`
@@ -172,6 +180,17 @@ Common flags:
 `claferIG <model file name>.cfr -all <scope>`
 
 - opens a non-interactive session and saves all instances up to the provided scope or a counterexample to files named `<model file name>.cfr.<instance number>.data`, one instance per file.
+
+### Models in several files
+
+A model can import other files, as with the Clafer compiler: `--import=FILE` in the model's `//# OPTIONS` directive, relative to the model's folder, or on the command line, relative to the current directory. The files and their imports are compiled together as one model. A model and its imports can also be URLs (`http://`, `https://`). See [Models in several files](https://github.com/gsdlab/clafer#models-in-several-files) in the compiler's README.
+
+```
+//# OPTIONS --import=products.cfr
+MyPhone : Phone
+```
+
+`claferIG MyPhone.cfr` generates the instances of `MyPhone.cfr` with the clafers of `products.cfr`. The other options of the directives (e.g., `--maxint`, `--no-layout`) apply too, and an error names the file in which it is (`products.cfr:3:11`).
 
 ## Interactive Session Usage
 

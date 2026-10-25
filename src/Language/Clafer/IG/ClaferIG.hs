@@ -30,6 +30,8 @@ module Language.Clafer.IG.ClaferIG (
     getClaferIGArgs,
     getConstraints,
     getClaferModel,
+    getModelFiles,
+    getModelFileName,
     getStrMap,
     getUIDIClaferMap,
     ClaferIGT(..),
@@ -63,6 +65,7 @@ module Language.Clafer.IG.ClaferIG (
 
 import Language.Clafer
 import Language.Clafer.Common
+import Language.Clafer.Import (ModelFile, readModel, modelText, modelPosition)
 import Language.Clafer.QNameUID
 import Language.ClaferT
 import Language.Clafer.Intermediate.Intclafer
@@ -97,6 +100,7 @@ data IGArgs = IGArgs {
     all :: Maybe Integer,
     saveDir :: Maybe FilePath,
     claferModelFile :: FilePath,
+    imports_comp :: [FilePath],
     alloySolution :: FilePath,
     bitwidth :: Integer,
     maxInt :: Integer,
@@ -143,6 +147,8 @@ data ClaferIGEnv = ClaferIGEnv{
     claferIGArgs :: IGArgs,
     constraints:: [Constraint],
     claferModel:: String,
+    modelFiles :: [ModelFile],
+    modelFileName :: FilePath,
     qNameMaps :: QNameMaps,
     info :: UIDIClaferMap,
     strMap :: Map Int String,
@@ -172,15 +178,29 @@ getConstraints = fetches constraints
 getClaferModel :: Monad m => ClaferIGT m String
 getClaferModel = fetches claferModel
 
+-- | The files of the model: the imported files, then the model.
+getModelFiles :: Monad m => ClaferIGT m [ModelFile]
+getModelFiles = fetches modelFiles
+
+-- | The name of the model's file, which names the saved files: for a model read from a URL,
+--   the last segment of the URL.
+getModelFileName :: Monad m => ClaferIGT m FilePath
+getModelFileName = fetches modelFileName
+
 getStrMap :: Monad m => ClaferIGT m (Map Int String)
 getStrMap = fetches strMap
 
 load :: MonadIO m => IGArgs -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
 load                 igArgs    =
     runExceptT $ do
-        claferModel <- liftIO $ strictReadFile claferFile'
+        when (null claferFile') $ throwError $ ClaferErrs [ClaferErr "Provide the file name or URL of a Clafer model."]
+        -- the model, the files it imports, and the options of all of them
+        (claferArgs', modelFiles') <- ExceptT $ liftIO $ either (Left . ClaferErrs . (:[]) . ClaferErr) Right <$> readModel claferArgs
+        let claferModel = modelText modelFiles'
+            -- the integer range of the options (--maxint, --minint) raises the bitwidth
+            bitwidth' = maximum $ bitwidth igArgs : map requiredBitwidth (catMaybes [maxint claferArgs', (\n -> -n - 1) <$> minint claferArgs'])
 
-        (claferEnv', alloyModel, mapping, sMap) <- ExceptT $ return $ callClaferTranslator claferModel
+        (claferEnv', alloyModel, mapping, sMap) <- ExceptT $ return $ mapLeft (inFiles modelFiles') $ callClaferTranslator claferArgs' claferModel
 
         let
             (ir, genv', _) = fromJust $ cIr claferEnv'
@@ -194,7 +214,7 @@ load                 igArgs    =
         let uidIClaferMap' = uidClaferMap genv'
         let irTrace = editMap $ irModuleTrace claferEnv'
 
-        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel qNameMaps uidIClaferMap' sMap irTrace
+        return $ ClaferIGEnv claferEnv' igArgs{bitwidth = bitwidth'} constraints claferModel modelFiles' (file claferArgs') qNameMaps uidIClaferMap' sMap irTrace
     where
     editMap :: Map.Map Span [Ir] -> Map.Map Integer String -- Map Line Number to Clafer Name
     editMap =
@@ -208,8 +228,8 @@ load                 igArgs    =
     removeConstraints :: [(Integer, String)] -> [(Integer, String)]
     removeConstraints = map swap . reverse . toList . fromList . reverse . map swap
 
-    callClaferTranslator code =
-        mapLeft ClaferErrs $ runClafer claferArgs $ do
+    callClaferTranslator claferArgs' code =
+        mapLeft ClaferErrs $ runClafer claferArgs'{mode = [Alloy], keep_unused = True, no_stats = True} $ do
             addModuleFragment code
             parse
             iModule <- desugar Nothing
@@ -224,9 +244,22 @@ load                 igArgs    =
                     else return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
-    claferArgs = defaultClaferArgs{mode = [Alloy], keep_unused = True, no_stats = True,flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
+    -- the options given to claferIG take precedence over the files' options
+    claferArgs = defaultClaferArgs{file = claferFile', imports = imports_comp igArgs, flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
     claferFile' = claferModelFile igArgs
-    bitwidth' = bitwidth igArgs
+    -- the bitwidth required to store the given integer
+    requiredBitwidth :: Integer -> Integer
+    requiredBitwidth n = ceiling $ logBase (2 :: Double) $ fromInteger $ 2 * n + 1
+
+-- | In a model with imports, the errors give the file and the position in it (@a.cfr:3:5@).
+inFiles :: [ModelFile] -> ClaferErrs -> ClaferErrs
+inFiles [_] errs = errs
+inFiles files (ClaferErrs errs) = ClaferErrs $ map inFile errs
+    where
+    inFile (ParseErr ErrPos{modelPos = Pos l c} msg') = ClaferErr $ "Parse error at " ++ at l c ++ ":\n    " ++ msg'
+    inFile (SemanticErr ErrPos{modelPos = Pos l c} msg') = ClaferErr $ "Error at " ++ at l c ++ ":\n    " ++ msg'
+    inFile err = err
+    at l c = let (path, l') = modelPosition files l in path ++ ":" ++ show l' ++ ":" ++ show c
 
 
 strictReadFile :: FilePath -> IO String
