@@ -30,6 +30,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Data.List (isInfixOf, isPrefixOf, isSuffixOf)
 import Language.Clafer.IG.Constraints
+import qualified Data.Map as Map
 import Data.Maybe
 import Data.IORef
 import System.Directory
@@ -139,3 +140,15 @@ case_ImportsUnsatCore = do
                 any ("y > 2 (" `isPrefixOf`) shown && any ("lib2.cfr:3:7)" `isSuffixOf`) shown @? ("The core names lib2.cfr: " ++ show shown)
                 any ("B.y < 2 (" `isPrefixOf`) shown && any ("unsat.cfr:2:3)" `isSuffixOf`) shown @? ("The core names unsat.cfr: " ++ show shown)
             _ -> assertFailure "The model has no unsatisfiable core"
+
+-- The command c shows the scope of every clafer, also of the first one: the line of each
+-- clafer's declaration names the clafer.
+case_LineNumMapFirstClafer :: Assertion
+case_LineNumMapFirstClafer = do
+        dir <- (</> "claferIG-test-imports") <$> getTemporaryDirectory
+        createDirectoryIfMissing True dir
+        writeFile (dir </> "lines.cfr") "B\n    y : integer\n    [ y > 2 ]\nC\n"
+        result <- runClaferIGT (defaultIGArgs $ dir </> "lines.cfr") getlineNumMap
+        case result of
+            Right lineNumMap -> Map.toList lineNumMap @?= [(1, "c0_B"), (2, "c0_y"), (4, "c0_C")]
+            Left errs -> assertFailure $ show errs

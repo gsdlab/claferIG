@@ -220,7 +220,7 @@ load                 igArgs    =
     editMap =
         fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case getIClafer ir of
             Just (IClafer _ _ _ _ uid' _ _ _ _ _ _) -> (num, uid') : acc
-            _ -> acc) [] . tail . (Data.List.foldr (\((Span (Pos l1 _) (Pos l2 _)), irs) acc -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc) []) . toList
+            _ -> acc) [] . (Data.List.foldr (\((Span (Pos l1 _) (Pos l2 _)), irs) acc -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc) []) . toList
     getIClafer :: [Ir] -> Maybe IClafer
     getIClafer [] = Nothing
     getIClafer ((IRClafer c):_) = Just c
