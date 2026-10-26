@@ -29,6 +29,7 @@ import Data.Maybe
 import Data.Ord
 import Language.Clafer
 import Language.Clafer.Front.AbsClafer (Span(..))
+import Language.Clafer.Import (ModelFile, modelText, modelPosition)
 import Language.Clafer.Intermediate.Intclafer
 import qualified Language.Clafer.Intermediate.Intclafer as I
 
@@ -60,10 +61,12 @@ instance Show ClaferInfo where
     show (ClaferInfo uniqueId cardinality) = uniqueId ++ " " ++ show cardinality
 
 
-data ConstraintInfo = ConstraintInfo {pId::String, pos::Span, syntax::String} deriving Eq
+-- | A constraint of the model: its position in the complete model, its text, and its position
+--   as shown, the file and the position in it (@file.cfr:3:5@).
+data ConstraintInfo = ConstraintInfo {pId::String, pos::Span, syntax::String, position::String} deriving Eq
 
 instance Show ConstraintInfo where
-    show ConstraintInfo{pos = Span (Pos l c) _, syntax} = syntax ++ " (line " ++ show l ++ ", column " ++ show c ++ ")"
+    show ConstraintInfo{syntax, position} = syntax ++ " (" ++ position ++ ")"
 
 isLowerCardinalityConstraint :: Constraint -> Bool
 isLowerCardinalityConstraint LowerCardinalityConstraint{} = True
@@ -88,14 +91,14 @@ lookupConstraint constraint' constraints =
         cs -> minimumBy (comparing $ to . range) cs
 
 
-parseConstraints :: String -> IModule -> [(Span, IrTrace)] -> [Constraint]
-parseConstraints claferModel imodule mapping =
+parseConstraints :: [ModelFile] -> IModule -> [(Span, IrTrace)] -> [Constraint]
+parseConstraints modelFiles imodule mapping =
     mapMaybe (uncurry convert) mapping
     where
     clafers = _mDecls imodule >>= subclafers
     pexps = (mapMaybe constraint $ _mDecls imodule ++ concatMap _elements clafers) >>= subexpressions
     convert s IrPExp{pUid} =
-        Just $ UserConstraint s $ ConstraintInfo pUid (_inPos $ findPExp pUid) $ extract $ _inPos $ findPExp pUid
+        Just $ UserConstraint s $ ConstraintInfo pUid (_inPos $ findPExp pUid) (extract $ _inPos $ findPExp pUid) (showPosition $ _inPos $ findPExp pUid)
     convert s LowerCard{pUid, isGroup = False} =
         Just $ LowerCardinalityConstraint s $ claferInfo pUid
     convert s UpperCard{pUid, isGroup = False} =
@@ -106,7 +109,8 @@ parseConstraints claferModel imodule mapping =
 
     findPExp pUid   = fromMaybe (error $ "Unknown constraint " ++ pUid) $ find ((== pUid) . _pid) pexps
     findClafer pUid = fromMaybe (error $ "Unknown clafer " ++ pUid) $ find ((== pUid) . _uid) clafers
-    text = lines claferModel
+    text = lines $ modelText modelFiles
+    showPosition (Span (Pos l c) _) = let (path, l') = modelPosition modelFiles l in path ++ ":" ++ show l' ++ ":" ++ show c
     extract (Span (Pos l1 c1) (Pos l2 c2))
         | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
         | otherwise = unlines $ f1 : fs ++ [fn]

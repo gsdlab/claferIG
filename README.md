@@ -1,6 +1,6 @@
 # Clafer Instance Generator
 
-##### v0.5.3
+##### v0.5.4
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model.
 
@@ -22,7 +22,7 @@ Clafer can be installed from a binary distribution (preferred), from Hackage, an
 
 Regardless of the installation method, the following are required:
 
-* [Clafer](https://github.com/gsdlab/clafer) v0.5.3
+* [Clafer](https://github.com/gsdlab/clafer) v0.5.4
 * [Java Platform (JDK)](https://adoptium.net) v17+, 64bit
 * [Alloy 6.2.0](https://github.com/AlloyTools/org.alloytools.alloy/releases/tag/v6.2.0) (`alloy6.2.0.jar`)
   * it includes the MiniSat solver with UnSAT cores for Linux and macOS; on Windows, ClaferIG generates instances but cannot compute UnSAT cores and near-miss instances
@@ -30,7 +30,7 @@ Regardless of the installation method, the following are required:
 
 ### Installation from binaries
 
-Binary distributions of the release 0.5.3 of Clafer Tools for Windows, Mac, and Linux,
+Binary distributions of the release 0.5.4 of Clafer Tools for Windows, Mac, and Linux,
 can be downloaded from [Clafer Tools - Binary Distributions](http://wiselab.uwaterloo.ca/clafer-tools-binary-distributions).
 
 1. download the binaries and unpack `<target directory>` of your choice,
@@ -38,7 +38,7 @@ can be downloaded from [Clafer Tools - Binary Distributions](http://wiselab.uwat
 
 ### Installation From Hackage
 
-Clafer is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.5.3/) and it can be installed using either [`stack`](https://github.com/commercialhaskell/stack) or [`cabal-install`](https://hackage.haskell.org/package/cabal-install).
+Clafer is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.5.4/) and it can be installed using either [`stack`](https://github.com/commercialhaskell/stack) or [`cabal-install`](https://hackage.haskell.org/package/cabal-install).
 
 #### Installation using `stack`
 
@@ -61,7 +61,7 @@ Dependencies
 1. Install GHC
 2. `cabal update`
 3. `cabal install claferIG`
-4. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\x86_64-windows-ghc-9.6.7\claferIG-0.5.3` on Windows or `.cabal/share/x86_64-linux-ghc-9.6.7/claferIG-0.5.3/` on Linux)
+4. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\x86_64-windows-ghc-9.6.7\claferIG-0.5.4` on Windows or `.cabal/share/x86_64-linux-ghc-9.6.7/claferIG-0.5.4/` on Linux)
 5. to automatically download alloy6.2.0.jar
   * execute `make alloy6.2.0.jar`
 6. copy the following into the Cabal's `bin` folder
@@ -108,18 +108,14 @@ Development versions from branches `develop` should work well together but this 
 1. execute `make install to=<target directory>`
 
 #### Note:
-> On Windows, use `/` with the `make` command instead of `\`, e.g., `make install to=/c/clafer-tools-0.5.3/`
+> On Windows, use `/` with the `make` command instead of `\`, e.g., `make install to=/c/clafer-tools-0.5.4/`
 
 
-## Integration with Sublime Text 2/3
+## Integration with text editors
 
-
-See [ClaferToolsST](https://github.com/gsdlab/ClaferToolsST)
-
-## Integration with VIM
-
-
-See [clafer-vim](https://github.com/wasowski/clafer-vim)
+* VS Code: [clafer-vscode](https://github.com/gsdlab/clafer-vscode)
+* Sublime Text 4: [ClaferToolsST](https://github.com/gsdlab/ClaferToolsST)
+* VIM: [clafer-vim](https://github.com/wasowski/clafer-vim)
 
 # Usage
 
@@ -130,17 +126,36 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG v0.5.3
+ClaferIG 0.5.4
 
-claferIG [OPTIONS] [FILE]
+claferig [OPTIONS] FILE
 
 Common flags:
-     --all=INT                                 Saves all instances up to the
-                                               provided scope or a
-                                               counterexample.
+     --all[=INTEGER]                           Saves all instances or a
+                                               counterexample. Reads scopes
+                                               from a `.cfr.scope` file or uses
+                                               the provided global scope.
      --savedir=FILE                            Specify the directory for
                                                storing saved files.
-     --alloysolution                           Convert Alloy solution to a
+     --import=FILE                             Compile the model together
+                                               with the given file or URL,
+                                               which is relative to the current
+                                               directory. A model also imports
+                                               files with --import in its //#
+                                               OPTIONS directive, relative to
+                                               its own folder or URL.
+     --import-root=DIR                         Allow only local imports
+                                               inside DIR, after resolving '..'
+                                               and symbolic links (command line
+                                               only). Can be repeated.
+     --public-imports                          Allow only URL imports from
+                                               public addresses (command line
+                                               only).
+     --import-base=URL                         The URL from which the model's
+                                               text was read: its imports are
+                                               relative to the URL (command
+                                               line only).
+     --alloysolution=FILE                      Convert Alloy solution to a
                                                Clafer solution.
   -b --bitwidth=INTEGER                        Set the bitwidth for integers.
   -m --maxint=INTEGER                          Set the bitwidth for integers
@@ -154,8 +169,7 @@ Common flags:
   -j --json                                    Render solution as JSON
                                                (forces 'addUids').
   -i --flatten-inheritance-comp                Flatten inheritance during
-                                               compiling ('alloy' and 'Alloy'
-                                               modes only)
+                                               compiling ('alloy' mode only)
   -l --no-layout-comp                          Don't resolve off-side rule
                                                layout during compiling
   -c --check-duplicates-comp                   Check duplicated clafer names
@@ -163,10 +177,11 @@ Common flags:
   -f --skip-resolver-comp                      Skip name resolution during
                                                compiling
      --ss=SCOPESTRATEGY --scope-strategy-comp  Use scope computation strategy
-                                               during compiling: none or simple
-                                               (default).
+                                               during compiling: none, simple
+                                               (default), or full.
   -? --help                                    Display help message
   -V --version                                 Print version information
+     --numeric-version                         Print just the version number
 ```
 
 `claferIG <model file name>.cfr`
@@ -177,12 +192,23 @@ Common flags:
 
 - opens a non-interactive session and saves all instances up to the provided scope or a counterexample to files named `<model file name>.cfr.<instance number>.data`, one instance per file.
 
+### Models in several files
+
+A model can import other files, as with the Clafer compiler: `--import=FILE` in the model's `//# OPTIONS` directive, relative to the model's folder, or on the command line, relative to the current directory. The files and their imports are compiled together as one model. A model and its imports can also be URLs (`http://`, `https://`). See [Models in several files](https://github.com/gsdlab/clafer#models-in-several-files) in the compiler's README.
+
+```
+//# OPTIONS --import=products.cfr
+MyPhone : Phone
+```
+
+`claferIG MyPhone.cfr` generates the instances of `MyPhone.cfr` with the clafers of `products.cfr`. The other options of the directives (e.g., `--maxint`, `--no-layout`) apply too, and an error names the file in which it is (`products.cfr:3:11`).
+
 ## Interactive Session Usage
 
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
 ```
-ClaferIG v0.5.3
+ClaferIG v0.5.4
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands

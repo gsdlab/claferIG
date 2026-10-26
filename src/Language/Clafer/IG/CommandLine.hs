@@ -29,6 +29,7 @@ import Language.Clafer
 import Language.ClaferT
 import Language.Clafer.Intermediate.Intclafer
 import Language.Clafer.IG.ClaferIG
+import Language.Clafer.Import (modelPosition)
 import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLineParser
 import Language.Clafer.IG.Constraints
@@ -260,7 +261,9 @@ runCommandLine =
                 printBitwidthWarning newBw
 
             oldScopes <- lift getScopes
-            mapM_ ( \(sigName', val') -> setAlloyScopeAndBitwidth bitwidth' (max 1 $ val'+inc') (sigToClaferName sigName') sigName') oldScopes
+            mapM_ ( \(sigName', val') -> do
+                        claferName' <- lift $ claferNameOfSig sigName'
+                        setAlloyScopeAndBitwidth bitwidth' (max 1 $ val'+inc') claferName' sigName') oldScopes
             lift solve
             outputStrLn ("Global scope changed to " ++ show newGlobalScope)
             nextLoop context
@@ -340,21 +343,21 @@ runCommandLine =
         do
             globalScope <- lift getGlobalScope
             originalScopes <- lift getScopes
-            claferIGArgs' <- lift getClaferIGArgs
+            modelFileName <- lift getModelFileName
             qNameMaps' <- lift getQNameMaps
             let
                 globalScopeTuple = ("", globalScope)
                 -- remove the "this/" prefix
                 uidScopes = globalScopeTuple : (map (\(sigName, value) -> (drop 5 sigName, value)) originalScopes)
-            liftIO $ writeCfrScopeFile uidScopes qNameMaps' $ claferModelFile claferIGArgs'
+            liftIO $ writeCfrScopeFile uidScopes qNameMaps' modelFileName
             outputStrLn "Scopes saved to the `.cfr-scope` file."
             nextLoop context
 
     loop LoadScopes context =
         do
-            claferIGArgs' <- lift getClaferIGArgs
+            modelFileName <- lift getModelFileName
             qNameMaps' <- lift getQNameMaps
-            maybeUidScopes <- liftIO $ readCfrScopeFile qNameMaps' $ claferModelFile claferIGArgs'
+            maybeUidScopes <- liftIO $ readCfrScopeFile qNameMaps' modelFileName
             case maybeUidScopes of
                 Nothing -> do
                     outputStrLn "The `.cfr-scope` file does not exist. Use the command `saveScopes` to create one."
@@ -400,30 +403,35 @@ runCommandLine =
             let unSATs = map getConstraintInfo $ catMaybes $ findRemovable env core constraints'
 
             claferModel <- lift getClaferModel
+            modelFiles' <- lift getModelFiles
             let commentLines = getCommentLines claferModel
             lineNumMap <- lift getlineNumMap
 
 
-            outputStrLn $ editModel claferModel commentLines unSATs lineNumMap scopesMap
+            outputStrLn $ editModel claferModel commentLines unSATs lineNumMap scopesMap modelFiles'
             nextLoop context
             where
-                editModel :: String -> [Integer] -> [String] -> (Map.Map Integer String) -> (Map.Map String Integer) -> String
-                editModel model cLines unSATs lineNumMap scopesMap' =
+                -- the lines of the model: each file under its name, with the numbers of its lines
+                editModel model cLines unSATs lineNumMap scopesMap' modelFiles' =
                     let
                         claferLines = lines $ removeCommentsAndUnify model
                         maxLineLength = maximum $ map length claferLines
-                    in unlines $ editLines cLines unSATs (numberOfDigits $ length claferLines) maxLineLength scopesMap' lineNumMap (zip [1..] claferLines)
+                        shown = [ (modelPosition modelFiles' num, num, l) | (num, l) <- zip [1..] claferLines, not (num `elem` cLines && isEmptyLine l) ]
+                        header ((path, _), _, _) previous
+                            | fmap (\((p, _), _, _) -> p) previous == Just path = []
+                            | otherwise = ["--- " ++ path]
+                    in unlines $ concat $ zipWith (\line' previous -> header line' previous ++ [editLine unSATs (numberOfDigits $ length claferLines) maxLineLength scopesMap' lineNumMap line']) shown (Nothing : map Just shown)
 
-                editLines :: [Integer] -> [String] -> Int -> Int -> (Map.Map String Integer) -> (Map.Map Integer String) -> [(Integer, String)] -> [String]
-                editLines _ _ _ _ _ _ [] = []
-                editLines cLines unSATs m1 m2 scopesMap' lineNumMap ((num, l):rest) =
-                    if (num `elem` cLines && isEmptyLine l)
-                        then editLines cLines unSATs m1 m2 scopesMap' lineNumMap rest
-                        else (show num ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral num)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal scopesMap' (Map.lookup num lineNumMap)))
-                        : editLines cLines unSATs m1 m2 scopesMap' lineNumMap rest
+                editLine :: [(Maybe Integer, String)] -> Int -> Int -> (Map.Map String Integer) -> (Map.Map Integer String) -> ((FilePath, Integer), Integer, String) -> String
+                editLine unSATs m1 m2 scopesMap' lineNumMap ((_, fileNum), num, l) =
+                    show fileNum ++ "." ++ (replicate (1 + m1 - (numberOfDigits $ fromIntegral fileNum)) ' ') ++ (if (isUnSAT unSATs l num) then "> " else "| ") ++ l ++ (replicate (3 + m2 - (length l)) ' ') ++ (if (isUnSAT unSATs l num) then "<UnSAT " else "|      ") ++ (addScopeVal scopesMap' (Map.lookup num lineNumMap))
 
-                isUnSAT :: [String] -> String -> Integer -> Bool
-                isUnSAT us l ln = getAny $ foldMap (\u -> Any (((safehead $ words u) == (safehead $ words l) && (safehead $ reverse $ words u) == (safehead $ reverse $ words l)) || (u `isInfixOf` l) || ("column" `isInfixOf` u && "line" `isInfixOf` u && (init $ head $ tail $ tail $ reverse $ words u) == show ln))) us
+                -- a constraint with a position is on the line where it starts; a cardinality
+                -- is on the line with the clafer's name and cardinality
+                isUnSAT :: [(Maybe Integer, String)] -> String -> Integer -> Bool
+                isUnSAT us l ln = getAny $ foldMap (\u -> Any $ case u of
+                    (Just line', _) -> line' == ln
+                    (Nothing, u') -> ((safehead $ words u') == (safehead $ words l) && (safehead $ reverse $ words u') == (safehead $ reverse $ words l)) || (u' `isInfixOf` l)) us
                 safehead [] = []
                 safehead x = head x
 
@@ -434,9 +442,9 @@ runCommandLine =
                 getCommentLines :: String -> [Integer]
                 getCommentLines = foldr (\((Span (Pos l1 _) (Pos l2 _)), _) acc -> [l1..l2] ++ acc) [] . getComments
 
-                getConstraintInfo :: Constraint -> String
-                getConstraintInfo (UserConstraint _ info) = show info
-                getConstraintInfo x = show $ claferInfo x
+                getConstraintInfo :: Constraint -> (Maybe Integer, String)
+                getConstraintInfo (UserConstraint _ info@(ConstraintInfo _ (Span (Pos l _) _) _ _)) = (Just l, show info)
+                getConstraintInfo x = (Nothing, show $ claferInfo x)
 
     loop ShowAlloyModel context =
         do
@@ -491,9 +499,8 @@ runCommandLine =
     save :: MonadIO m => [ClaferModel] -> Integer -> InputT (ClaferIGT m) ()
     save [] _ = return ()
     save (c:cs) counter = do
-        claferIGArgs' <- lift $ getClaferIGArgs
+        claferModelFile' <- lift getModelFileName
         let
-            claferModelFile' = claferModelFile claferIGArgs'
             saveName = claferModelFile' ++ "." ++ (show counter) ++ ".data"
         liftIO $ writeFile saveName (show c)
         outputStrLn $ "Saved to " ++ saveName
@@ -621,16 +628,16 @@ autoCompleteDetect error'
     expectedMessages   = mapMaybe expectedMessage messages
 
 
+-- | The errors of loading a model, which give the file and the position in it.
 printError :: ClaferErrs -> [String]
 printError (ClaferErrs errs) =
     map printErr errs
     where
     printErr (ParseErr (ErrPos _ _ (Pos l c)) msg) =
-        "Parse error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
+        "Parse failed at line " ++ show l ++ " column " ++ show c ++ "...\n" ++ msg
     printErr (SemanticErr (ErrPos _ _ (Pos l c)) msg) =
-        "Error at line " ++ show l ++ ", column " ++ show c ++ ":\n    " ++ msg
-    printErr (ClaferErr msg) =
-        "Error:\n    " ++ msg
+        "Compile error at line " ++ show l ++ " column " ++ show c ++ "...\n" ++ msg
+    printErr (ClaferErr msg) = msg
 
 -- only remove the contents while preserving the empty lines
 removeCommentsAndUnify :: String -> String

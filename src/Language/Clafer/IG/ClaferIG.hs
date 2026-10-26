@@ -30,6 +30,8 @@ module Language.Clafer.IG.ClaferIG (
     getClaferIGArgs,
     getConstraints,
     getClaferModel,
+    getModelFiles,
+    getModelFileName,
     getStrMap,
     getUIDIClaferMap,
     ClaferIGT(..),
@@ -58,10 +60,12 @@ module Language.Clafer.IG.ClaferIG (
     fst3,
     getlineNumMap,
     strictReadFile,
-    sigToClaferName) where
+    sigToClaferName,
+    claferNameOfSig) where
 
 import Language.Clafer
 import Language.Clafer.Common
+import Language.Clafer.Import (ModelFile, readModel, modelText, modelPosition)
 import Language.Clafer.QNameUID
 import Language.ClaferT
 import Language.Clafer.Intermediate.Intclafer
@@ -96,6 +100,10 @@ data IGArgs = IGArgs {
     all :: Maybe Integer,
     saveDir :: Maybe FilePath,
     claferModelFile :: FilePath,
+    imports_comp :: [FilePath],
+    import_root_comp :: [FilePath],
+    public_imports_comp :: Bool,
+    import_base_comp :: String,
     alloySolution :: FilePath,
     bitwidth :: Integer,
     maxInt :: Integer,
@@ -142,6 +150,8 @@ data ClaferIGEnv = ClaferIGEnv{
     claferIGArgs :: IGArgs,
     constraints:: [Constraint],
     claferModel:: String,
+    modelFiles :: [ModelFile],
+    modelFileName :: FilePath,
     qNameMaps :: QNameMaps,
     info :: UIDIClaferMap,
     strMap :: Map Int String,
@@ -171,19 +181,33 @@ getConstraints = fetches constraints
 getClaferModel :: Monad m => ClaferIGT m String
 getClaferModel = fetches claferModel
 
+-- | The files of the model: the imported files, then the model.
+getModelFiles :: Monad m => ClaferIGT m [ModelFile]
+getModelFiles = fetches modelFiles
+
+-- | The name of the model's file, which names the saved files: for a model read from a URL,
+--   the last segment of the URL.
+getModelFileName :: Monad m => ClaferIGT m FilePath
+getModelFileName = fetches modelFileName
+
 getStrMap :: Monad m => ClaferIGT m (Map Int String)
 getStrMap = fetches strMap
 
 load :: MonadIO m => IGArgs -> AlloyIGT m (Either ClaferErrs ClaferIGEnv)
 load                 igArgs    =
     runExceptT $ do
-        claferModel <- liftIO $ strictReadFile claferFile'
+        when (null claferFile') $ throwError $ inFiles [] $ ClaferErrs [ClaferErr "Provide the file name or URL of a Clafer model."]
+        -- the model, the files it imports, and the options of all of them
+        (claferArgs', modelFiles') <- ExceptT $ liftIO $ either (Left . inFiles [] . ClaferErrs . (:[]) . ClaferErr) Right <$> readModel claferArgs
+        let claferModel = modelText modelFiles'
+            -- the integer range of the options (--maxint, --minint) raises the bitwidth
+            bitwidth' = maximum $ bitwidth igArgs : map requiredBitwidth (catMaybes [maxint claferArgs', (\n -> -n - 1) <$> minint claferArgs'])
 
-        (claferEnv', alloyModel, mapping, sMap) <- ExceptT $ return $ callClaferTranslator claferModel
+        (claferEnv', alloyModel, mapping, sMap) <- ExceptT $ return $ mapLeft (inFiles modelFiles') $ callClaferTranslator claferArgs' claferModel
 
         let
             (ir, genv', _) = fromJust $ cIr claferEnv'
-        let constraints = parseConstraints claferModel ir mapping
+        let constraints = parseConstraints modelFiles' ir mapping
 
         lift $ AlloyIG.sendLoadCommand alloyModel
         lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
@@ -193,13 +217,13 @@ load                 igArgs    =
         let uidIClaferMap' = uidClaferMap genv'
         let irTrace = editMap $ irModuleTrace claferEnv'
 
-        return $ ClaferIGEnv claferEnv' igArgs constraints claferModel qNameMaps uidIClaferMap' sMap irTrace
+        return $ ClaferIGEnv claferEnv' igArgs{bitwidth = bitwidth'} constraints claferModel modelFiles' (file claferArgs') qNameMaps uidIClaferMap' sMap irTrace
     where
     editMap :: Map.Map Span [Ir] -> Map.Map Integer String -- Map Line Number to Clafer Name
     editMap =
         fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case getIClafer ir of
             Just (IClafer _ _ _ _ uid' _ _ _ _ _ _) -> (num, uid') : acc
-            _ -> acc) [] . tail . (Data.List.foldr (\((Span (Pos l1 _) (Pos l2 _)), irs) acc -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc) []) . toList
+            _ -> acc) [] . (Data.List.foldr (\((Span (Pos l1 _) (Pos l2 _)), irs) acc -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc) []) . toList
     getIClafer :: [Ir] -> Maybe IClafer
     getIClafer [] = Nothing
     getIClafer ((IRClafer c):_) = Just c
@@ -207,8 +231,8 @@ load                 igArgs    =
     removeConstraints :: [(Integer, String)] -> [(Integer, String)]
     removeConstraints = map swap . reverse . toList . fromList . reverse . map swap
 
-    callClaferTranslator code =
-        mapLeft ClaferErrs $ runClafer claferArgs $ do
+    callClaferTranslator claferArgs' code =
+        mapLeft ClaferErrs $ runClafer claferArgs'{mode = [Alloy], keep_unused = True, no_stats = True} $ do
             addModuleFragment code
             parse
             iModule <- desugar Nothing
@@ -223,9 +247,22 @@ load                 igArgs    =
                     else return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
-    claferArgs = defaultClaferArgs{mode = [Alloy], keep_unused = True, no_stats = True,flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
+    -- the options given to claferIG take precedence over the files' options
+    claferArgs = defaultClaferArgs{file = claferFile', imports = imports_comp igArgs, import_root = import_root_comp igArgs, public_imports = public_imports_comp igArgs, import_base = import_base_comp igArgs, flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
     claferFile' = claferModelFile igArgs
-    bitwidth' = bitwidth igArgs
+    -- the bitwidth required to store the given integer
+    requiredBitwidth :: Integer -> Integer
+    requiredBitwidth n = ceiling $ logBase (2 :: Double) $ fromInteger $ 2 * n + 1
+
+-- | The errors as the compiler reports them, with the file and the position in it:
+--   @Parse failed at a.cfr:3:5...@, @Compile error at a.cfr:3:5...@, or @Error...@, then the message.
+inFiles :: [ModelFile] -> ClaferErrs -> ClaferErrs
+inFiles files (ClaferErrs errs') = ClaferErrs $ map inFile errs'
+    where
+    inFile (ParseErr ErrPos{modelPos = Pos l c} msg') = ClaferErr $ "Parse failed at " ++ at l c ++ "...\n" ++ msg'
+    inFile (SemanticErr ErrPos{modelPos = Pos l c} msg') = ClaferErr $ "Compile error at " ++ at l c ++ "...\n" ++ msg'
+    inFile (ClaferErr msg') = ClaferErr $ "Error...\n" ++ msg'
+    at l c = let (path, l') = modelPosition files l in path ++ ":" ++ show l' ++ ":" ++ show c
 
 
 strictReadFile :: FilePath -> IO String
@@ -249,7 +286,7 @@ getClafers :: MonadIO m => ClaferIGT m [String]
 getClafers =
     do
         sigs <- ClaferIGT $ lift AlloyIG.getSigs
-        return $ map sigToClaferName sigs
+        mapM claferNameOfSig sigs
 
 
 getGlobalScope :: MonadIO m => ClaferIGT m Integer
@@ -290,7 +327,8 @@ setAlloyScope :: MonadIO m => Integer -> String -> ClaferIGT m (Either String ()
 setAlloyScope value sigName =
     do
         subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName value
-        runExceptT $ maybe (return ()) (throwError . sigToClaferName) subset
+        subsetName <- traverse claferNameOfSig subset
+        runExceptT $ maybe (return ()) throwError subsetName
 
 next :: MonadIO m => ClaferIGT m Instance
 next = do
@@ -360,6 +398,14 @@ setBitwidth bitwidth' = do
 quit :: MonadIO m => ClaferIGT m ()
 quit = ClaferIGT $ lift AlloyIG.sendQuitCommand
 
+
+-- | The clafer's name for an Alloy signature (this/c0_name). UIDs are not always
+-- cN_name: an apostrophe in a name is replaced in the UID (name' -> c0_name__prime__).
+claferNameOfSig :: MonadIO m => String -> ClaferIGT m String
+claferNameOfSig sig = do
+    uidIClaferMap' <- getUIDIClaferMap
+    let uid = fromMaybe sig $ stripPrefix "this/" sig
+    return $ maybe (sigToClaferName sig) _ident $ findIClafer uidIClaferMap' uid
 
 sigToClaferName :: String -> String
 sigToClaferName n =

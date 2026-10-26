@@ -23,6 +23,7 @@
 module Language.Clafer.IG.Sugarer (sugarClaferModel) where
 
 import Language.Clafer.Common
+import Language.Clafer.Intermediate.Intclafer (_ident)
 import Language.Clafer.IG.ClaferModel
 import Data.Maybe (fromMaybe, fromJust)
 import Data.List as List hiding (map)
@@ -39,15 +40,20 @@ data Census = Census
 
 
 -- | Adds the full name to the census
-poll :: Id -> Census -> Census
-poll id (Census sample' counts') =
+poll :: UIDIClaferMap -> Id -> Census -> Census
+poll uidIClaferMap' id (Census sample' counts') =
     Census sample'' counts''
     where
     fullName = i_name id
-    name = makeSimpleName fullName
+    name = claferName uidIClaferMap' fullName
     counts'' = insertWith (+) name 1 counts'
     ordinal' = findWithDefault (error $ "Did not find " ++ name ++ " in counts.") name counts''
     sample'' = insertWith (error $ "Polled " ++ fullName ++ " twice in the census.") id (ordinal', name) sample'
+
+-- | The clafer's name for its UID. UIDs are not always cN_name: an apostrophe in a
+-- name is replaced in the UID (name' -> c0_name__prime__).
+claferName :: UIDIClaferMap -> String -> String
+claferName uidIClaferMap' uid = maybe (makeSimpleName uid) _ident $ findIClafer uidIClaferMap' uid
 
 -- Transforms c2_name -> name
 makeSimpleName :: String -> String
@@ -58,12 +64,12 @@ makeSimpleName name' = case dropWhile (/='_') name' of
     x -> tail x
 
 -- | Count the number of each clafer
-claferModelCensus :: ClaferModel -> Census
-claferModelCensus (ClaferModel topLevelClafers) =
+claferModelCensus :: UIDIClaferMap -> ClaferModel -> Census
+claferModelCensus uidIClaferMap' (ClaferModel topLevelClafers) =
     clafersCensus (Census Map.empty Map.empty) topLevelClafers
     where
     clafersCensus = foldl claferCensus
-    claferCensus census Clafer{c_id=id, c_children=children} = poll id (clafersCensus census children)
+    claferCensus census Clafer{c_id=id, c_children=children} = poll uidIClaferMap' id (clafersCensus census children)
 
 
 -- | Rewrite the model into a human-friendlier format
@@ -95,7 +101,7 @@ sugarClaferModel   useUids addTypes uidIClaferMap'   model@(ClaferModel topLevel
         where strNumber = v_value  $ fromJust  $ c_value c
 
 
-    Census sample' counts' = claferModelCensus model
+    Census sample' counts' = claferModelCensus uidIClaferMap' model
 
     sugarId :: Bool -> Bool  -> Bool    -> Id -> Id
     sugarId    useUids' addTypes' addRefDecl id  =
@@ -123,7 +129,7 @@ retrieveSuper useUids' uidIClaferMap'      uid =
         iclafer = fromMaybe (error $ "IClafer not found: " ++ uid) $ findIClafer uidIClaferMap' uid
 
         sugarSuper :: [String] -> String
-        sugarSuper [s] = " : " ++ if useUids' then s else makeSimpleName s
+        sugarSuper [s] = " : " ++ if useUids' then s else claferName uidIClaferMap' s
         sugarSuper _   = ""
         -- sugarReference :: [String] -> String
         -- sugarReference [s] = " -> " ++ s
