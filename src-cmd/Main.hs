@@ -45,6 +45,7 @@ import Prelude hiding (all)
 import System.Console.CmdArgs
 import System.Directory
 import System.FilePath
+import System.IO (hFlush, stdout)
 
 claferIGArgsDef :: IGArgs
 claferIGArgsDef = IGArgs {
@@ -99,6 +100,9 @@ main =
                 Left l  -> do
                     mapM_ putStrLn $ printError l
                     putStrLn "Press enter to retry."
+                    -- a tool reading the output through a pipe, e.g., ClaferIDE, gets the error
+                    -- only when it is flushed
+                    hFlush stdout
                     void getLine
                     tryClaferIG args3
 
