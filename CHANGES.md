@@ -4,6 +4,7 @@ Minor release with Clafer 0.5.5.
 
 * A model that Alloy does not support, e.g., with decimals, reals or doubles, is refused with the compiler's reason ("Alloy output unavailable because the model contains: a decimal literal, ..."); claferIG crashed with "No match in record selector extension". Decimals are supported by the Choco backend (chocosolver) only.
 * The errors before "Press enter to retry." are flushed, so a tool reading claferIG's output through a pipe, e.g., ClaferIDE, shows them; it showed nothing and waited.
+* A `.cfr-scope` file may list only some clafers, without the global scope (`"lpqName": ""`), e.g., `[{"lpqName": "Component::Cfeatures", "scope": 132}]`: `loadScopes` keeps the global scope and `--all` uses the given one. Such a file crashed claferIG with "Prelude.maximum: empty list". chocosolver 0.5.5 reads the same files.
 
 ##### ClaferIG Version 0.5.4, Oct 25, 2026
 

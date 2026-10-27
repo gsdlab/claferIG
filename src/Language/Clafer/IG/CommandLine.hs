@@ -367,10 +367,10 @@ runCommandLine =
                         (globalScopes, normalScopes) = partition (\(uid', _) -> null uid') uidScopes
                         -- from the globalScopes, take the maximum
                         globalScopeVals = map snd globalScopes
-                        globalScope = maximum globalScopeVals
                         -- add the "this/" prefix
                         normalScopesAlloy = map (\(uid', scope) -> ("this/"++uid', scope)) normalScopes
-                    lift $ setGlobalScope globalScope
+                    -- a file may list only some clafers, without the global scope; then it stays
+                    unless (null globalScopeVals) $ lift $ setGlobalScope $ maximum globalScopeVals
                     lift $ mapM_ (\(uid', val) -> setAlloyScope val uid') normalScopesAlloy
                     outputStrLn "Scopes loaded from the `.cfr-scope` file."
                     loop ShowScopes context

@@ -136,7 +136,8 @@ runClaferIG args' =
                             (globalScopes, normalScopes) = partition (\(uid, _) -> null uid) uidScopes
                             -- from the globalScopes, take the maximum
                             globalScopeVals = map snd globalScopes
-                            globalScope = maximum globalScopeVals
+                            -- a file may list only some clafers, without the global scope
+                            globalScope = if null globalScopeVals then scope else maximum globalScopeVals
                             -- add the "this/" prefix
                             normalScopesAlloy = map (\(uid, scope2) -> ("this/"++uid, scope2)) normalScopes
                         setGlobalScope globalScope
