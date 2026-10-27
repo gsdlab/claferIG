@@ -1,6 +1,6 @@
 # Clafer Instance Generator
 
-##### v0.5.4
+##### v0.5.5
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model.
 
@@ -22,7 +22,7 @@ Clafer can be installed from a binary distribution (preferred), from Hackage, an
 
 Regardless of the installation method, the following are required:
 
-* [Clafer](https://github.com/gsdlab/clafer) v0.5.4
+* [Clafer](https://github.com/gsdlab/clafer) v0.5.5
 * [Java Platform (JDK)](https://adoptium.net) v17+, 64bit
 * [Alloy 6.2.0](https://github.com/AlloyTools/org.alloytools.alloy/releases/tag/v6.2.0) (`alloy6.2.0.jar`)
   * it includes the MiniSat solver with UnSAT cores for Linux and macOS; on Windows, ClaferIG generates instances but cannot compute UnSAT cores and near-miss instances
@@ -126,7 +126,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG 0.5.4
+ClaferIG 0.5.5
 
 claferig [OPTIONS] FILE
 
@@ -208,7 +208,7 @@ MyPhone : Phone
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
 ```
-ClaferIG v0.5.4
+ClaferIG v0.5.5
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands
