@@ -241,6 +241,9 @@ load                 igArgs    =
             case Map.lookup Alloy results of
                 Nothing            ->
                     throwErr (ClaferErr "No Alloy compilation result." :: ClaferSErr)
+                -- e.g., a model with decimals, reals or doubles, which Alloy does not support
+                (Just NoCompilerResult{reason = reason'}) ->
+                    throwErr (ClaferErr reason' :: ClaferSErr)
                 (Just alloyResult) ->
                     if extension alloyResult == "tmp.als"
                     then throwErr (ClaferErr "Instance generation currently not supported for behavioral Clafer.\nRemove temporal constructs or press <ctrl>+c to exit." :: ClaferSErr)

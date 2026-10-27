@@ -1,3 +1,9 @@
+##### ClaferIG Version 0.5.5, unreleased
+
+Minor release with Clafer 0.5.5.
+
+* A model that Alloy does not support, e.g., with decimals, reals or doubles, is refused with the compiler's reason ("Alloy output unavailable because the model contains: a decimal literal, ..."); claferIG crashed with "No match in record selector extension". Decimals are supported by the Choco backend (chocosolver) only.
+
 ##### ClaferIG Version 0.5.4, Oct 25, 2026
 
 Minor release with Clafer 0.5.4.
