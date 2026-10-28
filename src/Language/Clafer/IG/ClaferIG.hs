@@ -98,6 +98,7 @@ claferIGVersion = "ClaferIG " ++ showVersion Paths_claferIG.version
 
 data IGArgs = IGArgs {
     all :: Maybe Integer,
+    maxInstances :: Maybe Integer,
     saveDir :: Maybe FilePath,
     claferModelFile :: FilePath,
     imports_comp :: [FilePath],

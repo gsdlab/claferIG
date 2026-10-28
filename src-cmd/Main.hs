@@ -50,6 +50,7 @@ import System.IO (hFlush, stdout)
 claferIGArgsDef :: IGArgs
 claferIGArgsDef = IGArgs {
     all                         = def &= opt "1" &= help "Saves all instances or a counterexample. Reads scopes from a `.cfr.scope` file or uses the provided global scope." &= typ "INTEGER",
+    maxInstances                = def &= help "Specify the maximum number of instances saved by --all." &= typ "INTEGER" &= explicit &= name "n",
     saveDir                     = def &= help "Specify the directory for storing saved files." &= typ "FILE",
     bitwidth                    = 4 &= help "Set the bitwidth for integers." &= typ "INTEGER", -- Default bitwidth is 4.
     maxInt                      = 7 &= help "Set the bitwidth for integers based on the largest required number. Overrides --bitwidth argument." &= typ "INTEGER",
@@ -149,7 +150,7 @@ runClaferIG args' =
                 counterRef <- liftIO $ newIORef 1
 
                 let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir args'
-                saveAll (savePath claferModelFileName counterRef >>= saveDirectory)
+                saveAll (maxInstances args') (savePath claferModelFileName counterRef >>= saveDirectory)
                 quit
             Nothing    -> do
                 liftIO $ putStrLn "Type 'h' for the list of available REPL commands\n"
@@ -188,8 +189,10 @@ underDirectory dir file' =
         return $ joinPath [dir, file']
 
 
-saveAll :: IO FilePath -> ClaferIGT IO ()
-saveAll nextFile =
+-- | Saves the instances, at most the given number of them, if any
+saveAll :: Maybe Integer -> IO FilePath -> ClaferIGT IO ()
+saveAll (Just remaining) _ | remaining <= 0 = return ()
+saveAll maxInstances' nextFile =
     do
         file' <- liftIO nextFile
         liftIO $ createDirectoryIfMissing True $ takeDirectory file'
@@ -202,5 +205,5 @@ saveAll nextFile =
                               then generateJSON uidIClaferMap' modelInstance'
                               else show modelInstance'
                 liftIO $ writeFile file' output'
-                saveAll nextFile
+                saveAll (subtract 1 <$> maxInstances') nextFile
             _ -> return ()

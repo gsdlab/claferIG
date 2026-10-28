@@ -131,57 +131,78 @@ ClaferIG 0.5.5
 claferig [OPTIONS] FILE
 
 Common flags:
-     --all[=INTEGER]                           Saves all instances or a
-                                               counterexample. Reads scopes
-                                               from a `.cfr.scope` file or uses
-                                               the provided global scope.
-     --savedir=FILE                            Specify the directory for
-                                               storing saved files.
-     --import=FILE                             Compile the model together
-                                               with the given file or URL,
-                                               which is relative to the current
-                                               directory. A model also imports
-                                               files with --import in its //#
-                                               OPTIONS directive, relative to
-                                               its own folder or URL.
-     --import-root=DIR                         Allow only local imports
-                                               inside DIR, after resolving '..'
-                                               and symbolic links (command line
-                                               only). Can be repeated.
-     --public-imports                          Allow only URL imports from
-                                               public addresses (command line
-                                               only).
-     --import-base=URL                         The URL from which the model's
-                                               text was read: its imports are
-                                               relative to the URL (command
-                                               line only).
-     --alloysolution=FILE                      Convert Alloy solution to a
-                                               Clafer solution.
-  -b --bitwidth=INTEGER                        Set the bitwidth for integers.
-  -m --maxint=INTEGER                          Set the bitwidth for integers
-                                               based on the largest required
-                                               number. Overrides --bitwidth
-                                               argument.
-  -u --useuids                                 Use unique clafer names in the
-                                               Clafer solution.
-     --addtypes                                Add colon/reference types to
-                                               the Clafer solution.
-  -j --json                                    Render solution as JSON
-                                               (forces 'addUids').
-  -i --flatten-inheritance-comp                Flatten inheritance during
-                                               compiling ('alloy' mode only)
-  -l --no-layout-comp                          Don't resolve off-side rule
-                                               layout during compiling
-  -c --check-duplicates-comp                   Check duplicated clafer names
-                                               during compiling
-  -f --skip-resolver-comp                      Skip name resolution during
-                                               compiling
-     --ss=SCOPESTRATEGY --scope-strategy-comp  Use scope computation strategy
-                                               during compiling: none, simple
-                                               (default), or full.
-  -? --help                                    Display help message
-  -V --version                                 Print version information
-     --numeric-version                         Print just the version number
+             --all[=INTEGER]                           Saves all instances or
+                                                       a counterexample. Reads
+                                                       scopes from a
+                                                       `.cfr.scope` file or
+                                                       uses the provided global
+                                                       scope.
+  -n=INTEGER                                           Specify the maximum
+                                                       number of instances
+                                                       saved by --all.
+             --savedir=FILE                            Specify the directory
+                                                       for storing saved files.
+             --import=FILE                             Compile the model
+                                                       together with the given
+                                                       file or URL, which is
+                                                       relative to the current
+                                                       directory. A model also
+                                                       imports files with
+                                                       --import in its //#
+                                                       OPTIONS directive,
+                                                       relative to its own
+                                                       folder or URL.
+             --import-root=DIR                         Allow only local
+                                                       imports inside DIR,
+                                                       after resolving '..' and
+                                                       symbolic links (command
+                                                       line only). Can be
+                                                       repeated.
+             --public-imports                          Allow only URL imports
+                                                       from public addresses
+                                                       (command line only).
+             --import-base=URL                         The URL from which the
+                                                       model's text was read:
+                                                       its imports are relative
+                                                       to the URL (command line
+                                                       only).
+             --alloysolution=FILE                      Convert Alloy solution
+                                                       to a Clafer solution.
+  -b         --bitwidth=INTEGER                        Set the bitwidth for
+                                                       integers.
+  -m         --maxint=INTEGER                          Set the bitwidth for
+                                                       integers based on the
+                                                       largest required number.
+                                                       Overrides --bitwidth
+                                                       argument.
+  -u         --useuids                                 Use unique clafer
+                                                       names in the Clafer
+                                                       solution.
+             --addtypes                                Add colon/reference
+                                                       types to the Clafer
+                                                       solution.
+  -j         --json                                    Render solution as
+                                                       JSON (forces 'addUids').
+  -i         --flatten-inheritance-comp                Flatten inheritance
+                                                       during compiling
+                                                       ('alloy' mode only)
+  -l         --no-layout-comp                          Don't resolve off-side
+                                                       rule layout during
+                                                       compiling
+  -c         --check-duplicates-comp                   Check duplicated
+                                                       clafer names during
+                                                       compiling
+  -f         --skip-resolver-comp                      Skip name resolution
+                                                       during compiling
+             --ss=SCOPESTRATEGY --scope-strategy-comp  Use scope computation
+                                                       strategy during
+                                                       compiling: none, simple
+                                                       (default), or full.
+  -?         --help                                    Display help message
+  -V         --version                                 Print version
+                                                       information
+             --numeric-version                         Print just the version
+                                                       number
 ```
 
 `claferIG <model file name>.cfr`

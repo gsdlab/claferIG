@@ -50,6 +50,7 @@ main = defaultMain $ testGroup "Model tests" [ tg_modeltests ]
 claferIGArgsDef :: IGArgs
 claferIGArgsDef = IGArgs {
     all             = def,
+    maxInstances    = def,
     saveDir         = def,
     claferModelFile = def,
     imports_comp    = def,
