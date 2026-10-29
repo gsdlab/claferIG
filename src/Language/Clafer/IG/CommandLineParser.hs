@@ -38,6 +38,8 @@ data Command = Next |
                SetScope String Integer |
                SetBitwidth Integer |
                SetMaxInt Integer |
+               SetMaxTraceLength Integer |
+               ToggleDiff |
                Save |
                Quit |
                Reload |
@@ -127,6 +129,8 @@ commandMap =
     ("b", setBitwidthCommand):
     ("m", setMaxIntCommand):
     ("maxint", setMaxIntCommand):
+    ("tl", setMaxTraceLengthCommand):
+    ("d", toggleDiffCommand):
     ("n", nextCommand):
     ("f", findCommand):
     ("q", quitCommand):
@@ -154,6 +158,10 @@ setBitwidthCommand :: Parser Command
 setBitwidthCommand       = setBitwidth
 setMaxIntCommand :: Parser Command
 setMaxIntCommand       = setMaxInt
+setMaxTraceLengthCommand :: Parser Command
+setMaxTraceLengthCommand = SetMaxTraceLength `liftM` (gap >> number)
+toggleDiffCommand :: ParsecT String () Identity Command
+toggleDiffCommand        = return ToggleDiff
 nextCommand :: ParsecT String () Identity Command
 nextCommand              = return Next
 quitCommand :: ParsecT String () Identity Command

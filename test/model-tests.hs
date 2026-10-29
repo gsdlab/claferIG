@@ -26,6 +26,7 @@
 import Language.Clafer.IG.ClaferIG
 import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLine
+import Language.Clafer.IG.SolutionView
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.List (isInfixOf, isPrefixOf, isSuffixOf)
@@ -63,6 +64,8 @@ claferIGArgsDef = IGArgs {
     useUids         = False,
     addTypes        = False,
     json            = False,
+    diff            = False,
+    tl_comp         = def,
     flatten_inheritance_comp = False,
     no_layout_comp = False,
     check_duplicates_comp = False,
@@ -102,12 +105,67 @@ getModel fPath = runClaferIGT (defaultIGArgs fPath) $ do
 fromRight (Right x) = x
 fromRight _         = error "fromRight received Left _. Should never happen."
 
+-- | The instance, or the first state of the trace
+firstModel :: Instance -> ClaferModel
+firstModel = head . solutionModels . modelSolution
+
+-- | A traffic light, whose scenario is a trace of a dynamic model
+trafficLight :: String
+trafficLight = unlines
+    [ "abstract xor TrafficLight"
+    , "    initial xor on -->> off"
+    , "        initial xor normal"
+    , "            initial green --> yellow"
+    , "            yellow --> red"
+    , "            red --> green"
+    , "        xor flashing -->> normal"
+    , "            initial yellow_on --> yellow_off"
+    , "            yellow_off --> yellow_on"
+    , "    off --> on"
+    , "tl : TrafficLight"
+    ]
+
+-- | The solutions of a dynamic model are traces: the scenario gives the states of its trace, and
+--   the diff view shows the changes from one state to the next.
+case_DynamicModelTrace :: Assertion
+case_DynamicModelTrace = do
+        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
+        createDirectoryIfMissing True dir
+        writeFile (dir </> "scenario.cfr") $ trafficLight ++ "    [ initially (green --> yellow --> red --> green --> yellow_on --> yellow_off --> off) ]\n"
+        result <- getModel $ dir </> "scenario.cfr"
+        case modelSolution $ fromRight result of
+            ClaferTrace states _ -> do
+                length states >= 7 @? ("The trace has the 7 states of the scenario: " ++ show (length states))
+                let leaves = map (map c_name . filter (null . c_children) . traverseModel) states
+                take 7 leaves == [["green"], ["yellow"], ["red"], ["green"], ["yellow_on"], ["yellow_off"], ["off"]]
+                    @? ("The states follow the scenario: " ++ show leaves)
+                let diffView = showSolutionDiff id 1 Nothing (ClaferTrace states 0)
+                ("-       green\n+       yellow" `isInfixOf` diffView) @? ("The diff view shows the change of the light: " ++ diffView)
+            ClaferInstance _ -> assertFailure "A dynamic model has traces"
+
+-- | The traces given by next are distinct, and limited by the maximum trace length.
+case_DynamicModelTraces :: Assertion
+case_DynamicModelTraces = do
+        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
+        createDirectoryIfMissing True dir
+        writeFile (dir </> "light.cfr") trafficLight
+        result <- runClaferIGT (defaultIGArgs $ dir </> "light.cfr") $ do
+            setMaxTraceLength 3
+            solve
+            replicateM 5 next
+        let traces = [show $ solutionText s | Instance s _ <- fromRight result]
+        -- the traces of at most 3 states: one of 2 states and two of 3 states
+        length traces == 3 @? ("3 traces of at most 3 states: " ++ show (length traces))
+        length traces == length (nubOrd traces) @? "The traces are distinct"
+    where
+    nubOrd = foldr (\x seen -> if x `elem` seen then seen else x : seen) []
+
 
 case_strMapCheck :: Assertion
 case_strMapCheck = do
         --let claferModel = Right $ Instance (ClaferModel [(Clafer (Id "" 0) (Just (StringValue "")) [])]) ""
         claferModel' <- getModel "test/positive/i220.cfr"
-        (valueCheck $ c_value $ head $ c_topLevel $ modelInstance $ fromRight $ claferModel') @? "Mapping Int back to String Failed!"
+        (valueCheck $ c_value $ head $ c_topLevel $ firstModel $ fromRight $ claferModel') @? "Mapping Int back to String Failed!"
         where
             valueCheck Nothing = False
             valueCheck (Just (AliasValue _)) = False
@@ -123,7 +181,7 @@ case_Imports = do
         writeFile (dir </> "lib.cfr") "abstract Lib\n    x : integer\n    [ x = 3 ]\n"
         writeFile (dir </> "model.cfr") "//# OPTIONS --import=lib.cfr\nA : Lib\n"
         instance' <- getModel $ dir </> "model.cfr"
-        ("x -> 3" `isInfixOf` show (modelInstance $ fromRight instance')) @? "The instance has the imported clafer's value"
+        ("x -> 3" `isInfixOf` show (firstModel $ fromRight instance')) @? "The instance has the imported clafer's value"
         writeFile (dir </> "lib.cfr") "abstract Lib\n    x : integer\n    [ x = y ]\n"
         result <- getModel $ dir </> "model.cfr"
         case result of

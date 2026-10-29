@@ -2,6 +2,10 @@
 
 Minor release with Clafer 0.5.6.
 
+* Dynamic models, with temporal operators or the temporal modifiers `initial` and `final`: their solutions are traces, whose states are instances. `n` gives the next solution, an instance of a static model or a trace of a dynamic model, with its states (`--- State 0 ---`) and the state to which it loops back (`--- Loop back to state 3 ---`). An instance has the same name in all the states of a trace. claferIG refused dynamic models.
+* The traces are given from the shortest, each different from the traces given before, regardless of the names of their atoms, up to the maximum trace length: `--tl` and the command `tl <number>` (by default, 10 states). Alloy 6.2 enumerates only a few traces of a temporal model, or none, so claferIG solves for each next trace without the traces given before.
+* Diff view: `--diff`, or the command `d`, shows the first instance or state with `+` on each line, and each next one as its changes from the previous one: the clafers that appear (`+`), with their children, that disappear (`-`), and the values that change (`~`), each indented as in the tree and with its least-partially-qualified name, e.g., `normal.yellow`. The instances of a static model are compared by their structure.
+* `--all` saves each trace to its own file, `--json` gives a trace as `{"states": [...], "loop": 3}`, and `f` finds a clafer in all the states of the most recent trace.
 * `-n` limits the number of instances that `--all` saves, as chocosolver's `-n` does, e.g., `claferIG --all -n 2 model.cfr` to check whether a model has exactly one instance ([#43](https://github.com/gsdlab/claferIG/issues/43)).
 
 ##### ClaferIG Version 0.5.5, Oct 27, 2026

@@ -183,6 +183,14 @@ Common flags:
                                                        solution.
   -j         --json                                    Render solution as
                                                        JSON (forces 'addUids').
+  -d         --diff                                    Show each next
+                                                       instance, or state of a
+                                                       trace, as its changes
+                                                       from the previous one.
+             --tl=INTEGER                              Set the maximum length
+                                                       of the traces of a
+                                                       dynamic model (default:
+                                                       10).
   -i         --flatten-inheritance-comp                Flatten inheritance
                                                        during compiling
                                                        ('alloy' mode only)
@@ -224,6 +232,67 @@ MyPhone : Phone
 
 `claferIG MyPhone.cfr` generates the instances of `MyPhone.cfr` with the clafers of `products.cfr`. The other options of the directives (e.g., `--maxint`, `--no-layout`) apply too, and an error names the file in which it is (`products.cfr:3:11`).
 
+### Dynamic models
+
+A dynamic model, with temporal operators (e.g., `X`, `U`, `initially`) or the temporal modifiers `initial` and `final`, describes how its instances change over time. Its solutions are traces: each `n`ext gives a trace, and the trace is a sequence of states, each an instance of the model. Alloy's traces are lassos: after the last state, the trace loops back to an earlier state, and repeats the states from there forever.
+
+```
+//# OPTIONS --import=TrafficLight.cfr
+tl : TrafficLight
+    [ initially (green --> yellow --> red --> green --> yellow_on --> yellow_off --> off) ]
+```
+
+```
+=== Trace 1 Begin ===
+
+--- State 0 ---
+tl
+  on
+    normal
+      green
+
+--- State 1 ---
+tl
+  on
+    normal
+      yellow
+
+...
+
+--- State 6 ---
+tl
+  off
+
+--- Loop back to state 3 ---
+
+--- Trace 1 End ---
+```
+
+`--tl=INTEGER` and the command `tl <number>` set the maximum length of the traces (by default, 10 states). The traces are given from the shortest, and each trace is different from the traces given before, as the states in which the instances are, regardless of the names of their atoms. `--all` saves each trace to its own file, and `--json` gives a trace as `{"states": [...], "loop": 3}`.
+
+With `--diff`, or after the command `d`, the first state, whose clafers all appear, is shown with `+` on each line, and each next state as its changes from the previous state: the clafers that appear (`+`), with their children, the clafers that disappear (`-`), and the values that change (`~`). Each change is indented as the clafer in the tree, and has the least-partially-qualified name of the clafer, which is qualified only as much as needed to tell it from the other clafers with the same name, e.g., `normal.yellow` if `flashing` also had a `yellow`. An instance has the same name in all the states of a trace, so a clafer that disappears and appears again is the same instance.
+
+```
+--- State 0 ---
++ tl
++   on
++     normal
++       green
+
+...
+
+--- State 3 ---
+-       red
++       green
+
+--- State 4 ---
+-     normal
++     flashing
++       yellow_on
+```
+
+In a static model, the diff view shows the first instance with `+` on each line, and each next instance as its differences from the previous instance, by their structure: the names of the instances of different solutions are unrelated, so the numbers of the instances are left out.
+
 ## Interactive Session Usage
 
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
@@ -234,12 +303,16 @@ ClaferIG v0.5.6
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands
                    - auto-complete command name, a clafer name, or clafer instance name in a given context
-'n'ext, [enter]    - to produce the next instance if available or to output a message that no more
-                     instances exist within the given scope
+'n'ext, [enter]    - to produce the next solution if available, an instance of a static model or a trace
+                     of a dynamic model, or to output a message that no more solutions exist within
+                     the given scope
 'i'ncrease         - to increase the maximum number of instances of a given clafer or all clafers (scope)
 's'et              - to set the maximum number of instances of a given clafer or all clafers (scope)
 'm'axint, 'maxint' - to set the bitwidth by providing the largest integer
-sa'v'e             - to save all instances displayed so far or a counterexample to files named
+'tl'               - to set the maximum length of the traces of a dynamic model
+'d'iff             - to show each next instance or state as its changes from the previous one, or in full
+                     (+ appears, - disappears, ~ changes its value)
+sa'v'e             - to save all instances displayed so far or a counterexample to files named 
                      <model file name>.cfr.<instance number>.data, one instance per file
 'q'uit             - to quit the interactive session
 'r'eload           - to reload your clafer model
@@ -260,6 +333,7 @@ Parameterized command usage:
 's <number> [enter]'- to set for the clafers to <number>
 's <name> <number>' - to set for the clafer <name> to <number>
 'f <name>'          - to display a clafer <name>
+'tl <number>'       - to set the maximum trace length to <number>
 'setUnsatCoreMinimization fastest' - fastest but the worst
 'setUnsatCoreMinimization medium'
 'setUnsatCoreMinimization best' - best but slowest even for modest size cores

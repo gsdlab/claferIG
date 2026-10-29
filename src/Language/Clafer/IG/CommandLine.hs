@@ -33,7 +33,7 @@ import Language.Clafer.Import (modelPosition)
 import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLineParser
 import Language.Clafer.IG.Constraints
-import Language.Clafer.IG.JSONGenerator
+import Language.Clafer.IG.SolutionView
 import Language.Clafer.Comments
 import Language.Clafer.JSONMetaData
 import Language.Clafer.QNameUID
@@ -67,7 +67,9 @@ data AutoComplete
 
 data AutoCompleteContext = AutoCompleteContext {clafers::IORef [String], claferInstances::IORef [String]}
 
-data Context = Context {currentAlloyInstance::Maybe String, saved::[ClaferModel], unsaved::[ClaferModel], autoCompleteContext::AutoCompleteContext}
+-- | The solutions shown so far, the most recent first, and whether they are shown as the changes
+--   from the previous snapshot
+data Context = Context {currentAlloyInstance::Maybe String, saved::[ClaferSolution], unsaved::[ClaferSolution], autoCompleteContext::AutoCompleteContext, diffView::Bool}
 
 -- | Interactive session interface
 runCommandLine :: ClaferIGT IO ()
@@ -80,11 +82,12 @@ runCommandLine =
         claferInstancesRef <- liftIO $ newIORef []
 
         let autoCompleteContext = AutoCompleteContext clafersRef claferInstancesRef
+        diffView' <- diff <$> getClaferIGArgs
         runInputT Settings {
             complete = completeFunc autoCompleteContext,
             historyFile = Nothing,
             autoAddHistory = True
-        } $ loop Next (Context Nothing [] [] autoCompleteContext)
+        } $ loop Next (Context Nothing [] [] autoCompleteContext diffView')
     where
 
 
@@ -98,18 +101,19 @@ runCommandLine =
             claferIGArgs' <- lift getClaferIGArgs
             uidIClaferMap' <- lift getUIDIClaferMap
             case solution of
-                Instance claferModel xml -> do
-                    liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ map c_name (traverseModel claferModel)
+                Instance claferSolution xml -> do
+                    qNameMaps' <- lift getQNameMaps
+                    liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ nub $ map c_name $ concatMap traverseModel $ solutionModels claferSolution
 
+                    let
+                        iNumber = 1 + length (unsaved context)
+                        previous = listToMaybe (unsaved context ++ saved context)
                     outputStrLn $ if json claferIGArgs'
-                        then generateJSON uidIClaferMap' claferModel
-                        else let
-                                iNumber = show $ 1 + length (unsaved context)
-                             in
-                                "=== Instance " ++ iNumber ++ " Begin ===\n\n" ++
-                                show claferModel ++
-                                "\n--- Instance " ++ iNumber ++ " End ---\n\n"
-                    nextLoop context{unsaved=claferModel:(unsaved context), currentAlloyInstance=Just xml}
+                        then solutionJSON uidIClaferMap' claferSolution
+                        else if diffView context
+                            then showSolutionDiff (lpqName qNameMaps') iNumber previous claferSolution
+                            else showSolution iNumber claferSolution
+                    nextLoop context{unsaved=claferSolution:(unsaved context), currentAlloyInstance=Just xml}
                 UnsatCore core counterexample -> do
                     liftIO $ hPutStrLn stderr "No instances found."
                     liftIO $ hPutStrLn stderr "The following set of constraints cannot be satisfied in the current scope."
@@ -119,14 +123,17 @@ runCommandLine =
 
                     printConstraints core
                     case counterexample of
-                        Just (Counterexample removed claferModel _) -> do
+                        Just (Counterexample removed claferSolution _) -> do
                             liftIO $ hPutStrLn stderr "Altering the following constraints produced the following near-miss example:"
                             printTransformations removed
-                            outputStrLn $ show claferModel
+                            outputStrLn $ solutionText claferSolution
                         Nothing -> return ()
                     nextLoop context
                 NoInstance -> do
-                    liftIO $ hPutStrLn stderr "No more instances found. Try increasing the scopes to get more instances (type 'h' for help)."
+                    dynamic <- lift isDynamicModel
+                    liftIO $ hPutStrLn stderr $ if dynamic
+                        then "No more traces found. Try increasing the scopes or the maximum trace length ('tl') to get more traces (type 'h' for help)."
+                        else "No more instances found. Try increasing the scopes to get more instances (type 'h' for help)."
                     nextLoop context
             where
             printTransformation :: Constraint -> [Constraint] -> (String, [Constraint])
@@ -192,11 +199,15 @@ runCommandLine =
                 "You can invoke the following commands as indicated by single quotes:\n" ++
                 "[tab]              - print the available commands\n" ++
                 "                   - auto-complete command name, a clafer name, or clafer instance name in a given context\n" ++
-                "'n'ext, [enter]    - to produce the next instance if available or to output a message that no more \n" ++
-                "                     instances exist within the given scope\n" ++
+                "'n'ext, [enter]    - to produce the next solution if available, an instance of a static model or a trace\n" ++
+                "                     of a dynamic model, or to output a message that no more solutions exist within\n" ++
+                "                     the given scope\n" ++
                 "'i'ncrease         - to increase the maximum number of instances of a given clafer or all clafers (scope)\n" ++
                 "'s'et              - to set the maximum number of instances of a given clafer or all clafers (scope)\n" ++
                 "'m'axint, 'maxint' - to set the bitwidth by providing the largest integer\n" ++
+                "'tl'               - to set the maximum length of the traces of a dynamic model\n" ++
+                "'d'iff             - to show each next instance or state as its changes from the previous one, or in full\n" ++
+                "                     (+ appears, - disappears, ~ changes its value)\n" ++
                 "sa'v'e             - to save all instances displayed so far or a counterexample to files named \n" ++
                 "                     <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                 "'q'uit             - to quit the interactive session\n" ++
@@ -217,6 +228,7 @@ runCommandLine =
                 "'s <number> [enter]'- to set for the clafers to <number>\n" ++
                 "'s <name> <number>' - to set for the clafer <name> to <number>\n" ++
                 "'f <name>'          - to display a clafer <name>\n" ++
+                "'tl <number>'       - to set the maximum trace length to <number>\n" ++
                 "'setUnsatCoreMinimization fastest' - fastest but the worst\n" ++
                 "'setUnsatCoreMinimization medium'\n" ++
                 "'setUnsatCoreMinimization best' - best but slowest even for modest size cores"
@@ -316,6 +328,26 @@ runCommandLine =
                 printBitwidthIntRange newBitwidth
             nextLoop context
 
+    loop (SetMaxTraceLength traceLength) context =
+        do
+            dynamic <- lift isDynamicModel
+            if not dynamic
+            then outputStrLn "The model is static: its instances are not traces."
+            else if traceLength < 1
+            then outputStrLn "The trace length must be at least 1."
+            else do
+                lift $ setMaxTraceLength traceLength
+                lift solve
+                outputStrLn $ "The maximum trace length is " ++ show traceLength ++ "."
+            nextLoop context
+
+    loop ToggleDiff context =
+        do
+            outputStrLn $ if diffView context
+                then "The instances and states are shown in full."
+                else "Each next instance or state is shown as its changes from the previous one."
+            nextLoop context{diffView = not $ diffView context}
+
     loop (SetMaxInt newMaxInt) context =
         do
             when (newMaxInt >= 7) $ do
@@ -377,8 +409,8 @@ runCommandLine =
     loop (Find name) context =
         do
             case (unsaved context ++ saved context) of
-                model:_ ->
-                    case find ((name ==) . c_name) $ traverseModel model of
+                solution:_ ->
+                    case find ((name ==) . c_name) $ concatMap traverseModel $ solutionModels solution of
                         Just clafer' -> outputStrLn $ show clafer'
                         Nothing -> outputStrLn $ "\"" ++ name ++ "\" not found in the model."
                 []  -> outputStrLn $ "No instance"
@@ -496,13 +528,13 @@ runCommandLine =
                         Left msg    -> outputStrLn (show msg) >> nextLoop context
                         Right command -> loop command context
 
-    save :: MonadIO m => [ClaferModel] -> Integer -> InputT (ClaferIGT m) ()
+    save :: MonadIO m => [ClaferSolution] -> Integer -> InputT (ClaferIGT m) ()
     save [] _ = return ()
     save (c:cs) counter = do
         claferModelFile' <- lift getModelFileName
         let
             saveName = claferModelFile' ++ "." ++ (show counter) ++ ".data"
-        liftIO $ writeFile saveName (show c)
+        liftIO $ writeFile saveName (solutionText c)
         outputStrLn $ "Saved to " ++ saveName
         save cs (counter + 1)
 

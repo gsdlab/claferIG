@@ -27,7 +27,7 @@ module Main where
 import Language.Clafer.IG.ClaferIG
 import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLine
-import Language.Clafer.IG.JSONGenerator
+import Language.Clafer.IG.SolutionView
 import Language.Clafer.IG.Solution
 import Language.Clafer.IG.Sugarer
 import Language.Clafer.ClaferArgs
@@ -63,6 +63,8 @@ claferIGArgsDef = IGArgs {
     useUids                     = False &= help "Use unique clafer names in the Clafer solution.",
     addTypes                    = False &= help "Add colon/reference types to the Clafer solution.",
     json                        = False &= help "Render solution as JSON (forces 'addUids').",
+    diff                        = False &= help "Show each next instance, or state of a trace, as its changes from the previous one.",
+    tl_comp                     = def &= help "Set the maximum length of the traces of a dynamic model (default: 10)." &= typ "INTEGER" &= explicit &= name "tl",
     flatten_inheritance_comp    = def &= help "Flatten inheritance during compiling ('alloy' mode only)" &= name "i",
     no_layout_comp              = def &= help "Don't resolve off-side rule layout during compiling" &= name "l",
     check_duplicates_comp       = def &= help "Check duplicated clafer names during compiling"  &= name "c",
@@ -168,11 +170,16 @@ runAlloySolution args' =
         when (null alloyInstance) $ error $ "Provide an Alloy solution Alloy file name.\n"
                                          ++ "Usage: claferIG [OPTIONS] <model.cfr> --alloy-solution=<instance.xml>\n"
         env <- getClaferEnv
+        dynamic <- isDynamicModel
         let (_, genv', _) = fromJust $ cIr env
         let
             sMap = Map.empty
             uidIClaferMap' = uidClaferMap genv'
-        liftIO $ putStrLn $ show $ (sugarClaferModel (useUids args') (addTypes args') uidIClaferMap' $ buildClaferModel $ parseSolution alloyInstance) $ sMap
+            -- the trace of a dynamic model
+            (states, loopState) = parseTrace alloyInstance
+        liftIO $ putStrLn $ if dynamic
+            then solutionText $ ClaferTrace (sugarClaferStates (useUids args') (addTypes args') uidIClaferMap' (map buildStateModel states) sMap) loopState
+            else show $ (sugarClaferModel (useUids args') (addTypes args') uidIClaferMap' $ buildClaferModel $ parseSolution alloyInstance) $ sMap
 
 savePath :: FilePath -> IORef Int -> IO FilePath
 savePath file' counterRef =
@@ -189,7 +196,7 @@ underDirectory dir file' =
         return $ joinPath [dir, file']
 
 
--- | Saves the instances, at most the given number of them, if any
+-- | Saves the instances, or the traces of a dynamic model, at most the given number of them, if any
 saveAll :: Maybe Integer -> IO FilePath -> ClaferIGT IO ()
 saveAll (Just remaining) _ | remaining <= 0 = return ()
 saveAll maxInstances' nextFile =
@@ -200,10 +207,10 @@ saveAll maxInstances' nextFile =
         claferIGArgs' <- getClaferIGArgs
         uidIClaferMap' <- getUIDIClaferMap
         case solution of
-            Instance{modelInstance = modelInstance'} -> do
+            Instance{modelSolution = modelSolution'} -> do
                 let output' = if json claferIGArgs'
-                              then generateJSON uidIClaferMap' modelInstance'
-                              else show modelInstance'
+                              then solutionJSON uidIClaferMap' modelSolution'
+                              else solutionText modelSolution'
                 liftIO $ writeFile file' output'
                 saveAll (subtract 1 <$> maxInstances') nextFile
             _ -> return ()

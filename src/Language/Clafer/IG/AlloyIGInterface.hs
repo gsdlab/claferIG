@@ -267,6 +267,15 @@ sendSetBitwidthCommand bitwidth =
         putMsg $ show bitwidth
 
 
+-- | Tell alloyIG to change the maximum length of the traces of a dynamic model
+sendSetMaxTraceLengthCommand :: MonadIO m => Integer -> AlloyIGT m ()
+sendSetMaxTraceLengthCommand traceLength =
+    do
+        when (traceLength < 1) $ error (show traceLength ++ " is not a valid trace length.")
+        putMsg "setMaxTraceLength"
+        putMsg $ show traceLength
+
+
 -- | Tell alloyIG to quit
 sendQuitCommand :: MonadIO m => AlloyIGT m ()
 sendQuitCommand = putMsg "quit"

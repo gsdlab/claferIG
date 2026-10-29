@@ -52,6 +52,8 @@ module Language.Clafer.IG.ClaferIG (
     setScope,
     setAlloyScope,
     next,
+    isDynamicModel,
+    setMaxTraceLength,
     setUnsatCoreMinimization,
     setBitwidth,
     quit,
@@ -111,6 +113,8 @@ data IGArgs = IGArgs {
     useUids :: Bool,
     addTypes :: Bool,
     json :: Bool,
+    diff :: Bool,
+    tl_comp :: Maybe Integer,
     flatten_inheritance_comp :: Bool,
     no_layout_comp :: Bool,
     check_duplicates_comp :: Bool,
@@ -156,16 +160,18 @@ data ClaferIGEnv = ClaferIGEnv{
     qNameMaps :: QNameMaps,
     info :: UIDIClaferMap,
     strMap :: Map Int String,
-    lineNumMap :: Map Integer String
+    lineNumMap :: Map Integer String,
+    -- | A dynamic model, with temporal operators or modifiers, whose solutions are traces
+    dynamicModel :: Bool
 }
 
 data Instance =
-    Instance {modelInstance::ClaferModel, alloyModelInstance::String} |
+    Instance {modelSolution::ClaferSolution, alloyModelInstance::String} |
     UnsatCore {unsatConstraints::[Constraint], counterexample::Maybe Counterexample} |
     NoInstance
 
 
-data Counterexample = Counterexample {removedConstraints::[Constraint], counterexampleInstance::ClaferModel, counterexampleAlloyInstance::String}
+data Counterexample = Counterexample {removedConstraints::[Constraint], counterexampleInstance::ClaferSolution, counterexampleAlloyInstance::String}
 
 getClaferEnv :: Monad m => ClaferIGT m ClaferEnv
 getClaferEnv = fetches claferEnv'
@@ -204,7 +210,7 @@ load                 igArgs    =
             -- the integer range of the options (--maxint, --minint) raises the bitwidth
             bitwidth' = maximum $ bitwidth igArgs : map requiredBitwidth (catMaybes [maxint claferArgs', (\n -> -n - 1) <$> minint claferArgs'])
 
-        (claferEnv', alloyModel, mapping, sMap) <- ExceptT $ return $ mapLeft (inFiles modelFiles') $ callClaferTranslator claferArgs' claferModel
+        (claferEnv', alloyModel, mapping, sMap, dynamic) <- ExceptT $ return $ mapLeft (inFiles modelFiles') $ callClaferTranslator claferArgs' claferModel
 
         let
             (ir, genv', _) = fromJust $ cIr claferEnv'
@@ -218,7 +224,7 @@ load                 igArgs    =
         let uidIClaferMap' = uidClaferMap genv'
         let irTrace = editMap $ irModuleTrace claferEnv'
 
-        return $ ClaferIGEnv claferEnv' igArgs{bitwidth = bitwidth'} constraints claferModel modelFiles' (file claferArgs') qNameMaps uidIClaferMap' sMap irTrace
+        return $ ClaferIGEnv claferEnv' igArgs{bitwidth = bitwidth'} constraints claferModel modelFiles' (file claferArgs') qNameMaps uidIClaferMap' sMap irTrace dynamic
     where
     editMap :: Map.Map Span [Ir] -> Map.Map Integer String -- Map Line Number to Clafer Name
     editMap =
@@ -245,14 +251,13 @@ load                 igArgs    =
                 -- e.g., a model with decimals, reals or doubles, which Alloy does not support
                 (Just NoCompilerResult{reason = reason'}) ->
                     throwErr (ClaferErr reason' :: ClaferSErr)
+                -- a dynamic model compiles to a temporal Alloy model (tmp.als)
                 (Just alloyResult) ->
-                    if extension alloyResult == "tmp.als"
-                    then throwErr (ClaferErr "Instance generation currently not supported for behavioral Clafer.\nRemove temporal constructs or press <ctrl>+c to exit." :: ClaferSErr)
-                    else return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult)
+                    return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult, extension alloyResult == "tmp.als")
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
     -- the options given to claferIG take precedence over the files' options
-    claferArgs = defaultClaferArgs{file = claferFile', imports = imports_comp igArgs, import_root = import_root_comp igArgs, public_imports = public_imports_comp igArgs, import_base = import_base_comp igArgs, flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs}
+    claferArgs = defaultClaferArgs{file = claferFile', imports = imports_comp igArgs, import_root = import_root_comp igArgs, public_imports = public_imports_comp igArgs, import_base = import_base_comp igArgs, flatten_inheritance = flatten_inheritance_comp igArgs, no_layout = no_layout_comp igArgs, check_duplicates = check_duplicates_comp igArgs, skip_resolver = skip_resolver_comp igArgs, scope_strategy = scope_strategy_comp igArgs, trace_len = fromMaybe (trace_len defaultClaferArgs) (tl_comp igArgs)}
     claferFile' = claferModelFile igArgs
     -- the bitwidth required to store the given integer
     requiredBitwidth :: Integer -> Integer
@@ -343,20 +348,21 @@ next = do
         useUids' = useUids claferIGArgs'
         addTypes' = addTypes claferIGArgs'
     constraints' <- getConstraints
+    dynamic <- isDynamicModel
     xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
     sMap <- getStrMap
     case xmlSolution of
-        Just xml -> return $ Instance (xmlToModel useUids' addTypes' uidIClaferMap' xml sMap) xml
+        Just xml -> return $ Instance (xmlToSolution dynamic useUids' addTypes' uidIClaferMap' xml sMap) xml
         Nothing  -> do
             ClaferIGT $ lift AlloyIG.sendSaveStateCommand
             -- Generating counterexample modifies the state. If we ever want to
             -- rerun the original model, we need to restore the state.
             AlloyIG.UnsatCore core <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-            c <- counterexample env core useUids' addTypes' uidIClaferMap' constraints' sMap
+            c <- counterexample (xmlToSolution dynamic) env core useUids' addTypes' uidIClaferMap' constraints' sMap
             ClaferIGT $ lift AlloyIG.sendRestoreStateCommand
             return c
     where
-    counterexample env' originalCore useUids'' addTypes'' uidIClaferMap'' constraints' sMap = counterexample' env' originalCore [] useUids'' addTypes'' uidIClaferMap'' constraints' sMap
+    counterexample toSolution env' originalCore useUids'' addTypes'' uidIClaferMap'' constraints' sMap = counterexample' env' originalCore [] useUids'' addTypes'' uidIClaferMap'' constraints' sMap
         where
         counterexample' env'' core removed useUids''' addTypes''' uidIClaferMap''' constraints'' sMap' =
             case msum $ findRemovable env'' core constraints'' of
@@ -366,7 +372,7 @@ next = do
                     xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
                     case xmlSolution of
                         Just xml -> return $
-                            UnsatCore (catMaybes $ findRemovable env'' core constraints'') (Just $ Counterexample (reverse $ remove : removed) (xmlToModel useUids''' addTypes''' uidIClaferMap''' xml sMap') xml)
+                            UnsatCore (catMaybes $ findRemovable env'' core constraints'') (Just $ Counterexample (reverse $ remove : removed) (toSolution useUids''' addTypes''' uidIClaferMap''' xml sMap') xml)
                         Nothing ->
                             do
                                 AlloyIG.UnsatCore core' <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
@@ -374,8 +380,20 @@ next = do
                 Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
 
-    xmlToModel :: Bool -> Bool -> UIDIClaferMap -> String -> Map Int String -> ClaferModel
-    xmlToModel  useUids' addTypes' uidIClaferMap' xml sMap = (sugarClaferModel useUids' addTypes' uidIClaferMap' $ buildClaferModel $ parseSolution xml) sMap
+    -- the instance of a static model, or the trace of a dynamic model
+    xmlToSolution :: Bool -> Bool -> Bool -> UIDIClaferMap -> String -> Map Int String -> ClaferSolution
+    xmlToSolution False useUids' addTypes' uidIClaferMap' xml sMap = ClaferInstance $ (sugarClaferModel useUids' addTypes' uidIClaferMap' $ buildClaferModel $ parseSolution xml) sMap
+    xmlToSolution True  useUids' addTypes' uidIClaferMap' xml sMap = ClaferTrace (sugarClaferStates useUids' addTypes' uidIClaferMap' (map buildStateModel states) sMap) loopState
+        where
+        (states, loopState) = parseTrace xml
+
+-- | Whether the model is dynamic, with traces as its solutions
+isDynamicModel :: Monad m => ClaferIGT m Bool
+isDynamicModel = fetches dynamicModel
+
+-- | Sets the maximum length of the traces of a dynamic model
+setMaxTraceLength :: MonadIO m => Integer -> ClaferIGT m ()
+setMaxTraceLength traceLength = ClaferIGT $ lift $ AlloyIG.sendSetMaxTraceLengthCommand traceLength
 
 reload :: MonadIO m => ClaferIGT m (Either ClaferErrs ())
 reload  =

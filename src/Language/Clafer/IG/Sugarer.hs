@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.Sugarer (sugarClaferModel) where
+module Language.Clafer.IG.Sugarer (sugarClaferModel, sugarClaferStates) where
 
 import Language.Clafer.Common
 import Language.Clafer.Intermediate.Intclafer (_ident)
@@ -65,27 +65,47 @@ makeSimpleName name' = case dropWhile (/='_') name' of
 
 -- | Count the number of each clafer
 claferModelCensus :: UIDIClaferMap -> ClaferModel -> Census
-claferModelCensus uidIClaferMap' (ClaferModel topLevelClafers) =
-    clafersCensus (Census Map.empty Map.empty) topLevelClafers
+claferModelCensus uidIClaferMap' = statesCensus uidIClaferMap' . (:[])
+
+-- | Count the number of each clafer in the states of a trace: an instance that exists in
+--   several states is counted once, so it has the same name in each of them
+statesCensus :: UIDIClaferMap -> [ClaferModel] -> Census
+statesCensus uidIClaferMap' states =
+    foldl clafersCensus (Census Map.empty Map.empty) $ map c_topLevel states
     where
     clafersCensus = foldl claferCensus
-    claferCensus census Clafer{c_id=id, c_children=children} = poll uidIClaferMap' id (clafersCensus census children)
+    claferCensus census Clafer{c_id=id, c_children=children} = pollOnce id (clafersCensus census children)
+    pollOnce id census@(Census sample' _)
+        | id `member` sample' = census
+        | otherwise           = poll uidIClaferMap' id census
 
 
 -- | Rewrite the model into a human-friendlier format
 sugarClaferModel:: Bool -> Bool  -> UIDIClaferMap -> ClaferModel                      -> Map Int String -> ClaferModel
-sugarClaferModel   useUids addTypes uidIClaferMap'   model@(ClaferModel topLevelClafers) sMap            =
+sugarClaferModel   useUids addTypes uidIClaferMap'   model sMap =
+    sugarWithCensus (claferModelCensus uidIClaferMap' model) useUids addTypes uidIClaferMap' model sMap
+
+-- | Rewrite the states of a trace into a human-friendlier format: an instance has the same name
+--   in every state
+sugarClaferStates :: Bool -> Bool -> UIDIClaferMap -> [ClaferModel] -> Map Int String -> [ClaferModel]
+sugarClaferStates useUids addTypes uidIClaferMap' states sMap =
+    map (\state -> sugarWithCensus census useUids addTypes uidIClaferMap' state sMap) states
+    where
+    census = statesCensus uidIClaferMap' states
+
+sugarWithCensus :: Census -> Bool -> Bool  -> UIDIClaferMap -> ClaferModel                -> Map Int String -> ClaferModel
+sugarWithCensus    census    useUids addTypes uidIClaferMap'   (ClaferModel topLevelClafers) sMap            =
     ClaferModel $ map sugarClafer topLevelClafers
     where
-    sugarClafer (Clafer id value children) =
-        Clafer (sugarId useUids addTypes True id) (sugarValue (Clafer id value children)) (map sugarClafer children)
+    sugarClafer clafer@(Clafer id uid' _ children) =
+        Clafer (sugarId useUids addTypes True id) uid' (sugarValue clafer) (map sugarClafer children)
 
-    sugarValue (Clafer _ (Just (AliasValue alias)) _) = Just $ AliasValue $ sugarId useUids addTypes False alias
-    sugarValue (Clafer _ Nothing _) = Nothing
+    sugarValue (Clafer _ _ (Just (AliasValue alias)) _) = Just $ AliasValue $ sugarId useUids addTypes False alias
+    sugarValue (Clafer _ _ Nothing _) = Nothing
     sugarValue c  = if cType c == "string" then Just (StringValue (getString c)) else c_value c
 
 
-    cType (Clafer id _ _) = cTypeSolve $ getReference iclafer
+    cType (Clafer id _ _ _) = cTypeSolve $ getReference iclafer
       where
         iclafer = fromMaybe (error $ "IClafer not found:" ++ i_name id) $ findIClafer uidIClaferMap' $ i_name id
 
@@ -101,7 +121,7 @@ sugarClaferModel   useUids addTypes uidIClaferMap'   model@(ClaferModel topLevel
         where strNumber = v_value  $ fromJust  $ c_value c
 
 
-    Census sample' counts' = claferModelCensus uidIClaferMap' model
+    Census sample' counts' = census
 
     sugarId :: Bool -> Bool  -> Bool    -> Id -> Id
     sugarId    useUids' addTypes' addRefDecl id  =

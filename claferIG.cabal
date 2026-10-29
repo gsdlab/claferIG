@@ -80,6 +80,7 @@ library
                       , Language.Clafer.IG.JSONGenerator
                       , Language.Clafer.IG.Process
                       , Language.Clafer.IG.Solution
+                      , Language.Clafer.IG.SolutionView
                       , Language.Clafer.IG.Sugarer
     other-modules:      Paths_claferIG
     autogen-modules:    Paths_claferIG

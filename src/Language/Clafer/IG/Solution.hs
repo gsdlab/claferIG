@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.Solution (Solution(..), Sig(..), Atom(..), Field(..), Tuple(..), parseSolution) where
+module Language.Clafer.IG.Solution (Solution(..), Sig(..), Atom(..), Field(..), Tuple(..), parseSolution, parseTrace) where
 
 import Control.Monad
 import Data.Maybe
@@ -53,6 +53,26 @@ parseSolution xml =
         fields = map parseField $ fieldElems rootElem
     in
     Solution sigs fields
+
+
+-- | The states of a trace of a dynamic model, one instance each, and the state to which
+--   its last state loops back: Alloy gives the length of the trace and of its loop.
+parseTrace :: String -> ([Solution], Int)
+parseTrace xml =
+    let (Document _ _ root _) = xmlParse "claferIG" xml
+        instances = (tag "alloy" /> tag "instance") $ CElem root noPos
+
+        parseInstance instance' = Solution
+            (map parseSig $ (keep /> tag "sig") instance')
+            (map parseField $ (keep /> tag "field") instance')
+
+        loopState = fromMaybe 0 $ do
+            instance' <- listToMaybe instances
+            traceLength <- read <$> findOptAttr "tracelength" instance'
+            loopLength <- read <$> findOptAttr "looplength" instance'
+            return $ traceLength - loopLength
+    in
+    (map parseInstance instances, loopState)
 
 
 parseSig :: Content i -> Sig
