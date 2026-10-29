@@ -1,3 +1,9 @@
+##### ClaferIG Version 0.5.6, Oct 28, 2026
+
+Minor release with Clafer 0.5.6.
+
+* `-n` limits the number of instances that `--all` saves, as chocosolver's `-n` does, e.g., `claferIG --all -n 2 model.cfr` to check whether a model has exactly one instance ([#43](https://github.com/gsdlab/claferIG/issues/43)).
+
 ##### ClaferIG Version 0.5.5, Oct 27, 2026
 
 Minor release with Clafer 0.5.5.
