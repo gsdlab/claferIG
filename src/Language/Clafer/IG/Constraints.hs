@@ -109,15 +109,24 @@ parseConstraints modelFiles imodule mapping =
 
     findPExp pUid   = fromMaybe (error $ "Unknown constraint " ++ pUid) $ find ((== pUid) . _pid) pexps
     findClafer pUid = fromMaybe (error $ "Unknown clafer " ++ pUid) $ find ((== pUid) . _uid) clafers
-    text = lines $ modelText modelFiles
+    -- the columns count a tab up to the next multiple of 8, as the compiler does
+    text = map expandTabs $ lines $ modelText modelFiles
     showPosition (Span (Pos l c) _) = let (path, l') = modelPosition modelFiles l in path ++ ":" ++ show l' ++ ":" ++ show c
-    extract (Span (Pos l1 c1) (Pos l2 c2))
+    -- an expression's span ends before the parentheses that close its last operand, e.g.,
+    -- `initially (a --> b` of `initially (a --> b)`, which are added
+    extract (Span (Pos l1 c1) (Pos l2 c2)) = closeParentheses (extract' l1 c1 l2 c2) (drop (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1))
+    extract' l1 c1 l2 c2
         | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
         | otherwise = unlines $ f1 : fs ++ [fn]
         where
         f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
         fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
         fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
+    closeParentheses extracted rest
+        | open > 0, ')' : rest' <- dropWhile (== ' ') rest = closeParentheses (extracted ++ takeWhile (== ' ') rest ++ ")") rest'
+        | otherwise = extracted
+        where
+        open = length (filter (== '(') extracted) - length (filter (== ')') extracted)
     convertCard (l, -1) = Cardinality l Nothing
     convertCard (l, h)  = Cardinality l $ Just h
     claferInfo pUid =
@@ -125,6 +134,14 @@ parseConstraints modelFiles imodule mapping =
         where
         claf = findClafer pUid
 
+
+-- | The line with its tabs as spaces, up to the next multiple of 8
+expandTabs :: String -> String
+expandTabs = expand 0
+    where
+    expand column ('\t' : rest) = let n = 8 - column `mod` 8 in replicate n ' ' ++ expand (column + n) rest
+    expand column (x : rest) = x : expand (column + 1) rest
+    expand _ [] = []
 
 subclafers :: IElement -> [IClafer]
 subclafers (IEClafer claf) = claf : (_elements claf >>= subclafers)

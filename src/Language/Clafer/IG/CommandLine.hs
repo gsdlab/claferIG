@@ -98,22 +98,8 @@ runCommandLine =
     loop Next context =
         do
             solution <- lift next
-            claferIGArgs' <- lift getClaferIGArgs
-            uidIClaferMap' <- lift getUIDIClaferMap
             case solution of
-                Instance claferSolution xml -> do
-                    qNameMaps' <- lift getQNameMaps
-                    liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ nub $ map c_name $ concatMap traverseModel $ solutionModels claferSolution
-
-                    let
-                        iNumber = 1 + length (unsaved context)
-                        previous = listToMaybe (unsaved context ++ saved context)
-                    outputStrLn $ if json claferIGArgs'
-                        then solutionJSON uidIClaferMap' claferSolution
-                        else if diffView context
-                            then showSolutionDiff (lpqName qNameMaps') iNumber previous claferSolution
-                            else showSolution iNumber claferSolution
-                    nextLoop context{unsaved=claferSolution:(unsaved context), currentAlloyInstance=Just xml}
+                Instance claferSolution xml -> showNew claferSolution xml context
                 UnsatCore core counterexample -> do
                     liftIO $ hPutStrLn stderr "No instances found."
                     liftIO $ hPutStrLn stderr "The following set of constraints cannot be satisfied in the current scope."
@@ -208,6 +194,9 @@ runCommandLine =
                 "'tl'               - to set the maximum length of the traces of a dynamic model\n" ++
                 "'d'iff             - to show each next instance or state as its changes from the previous one, or in full\n" ++
                 "                     (+ appears, - disappears, ~ changes its value)\n" ++
+                "'fork'             - to produce another trace with the same first states as the last trace\n" ++
+                "'config'           - to produce a trace of a dynamic model whose clafers that do not change over time\n" ++
+                "                     differ from those of the traces so far\n" ++
                 "sa'v'e             - to save all instances displayed so far or a counterexample to files named \n" ++
                 "                     <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                 "'q'uit             - to quit the interactive session\n" ++
@@ -229,6 +218,7 @@ runCommandLine =
                 "'s <name> <number>' - to set for the clafer <name> to <number>\n" ++
                 "'f <name>'          - to display a clafer <name>\n" ++
                 "'tl <number>'       - to set the maximum trace length to <number>\n" ++
+                "'fork <number>'     - to produce another trace with the states of the last trace before state <number>\n" ++
                 "'setUnsatCoreMinimization fastest' - fastest but the worst\n" ++
                 "'setUnsatCoreMinimization medium'\n" ++
                 "'setUnsatCoreMinimization best' - best but slowest even for modest size cores"
@@ -340,6 +330,10 @@ runCommandLine =
                 lift solve
                 outputStrLn $ "The maximum trace length is " ++ show traceLength ++ "."
             nextLoop context
+
+    loop (Fork state) context = otherTrace (fork state) ("No other trace has the states of the last trace before state " ++ show state ++ ".") context
+
+    loop NextConfiguration context = otherTrace nextConfiguration "No trace has another configuration." context
 
     loop ToggleDiff context =
         do
@@ -517,6 +511,38 @@ runCommandLine =
             lift $ setUnsatCoreMinimization level' >> solve
 
             nextLoop context
+
+    -- shows a new solution, the next one
+    showNew claferSolution xml context =
+        do
+            claferIGArgs' <- lift getClaferIGArgs
+            uidIClaferMap' <- lift getUIDIClaferMap
+            qNameMaps' <- lift getQNameMaps
+            liftIO $ writeIORef (claferInstances $ autoCompleteContext context) $ nub $ map c_name $ concatMap traverseModel $ solutionModels claferSolution
+
+            let
+                iNumber = 1 + length (unsaved context)
+                previous = listToMaybe (unsaved context ++ saved context)
+            outputStrLn $ if json claferIGArgs'
+                then solutionJSON uidIClaferMap' claferSolution
+                else if diffView context
+                    then showSolutionDiff (lpqName qNameMaps') iNumber previous claferSolution
+                    else showSolution iNumber claferSolution
+            nextLoop context{unsaved=claferSolution:(unsaved context), currentAlloyInstance=Just xml}
+
+    -- shows a trace of a dynamic model other than the next one: a fork, or another configuration
+    otherTrace command none context =
+        do
+            dynamic <- lift isDynamicModel
+            if not dynamic
+            then outputStrLn "The model is static: its instances are not traces." >> nextLoop context
+            else if null (unsaved context ++ saved context)
+            then outputStrLn "No trace yet: type 'n' for the first one." >> nextLoop context
+            else do
+                solution <- lift command
+                case solution of
+                    Instance claferSolution xml -> showNew claferSolution xml context
+                    _ -> outputStrLn none >> nextLoop context
 
     nextLoop context =
         do

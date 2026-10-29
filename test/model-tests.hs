@@ -143,6 +143,50 @@ case_DynamicModelTrace = do
                 ("-       green\n+       yellow" `isInfixOf` diffView) @? ("The diff view shows the change of the light: " ++ diffView)
             ClaferInstance _ -> assertFailure "A dynamic model has traces"
 
+-- | A scenario that contradicts the model has an unsat core with the scenario and the transition
+--   it contradicts.
+case_DynamicModelUnsatCore :: Assertion
+case_DynamicModelUnsatCore = do
+        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
+        createDirectoryIfMissing True dir
+        writeFile (dir </> "contradiction.cfr") $ trafficLight ++ "    [ initially (green --> red) ]\n"
+        result <- getModel $ dir </> "contradiction.cfr"
+        case fromRight result of
+            UnsatCore core _ -> do
+                let shown = map show core
+                any ("initially (green --> red)" `isInfixOf`) shown @? ("The core has the scenario: " ++ show shown)
+                any ("green --> yellow" `isInfixOf`) shown @? ("The core has the transition: " ++ show shown)
+            _ -> assertFailure "The scenario contradicts the model"
+
+-- | A fork has the states of the last trace before the given state; a new configuration differs
+--   in the clafers that do not change over time.
+case_DynamicModelForkAndConfiguration :: Assertion
+case_DynamicModelForkAndConfiguration = do
+        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
+        createDirectoryIfMissing True dir
+        writeFile (dir </> "fork.cfr") trafficLight
+        forked <- runClaferIGT (defaultIGArgs $ dir </> "fork.cfr") $ do
+            solve
+            liftM2 (,) next (fork 2)
+        case fromRight forked of
+            (Instance (ClaferTrace states _) _, Instance (ClaferTrace states' _) _) ->
+                map show (take 2 states) == map show (take 2 states') @? "The fork has the first 2 states of the trace"
+            _ -> assertFailure "A trace and its fork"
+        writeFile (dir </> "configuration.cfr") $ unlines
+            [ "final Features"
+            , "    final EU ?"
+            , "xor Light"
+            , "    initial red --> green"
+            , "    green --> red"
+            ]
+        configurations <- runClaferIGT (defaultIGArgs $ dir </> "configuration.cfr") $ do
+            solve
+            sequence [next, nextConfiguration, nextConfiguration]
+        case fromRight configurations of
+            [Instance (ClaferTrace (state : _) _) _, Instance (ClaferTrace (state' : _) _) _, NoInstance] ->
+                (("EU" `isInfixOf` show state) /= ("EU" `isInfixOf` show state')) @? "The configurations differ in EU"
+            _ -> assertFailure "Two configurations"
+
 -- | The traces given by next are distinct, and limited by the maximum trace length.
 case_DynamicModelTraces :: Assertion
 case_DynamicModelTraces = do

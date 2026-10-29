@@ -54,6 +54,8 @@ module Language.Clafer.IG.ClaferIG (
     next,
     isDynamicModel,
     setMaxTraceLength,
+    fork,
+    nextConfiguration,
     setUnsatCoreMinimization,
     setBitwidth,
     quit,
@@ -386,6 +388,28 @@ next = do
     xmlToSolution True  useUids' addTypes' uidIClaferMap' xml sMap = ClaferTrace (sugarClaferStates useUids' addTypes' uidIClaferMap' (map buildStateModel states) sMap) loopState
         where
         (states, loopState) = parseTrace xml
+
+-- | A trace with the same states as the trace given last before the given state, which differs
+--   from the traces given so far, if any
+fork :: MonadIO m => Integer -> ClaferIGT m Instance
+fork state = otherTrace $ AlloyIG.sendForkCommand state
+
+-- | A trace whose configuration, its clafers that do not change over time, differs from those of
+--   the traces given so far, if any
+nextConfiguration :: MonadIO m => ClaferIGT m Instance
+nextConfiguration = otherTrace AlloyIG.sendNextConfigurationCommand
+
+otherTrace :: MonadIO m => AlloyIGT m (Maybe String) -> ClaferIGT m Instance
+otherTrace command = do
+    claferIGArgs' <- getClaferIGArgs
+    uidIClaferMap' <- getUIDIClaferMap
+    sMap <- getStrMap
+    xmlSolution <- ClaferIGT $ lift command
+    return $ case xmlSolution of
+        Just xml -> Instance (ClaferTrace (sugarClaferStates (useUids claferIGArgs') (addTypes claferIGArgs') uidIClaferMap' (map buildStateModel states) sMap) loopState) xml
+            where
+            (states, loopState) = parseTrace xml
+        Nothing  -> NoInstance
 
 -- | Whether the model is dynamic, with traces as its solutions
 isDynamicModel :: Monad m => ClaferIGT m Bool

@@ -270,6 +270,18 @@ tl
 
 `--tl=INTEGER` and the command `tl <number>` set the maximum length of the traces (by default, 10 states). The traces are given from the shortest, and each trace is different from the traces given before, as the states in which the instances are, regardless of the names of their atoms. `--all` saves each trace to its own file, and `--json` gives a trace as `{"states": [...], "loop": 3}`.
 
+Two commands explore other traces than the next one:
+
+* `fork <number>` gives another trace with the same states as the last trace before the state `<number>`: what else can happen from there. E.g., `fork 2` keeps the states 0 and 1.
+* `config` gives a trace with another configuration: the clafers that do not change over time, e.g., the features of a product line declared `final`, differ from those of the traces given so far.
+
+A dynamic model, or a scenario, with no traces has an unsat core: the constraints that contradict each other, e.g., a scenario and the transition it does not follow, and a near-miss trace without one of them, as for a static model.
+
+```
+  1) green --> yellow (TrafficLight.cfr:6:33)
+  2) initially (green --> red) (scenario.cfr:3:7)
+```
+
 With `--diff`, or after the command `d`, the first state, whose clafers all appear, is shown with `+` on each line, and each next state as its changes from the previous state: the clafers that appear (`+`), with their children, the clafers that disappear (`-`), and the values that change (`~`). Each change is indented as the clafer in the tree, and has the least-partially-qualified name of the clafer, which is qualified only as much as needed to tell it from the other clafers with the same name, e.g., `normal.yellow` if `flashing` also had a `yellow`. An instance has the same name in all the states of a trace, so a clafer that disappears and appears again is the same instance.
 
 ```
@@ -312,6 +324,9 @@ You can invoke the following commands as indicated by single quotes:
 'tl'               - to set the maximum length of the traces of a dynamic model
 'd'iff             - to show each next instance or state as its changes from the previous one, or in full
                      (+ appears, - disappears, ~ changes its value)
+'fork'             - to produce another trace with the same first states as the last trace
+'config'           - to produce a trace of a dynamic model whose clafers that do not change over time
+                     differ from those of the traces so far
 sa'v'e             - to save all instances displayed so far or a counterexample to files named 
                      <model file name>.cfr.<instance number>.data, one instance per file
 'q'uit             - to quit the interactive session
@@ -334,6 +349,7 @@ Parameterized command usage:
 's <name> <number>' - to set for the clafer <name> to <number>
 'f <name>'          - to display a clafer <name>
 'tl <number>'       - to set the maximum trace length to <number>
+'fork <number>'     - to produce another trace with the states of the last trace before state <number>
 'setUnsatCoreMinimization fastest' - fastest but the worst
 'setUnsatCoreMinimization medium'
 'setUnsatCoreMinimization best' - best but slowest even for modest size cores

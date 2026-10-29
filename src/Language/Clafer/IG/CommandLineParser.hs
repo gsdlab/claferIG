@@ -40,6 +40,8 @@ data Command = Next |
                SetMaxInt Integer |
                SetMaxTraceLength Integer |
                ToggleDiff |
+               Fork Integer |
+               NextConfiguration |
                Save |
                Quit |
                Reload |
@@ -131,6 +133,8 @@ commandMap =
     ("maxint", setMaxIntCommand):
     ("tl", setMaxTraceLengthCommand):
     ("d", toggleDiffCommand):
+    ("fork", forkCommand):
+    ("config", nextConfigurationCommand):
     ("n", nextCommand):
     ("f", findCommand):
     ("q", quitCommand):
@@ -160,6 +164,10 @@ setMaxIntCommand :: Parser Command
 setMaxIntCommand       = setMaxInt
 setMaxTraceLengthCommand :: Parser Command
 setMaxTraceLengthCommand = SetMaxTraceLength `liftM` (gap >> number)
+forkCommand :: Parser Command
+forkCommand              = Fork `liftM` (gap >> number)
+nextConfigurationCommand :: ParsecT String () Identity Command
+nextConfigurationCommand = return NextConfiguration
 toggleDiffCommand :: ParsecT String () Identity Command
 toggleDiffCommand        = return ToggleDiff
 nextCommand :: ParsecT String () Identity Command

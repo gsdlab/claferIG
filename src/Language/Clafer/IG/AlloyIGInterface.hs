@@ -267,6 +267,31 @@ sendSetBitwidthCommand bitwidth =
         putMsg $ show bitwidth
 
 
+-- | Get a trace of a dynamic model with the same states as the trace given last before the given
+--   state, which differs from the traces given so far
+sendForkCommand :: MonadIO m => Integer -> AlloyIGT m (Maybe String)
+sendForkCommand state =
+    do
+        putMsg "fork"
+        putMsg $ show state
+        status <- readMsg
+        case status of
+            True  -> Just `liftM` getMsg
+            False -> return Nothing
+
+
+-- | Get a trace of a dynamic model whose relations that do not change over time differ from those
+--   of the traces given so far
+sendNextConfigurationCommand :: MonadIO m => AlloyIGT m (Maybe String)
+sendNextConfigurationCommand =
+    do
+        putMsg "nextConfiguration"
+        status <- readMsg
+        case status of
+            True  -> Just `liftM` getMsg
+            False -> return Nothing
+
+
 -- | Tell alloyIG to change the maximum length of the traces of a dynamic model
 sendSetMaxTraceLengthCommand :: MonadIO m => Integer -> AlloyIGT m ()
 sendSetMaxTraceLengthCommand traceLength =

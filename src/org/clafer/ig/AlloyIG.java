@@ -215,6 +215,21 @@ public final class AlloyIG {
         }
     }
 
+    private static class ForkOperation implements Operation {
+        private final int state;
+
+        public ForkOperation(int state) {
+            this.state = state;
+        }
+
+        public int getState() {
+            return state;
+        }
+    }
+
+    private static class NextConfigurationOperation implements Operation {
+    }
+
     private static Operation nextOperation() throws IOException {
         String op = readMessage();
         if (op == null || op.equals("quit")) {
@@ -251,6 +266,10 @@ public final class AlloyIG {
             return new SetBitwidthOperation(bitwidth);
         } else if (op.equals("setMaxTraceLength")) {
             return new SetMaxTraceLengthOperation(readIntMessage());
+        } else if (op.equals("fork")) {
+            return new ForkOperation(readIntMessage());
+        } else if (op.equals("nextConfiguration")) {
+            return new NextConfigurationOperation();
         }
         throw new AlloyIGException("Unknown op " + op);
     }
@@ -339,14 +358,26 @@ public final class AlloyIG {
         return decl.get();
     }
 
-    // The trace is the given trace, up to a renaming of its atoms: some distinct atoms make its
-    // states equal, and from its loop state, it repeats its loop.
-    private static Expr sameTrace(A4Solution ans, List<Sig.Field> fields) throws Err {
+    // The relations of a configuration of a dynamic model, which do not change over time.
+    private static List<Sig.Field> staticFields(List<Sig.Field> fields) {
+        List<Sig.Field> statics = new ArrayList<Sig.Field>();
+        for (Sig.Field field : fields) {
+            if (field.isVariable == null) {
+                statics.add(field);
+            }
+        }
+        return statics;
+    }
+
+    // Some distinct atoms make the given relations in the first states of the trace equal to those
+    // of the given trace, up to a renaming of its atoms; with the loop, from the loop state, the
+    // trace repeats the loop, so that it is the given trace.
+    private static Expr sameStates(A4Solution ans, List<Sig.Field> fields, int count, boolean withLoop) throws Err {
         Map<String, Decl> vars = new LinkedHashMap<String, Decl>();
         int length = ans.getTraceLength();
         int loop = ans.getLoopState();
-        Expr trace = null;
-        for (int s = length - 1; s >= 0; s--) {
+        Expr trace = ExprConstant.TRUE;
+        for (int s = Math.min(count, length) - 1; s >= 0; s--) {
             Expr state = ExprConstant.TRUE;
             for (Sig.Field field : fields) {
                 Expr value = null;
@@ -360,13 +391,15 @@ public final class AlloyIG {
                 }
                 state = state.and(value == null ? field.no() : field.equal(value));
             }
-            trace = trace == null ? state : state.and(trace.after());
+            trace = s == Math.min(count, length) - 1 ? state : state.and(trace.after());
         }
-        Expr periodic = ExprConstant.TRUE;
-        for (Sig.Field field : fields) {
-            periodic = periodic.and(field.equal(repeat(field, length - loop, true)));
+        if (withLoop) {
+            Expr periodic = ExprConstant.TRUE;
+            for (Sig.Field field : fields) {
+                periodic = periodic.and(field.equal(repeat(field, length - loop, true)));
+            }
+            trace = trace.and(repeat(periodic.always(), loop, false));
         }
-        trace = trace.and(repeat(periodic.always(), loop, false));
         List<Decl> decls = new ArrayList<Decl>(vars.values());
         for (int i = 0; i < decls.size(); i++) {
             for (int j = i + 1; j < decls.size(); j++) {
@@ -420,10 +453,18 @@ public final class AlloyIG {
         String modelFile = "";
 
         A4Solution ans = null;
+        // The solution of the model, as solved by the last resolve: if it is unsatisfiable, the
+        // model has no instances, and its unsat core explains why.
+        A4Solution resolved = null;
         Operation operation = null;
         boolean dynamic = false;
-        // In a dynamic model, the traces given so far are excluded from the next solutions.
+        // In a dynamic model, the traces given so far are excluded from the next solutions, and the
+        // configurations given so far from the next configuration. The next trace is solved for
+        // when it is asked for, after the trace shown last.
         Expr givenTraces = ExprConstant.TRUE;
+        Expr givenConfigurations = ExprConstant.TRUE;
+        A4Solution shown = null;
+        boolean stale = false;
 
         A4Options options = new A4Options();
         // Use fastest
@@ -468,30 +509,65 @@ public final class AlloyIG {
                 rep.minimizedBefore = 0;
                 rep.minimizedAfter = 0;
                 givenTraces = ExprConstant.TRUE;
+                givenConfigurations = ExprConstant.TRUE;
+                shown = null;
+                stale = false;
                 // Reexecute the command
                 ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
+                resolved = ans;
             } else if (operation instanceof NextOperation) {
+                if (dynamic && stale) {
+                    // Alloy does not enumerate the traces of a temporal model: it gives few of them,
+                    // of the length it found first, or none at all, depending on the model. Instead,
+                    // the next trace is solved for, without the traces given so far. The reporter of
+                    // the model stays as it is, since no more traces is not an unsat core of the model.
+                    ans = TranslateAlloyToKodkod.execute_command(new AlloyIGReporter(), world.getAllReachableSigs(),
+                            command.change(command.formula.and(givenTraces)), options);
+                    stale = false;
+                }
                 if (ans.satisfiable()) {
                     writeMessage("True");
                     writeMessage(toXml(ans));
 
-                    A4Solution nextAns;
                     if (dynamic) {
-                        // Alloy does not enumerate the traces of a temporal model: it gives few of
-                        // them, of the length it found first, or none at all, depending on the
-                        // model. Instead, the next trace is solved for, without the traces given so
-                        // far. The reporter of the model stays as it is, since no more traces is not
-                        // an unsat core of the model.
-                        givenTraces = givenTraces.and(sameTrace(ans, stateFields(world.getAllReachableSigs())).not());
-                        nextAns = TranslateAlloyToKodkod.execute_command(new AlloyIGReporter(), world.getAllReachableSigs(),
-                                command.change(command.formula.and(givenTraces)), options);
+                        List<Sig.Field> fields = stateFields(world.getAllReachableSigs());
+                        givenTraces = givenTraces.and(sameStates(ans, fields, ans.getTraceLength(), true).not());
+                        givenConfigurations = givenConfigurations.and(sameStates(ans, staticFields(fields), 1, false).not());
+                        shown = ans;
+                        stale = true;
                     } else {
-                        nextAns = ans.next();
+                        A4Solution nextAns = ans.next();
+                        if (nextAns == ans) {
+                            break;
+                        }
+                        ans = nextAns;
                     }
-                    if (nextAns == ans) {
-                        break;
-                    }
-                    ans = nextAns;
+                } else {
+                    writeMessage("False");
+                }
+            } else if (operation instanceof ForkOperation || operation instanceof NextConfigurationOperation) {
+                // A fork of the trace shown last at a state: a trace with the same states before
+                // it. A new configuration: a trace whose relations that do not change over time
+                // differ from those of the traces given so far. Both differ from the traces given
+                // so far.
+                A4Solution other = null;
+                if (dynamic && shown != null) {
+                    List<Sig.Field> fields = stateFields(world.getAllReachableSigs());
+                    Expr formula = operation instanceof ForkOperation
+                            ? sameStates(shown, fields, ((ForkOperation) operation).getState(), false)
+                            : givenConfigurations;
+                    other = TranslateAlloyToKodkod.execute_command(new AlloyIGReporter(), world.getAllReachableSigs(),
+                            command.change(command.formula.and(givenTraces).and(formula)), options);
+                }
+                if (other != null && other.satisfiable()) {
+                    writeMessage("True");
+                    writeMessage(toXml(other));
+                    List<Sig.Field> fields = stateFields(world.getAllReachableSigs());
+                    givenTraces = givenTraces.and(sameStates(other, fields, other.getTraceLength(), true).not());
+                    givenConfigurations = givenConfigurations.and(sameStates(other, staticFields(fields), 1, false).not());
+                    shown = other;
+                    ans = other;
+                    stale = true;
                 } else {
                     writeMessage("False");
                 }
@@ -512,12 +588,13 @@ public final class AlloyIG {
                 Command c = command;
                 command = new Command(c.pos, c.nameExpr, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.minprefix, c.maxprefix, c.expects, scope, c.additionalExactScopes, c.commandKeyword, c.formula, c.parent);
             } else if (operation instanceof SaveStateOperation) {
-                state = saveState(sigs, new StateExtra(rep.minimizedBefore, rep.minimizedAfter, ans, command, givenTraces));
+                state = saveState(sigs, new StateExtra(rep.minimizedBefore, rep.minimizedAfter, ans, resolved, command, givenTraces));
             } else if (operation instanceof RestoreStateOperation) {
                 StateExtra extra = restoreState(state, sigs);
                 rep.minimizedBefore = extra.getMinimizedBefore();
                 rep.minimizedAfter = extra.getMinimizedAfter();
                 ans = extra.getAnswer();
+                resolved = extra.getResolved();
                 command = extra.getCommand();
                 givenTraces = extra.getGivenTraces();
             } else if (operation instanceof RemoveConstraintOperation) {
@@ -536,9 +613,11 @@ public final class AlloyIG {
                     command = newCommand;
                 }
             } else if (operation instanceof UnsatCoreOperation) {
-                // Without this check, the highLevelCore can return garbage.
-                // Learned the hard way.
-                if (rep.minimizedAfter > 0) {
+                // Only the model has an unsat core: not the next solution, when the solutions of the
+                // model run out. Alloy reports no minimized core when it finds the model
+                // unsatisfiable without solving, e.g., [ some b ] and [ no b ], so the core is not
+                // checked by its size.
+                if (ans == resolved && !ans.satisfiable()) {
                     Set<Pos> unsatCore = ans.highLevelCore().a;
 
                     writeMessage(unsatCore.size());
@@ -576,15 +655,21 @@ public final class AlloyIG {
         private final int minimizedBefore;
         private final int minimizedAfter;
         private final A4Solution answer;
+        private final A4Solution resolved;
         private final Command command;
         private final Expr givenTraces;
 
-        public StateExtra(int minimizedBefore, int minimizedAfter, A4Solution answer, Command command, Expr givenTraces) {
+        public StateExtra(int minimizedBefore, int minimizedAfter, A4Solution answer, A4Solution resolved, Command command, Expr givenTraces) {
             this.minimizedBefore = minimizedBefore;
             this.minimizedAfter = minimizedAfter;
             this.answer = notNull(answer);
+            this.resolved = resolved;
             this.command = notNull(command);
             this.givenTraces = notNull(givenTraces);
+        }
+
+        public A4Solution getResolved() {
+            return resolved;
         }
 
         public Expr getGivenTraces() {
