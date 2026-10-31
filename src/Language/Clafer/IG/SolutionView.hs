@@ -22,7 +22,7 @@
 -- | The views of the solutions: a static model has instances, and a dynamic model has traces,
 --   whose states are instances. Both are sequences of snapshots, which the full view shows
 --   one by one, and the diff view shows as the changes from the previous snapshot.
-module Language.Clafer.IG.SolutionView (showSolution, showSolutionDiff, solutionText, solutionJSON, lpqName) where
+module Language.Clafer.IG.SolutionView (showSolution, showSolutionDiff, solutionText, solutionJSON, solutionDot, lpqName) where
 
 import Data.Char (isDigit)
 import Data.List
@@ -93,6 +93,34 @@ solutionJSON :: UIDIClaferMap -> ClaferSolution -> String
 solutionJSON uidIClaferMap' (ClaferInstance model) = generateJSON uidIClaferMap' model
 solutionJSON uidIClaferMap' (ClaferTrace states loopState) =
     "{\"states\": [" ++ intercalate ", " (map (generateJSON uidIClaferMap') states) ++ "], \"loop\": " ++ show loopState ++ "}"
+
+-- | The Graphviz graph of a solution: an instance is a single node, and a trace is a node per state
+--   with an edge to the next state, and a dashed edge from the last state back to the loop state.
+solutionDot :: ClaferSolution -> String
+solutionDot solution =
+    "digraph solution {\n    node [shape=box, fontname=\"monospace\"];\n" ++ body solution ++ "}\n"
+    where
+    body (ClaferInstance model) = dotNode "instance" (show model)
+    body (ClaferTrace states loopState) =
+        "    start [shape=point];\n" ++
+        concat (zipWith showState [0 ..] states) ++
+        "    start -> " ++ stateNode 0 ++ ";\n" ++
+        concatMap showEdge [1 .. lastState] ++
+        "    " ++ stateNode lastState ++ " -> " ++ stateNode loopState ++ " [style=dashed, label=\"loop\"];\n"
+        where
+        lastState = length states - 1
+    showState i state = dotNode (stateNode i) ("State " ++ show i ++ "\n" ++ show state)
+    showEdge i = "    " ++ stateNode (i - 1) ++ " -> " ++ stateNode i ++ ";\n"
+    stateNode i = "s" ++ show (i :: Int)
+
+-- | A node with left-aligned lines, which keep the indentation of the tree
+dotNode :: String -> String -> String
+dotNode name text = "    " ++ name ++ " [label=\"" ++ concatMap line (filter (not . null) $ lines text) ++ "\"];\n"
+    where
+    line l = concatMap escape l ++ "\\l"
+    escape '"' = "\\\""
+    escape '\\' = "\\\\"
+    escape c = [c]
 
 stateHeader :: Int -> String
 stateHeader i = "--- State " ++ show i ++ " ---\n"

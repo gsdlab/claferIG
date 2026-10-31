@@ -187,6 +187,10 @@ Common flags:
                                                        instance, or state of a
                                                        trace, as its changes
                                                        from the previous one.
+             --dot                                     Render solution as a
+                                                       Graphviz graph: for a
+                                                       trace, its states and
+                                                       transitions.
              --tl=INTEGER                              Set the maximum length
                                                        of the traces of a
                                                        dynamic model (default:
@@ -275,6 +279,12 @@ Two commands explore other traces than the next one:
 * `fork <number>` gives another trace with the same states as the last trace before the state `<number>`: what else can happen from there. E.g., `fork 2` keeps the states 0 and 1.
 * `config` gives a trace with another configuration: the clafers that do not change over time, e.g., the features of a product line declared `final`, differ from those of the traces given so far.
 
+The command `dot` saves the most recent solution as a Graphviz graph: a node for each state, with the instance as its label, an edge to the next state, and a dashed edge back to the loop state. With `--dot`, solutions are given as such graphs, and `--all` saves them to `.dot` files. To render one:
+
+```bash
+dot -Tsvg TrafficLight.cfr.1.dot -o trace.svg
+```
+
 A dynamic model, or a scenario, with no traces has an unsat core: the constraints that contradict each other, e.g., a scenario and the transition it does not follow, and a near-miss trace without one of them, as for a static model.
 
 ```
@@ -329,6 +339,8 @@ You can invoke the following commands as indicated by single quotes:
                      differ from those of the traces so far
 sa'v'e             - to save all instances displayed so far or a counterexample to files named 
                      <model file name>.cfr.<instance number>.data, one instance per file
+'dot'              - to save the most recent solution as a Graphviz graph, for a trace its states
+                     and transitions, to <model file name>.cfr.<solution number>.dot
 'q'uit             - to quit the interactive session
 'r'eload           - to reload your clafer model
 'h'elp             - to display this menu options summary

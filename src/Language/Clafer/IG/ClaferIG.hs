@@ -116,6 +116,7 @@ data IGArgs = IGArgs {
     addTypes :: Bool,
     json :: Bool,
     diff :: Bool,
+    dot :: Bool,
     tl_comp :: Maybe Integer,
     flatten_inheritance_comp :: Bool,
     no_layout_comp :: Bool,

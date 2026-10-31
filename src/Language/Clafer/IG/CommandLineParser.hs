@@ -43,6 +43,7 @@ data Command = Next |
                Fork Integer |
                NextConfiguration |
                Save |
+               SaveGraph |
                Quit |
                Reload |
                Help |
@@ -139,6 +140,7 @@ commandMap =
     ("f", findCommand):
     ("q", quitCommand):
     ("v", saveCommand):
+    ("dot", saveGraphCommand):
     ("r", reloadCommand):
     ("scope", showScopesCommand):
     ("saveScopes", saveScopesCommand):
@@ -176,6 +178,8 @@ quitCommand :: ParsecT String () Identity Command
 quitCommand              = return Quit
 saveCommand :: ParsecT String () Identity Command
 saveCommand              = return Save
+saveGraphCommand :: ParsecT String () Identity Command
+saveGraphCommand         = return SaveGraph
 reloadCommand :: ParsecT String () Identity Command
 reloadCommand            = return Reload
 findCommand :: ParsecT String () Identity Command

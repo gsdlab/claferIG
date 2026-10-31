@@ -199,6 +199,8 @@ runCommandLine =
                 "                     differ from those of the traces so far\n" ++
                 "sa'v'e             - to save all instances displayed so far or a counterexample to files named \n" ++
                 "                     <model file name>.cfr.<instance number>.data, one instance per file\n" ++
+                "'dot'              - to save the most recent solution as a Graphviz graph, for a trace its states\n" ++
+                "                     and transitions, to <model file name>.cfr.<solution number>.dot\n" ++
                 "'q'uit             - to quit the interactive session\n" ++
                 "'r'eload           - to reload your clafer model\n" ++
                 "'h'elp             - to display this menu options summary\n" ++
@@ -230,6 +232,18 @@ runCommandLine =
         do
             save unsaved (toInteger $ length saved)
             nextLoop context{saved=unsaved ++ saved, unsaved=[]}
+
+    loop SaveGraph context =
+        do
+            let solutions = unsaved context ++ saved context
+            case solutions of
+                [] -> outputStrLn "No solution yet: type 'n' for the first one."
+                solution : _ -> do
+                    claferModelFile' <- lift getModelFileName
+                    let saveName = claferModelFile' ++ "." ++ show (length solutions) ++ ".dot"
+                    liftIO $ writeFile saveName (solutionDot solution)
+                    outputStrLn $ "Saved to " ++ saveName
+            nextLoop context
 
     loop Reload context =
         do
@@ -525,6 +539,8 @@ runCommandLine =
                 previous = listToMaybe (unsaved context ++ saved context)
             outputStrLn $ if json claferIGArgs'
                 then solutionJSON uidIClaferMap' claferSolution
+                else if dot claferIGArgs'
+                then solutionDot claferSolution
                 else if diffView context
                     then showSolutionDiff (lpqName qNameMaps') iNumber previous claferSolution
                     else showSolution iNumber claferSolution

@@ -64,6 +64,7 @@ claferIGArgsDef = IGArgs {
     addTypes                    = False &= help "Add colon/reference types to the Clafer solution.",
     json                        = False &= help "Render solution as JSON (forces 'addUids').",
     diff                        = False &= help "Show each next instance, or state of a trace, as its changes from the previous one.",
+    dot                         = False &= help "Render solution as a Graphviz graph: for a trace, its states and transitions." &= explicit &= name "dot",
     tl_comp                     = def &= help "Set the maximum length of the traces of a dynamic model (default: 10)." &= typ "INTEGER" &= explicit &= name "tl",
     flatten_inheritance_comp    = def &= help "Flatten inheritance during compiling ('alloy' mode only)" &= name "i",
     no_layout_comp              = def &= help "Don't resolve off-side rule layout during compiling" &= name "l",
@@ -152,7 +153,8 @@ runClaferIG args' =
                 counterRef <- liftIO $ newIORef 1
 
                 let saveDirectory = fromMaybe return $ underDirectory `liftM` saveDir args'
-                saveAll (maxInstances args') (savePath claferModelFileName counterRef >>= saveDirectory)
+                let extension = if dot args' && not (json args') then ".dot" else ".data"
+                saveAll (maxInstances args') (savePath extension claferModelFileName counterRef >>= saveDirectory)
                 quit
             Nothing    -> do
                 liftIO $ putStrLn "Type 'h' for the list of available REPL commands\n"
@@ -181,12 +183,12 @@ runAlloySolution args' =
             then solutionText $ ClaferTrace (sugarClaferStates (useUids args') (addTypes args') uidIClaferMap' (map buildStateModel states) sMap) loopState
             else show $ (sugarClaferModel (useUids args') (addTypes args') uidIClaferMap' $ buildClaferModel $ parseSolution alloyInstance) $ sMap
 
-savePath :: FilePath -> IORef Int -> IO FilePath
-savePath file' counterRef =
+savePath :: String -> FilePath -> IORef Int -> IO FilePath
+savePath extension file' counterRef =
     do
         counter <- readIORef counterRef
         writeIORef counterRef (counter + 1)
-        return $ file' ++ "." ++ (show counter) ++ ".data"
+        return $ file' ++ "." ++ (show counter) ++ extension
 
 
 underDirectory :: FilePath -> FilePath -> IO FilePath
@@ -210,6 +212,8 @@ saveAll maxInstances' nextFile =
             Instance{modelSolution = modelSolution'} -> do
                 let output' = if json claferIGArgs'
                               then solutionJSON uidIClaferMap' modelSolution'
+                              else if dot claferIGArgs'
+                              then solutionDot modelSolution'
                               else solutionText modelSolution'
                 liftIO $ writeFile file' output'
                 saveAll (subtract 1 <$> maxInstances') nextFile

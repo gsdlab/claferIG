@@ -65,6 +65,7 @@ claferIGArgsDef = IGArgs {
     addTypes        = False,
     json            = False,
     diff            = False,
+    dot             = False,
     tl_comp         = def,
     flatten_inheritance_comp = False,
     no_layout_comp = False,
@@ -142,6 +143,29 @@ case_DynamicModelTrace = do
                 let diffView = showSolutionDiff id 1 Nothing (ClaferTrace states 0)
                 ("-       green\n+       yellow" `isInfixOf` diffView) @? ("The diff view shows the change of the light: " ++ diffView)
             ClaferInstance _ -> assertFailure "A dynamic model has traces"
+
+-- | The graph of a trace has its states, their transitions and the loop; of an instance, a node.
+case_SolutionGraph :: Assertion
+case_SolutionGraph = do
+        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
+        createDirectoryIfMissing True dir
+        writeFile (dir </> "graph.cfr") trafficLight
+        result <- runClaferIGT (defaultIGArgs $ dir </> "graph.cfr") $ solve >> next
+        case fromRight result of
+            Instance solution@(ClaferTrace states loopState) _ -> do
+                let
+                    graph = solutionDot solution
+                    lastState = length states - 1
+                    has line = (line `isInfixOf` graph) @? ("The graph has " ++ line ++ ": " ++ graph)
+                has "start -> s0;"
+                forM_ [1 .. lastState] $ \i -> has $ "s" ++ show (i - 1) ++ " -> s" ++ show i ++ ";"
+                has $ "s" ++ show lastState ++ " -> s" ++ show loopState ++ " [style=dashed"
+                has "s0 [label=\"State 0\\l"
+            _ -> assertFailure "A trace"
+        let
+            value = Clafer (Id "c" 0) "c" (Just $ StringValue "\"a\"") []
+            graph = solutionDot $ ClaferInstance $ ClaferModel [value]
+        ("\\\"a\\\"" `isInfixOf` graph) @? ("The quotes are escaped: " ++ graph)
 
 -- | A scenario that contradicts the model has an unsat core with the scenario and the transition
 --   it contradicts.
