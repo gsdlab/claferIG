@@ -196,7 +196,8 @@ runCommandLine =
                 "                     (+ appears, - disappears, ~ changes its value)\n" ++
                 "'fork'             - to produce another trace with the same first states as the last trace\n" ++
                 "'config'           - to produce a trace of a dynamic model whose clafers that do not change over time\n" ++
-                "                     differ from those of the traces so far\n" ++
+                "                     differ from those of the traces so far, or an instance of a static model whose\n" ++
+                "                     clafers, without the values of their references, differ from those so far\n" ++
                 "sa'v'e             - to save all instances displayed so far or a counterexample to files named \n" ++
                 "                     <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                 "'dot'              - to save the most recent solution as a Graphviz graph, for a trace its states\n" ++
@@ -348,9 +349,14 @@ runCommandLine =
                 outputStrLn $ "The maximum trace length is " ++ show traceLength ++ "."
             nextLoop context
 
-    loop (Fork state) context = otherTrace (fork state) ("No other trace has the states of the last trace before state " ++ show state ++ ".") context
+    loop (Fork state) context =
+        do
+            dynamic <- lift isDynamicModel
+            if not dynamic
+            then outputStrLn "The model is static: its instances are not traces." >> nextLoop context
+            else otherSolution (fork state) ("No other trace has the states of the last trace before state " ++ show state ++ ".") context
 
-    loop NextConfiguration context = otherTrace nextConfiguration "No trace has another configuration." context
+    loop NextConfiguration context = otherSolution nextConfiguration "No solution has another configuration." context
 
     loop ToggleDiff context =
         do
@@ -549,14 +555,11 @@ runCommandLine =
                     else showSolution iNumber claferSolution
             nextLoop context{unsaved=claferSolution:(unsaved context), currentAlloyInstance=Just xml}
 
-    -- shows a trace of a dynamic model other than the next one: a fork, or another configuration
-    otherTrace command none context =
+    -- shows a solution other than the next one: a fork, or another configuration
+    otherSolution command none context =
         do
-            dynamic <- lift isDynamicModel
-            if not dynamic
-            then outputStrLn "The model is static: its instances are not traces." >> nextLoop context
-            else if null (unsaved context ++ saved context)
-            then outputStrLn "No trace yet: type 'n' for the first one." >> nextLoop context
+            if null (unsaved context ++ saved context)
+            then outputStrLn "No solution yet: type 'n' for the first one." >> nextLoop context
             else do
                 solution <- lift command
                 case solution of

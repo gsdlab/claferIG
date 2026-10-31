@@ -369,17 +369,36 @@ public final class AlloyIG {
         return statics;
     }
 
+    // The relations of a configuration of a static model: its structure, which clafers there
+    // are, without the values of its references. A top-level clafer has no parent relation,
+    // so the sigs say which clafers there are.
+    private static List<Expr> structure(Iterable<Sig> sigs) {
+        List<Expr> structure = new ArrayList<Expr>();
+        for (Sig sig : sigs) {
+            if (!sig.builtin && sig.isAbstract == null) {
+                structure.add(sig);
+            }
+            for (Sig.Field field : sig.getFields()) {
+                if (field.label.startsWith("r_")) {
+                    structure.add(field);
+                }
+            }
+        }
+        return structure;
+    }
+
     // Some distinct atoms make the given relations in the first states of the trace equal to those
     // of the given trace, up to a renaming of its atoms; with the loop, from the loop state, the
     // trace repeats the loop, so that it is the given trace.
-    private static Expr sameStates(A4Solution ans, List<Sig.Field> fields, int count, boolean withLoop) throws Err {
+    private static Expr sameStates(A4Solution ans, List<? extends Expr> fields, int count, boolean withLoop) throws Err {
         Map<String, Decl> vars = new LinkedHashMap<String, Decl>();
-        int length = ans.getTraceLength();
+        // an instance of a static model has no trace, but it is one state
+        int length = Math.max(ans.getTraceLength(), 1);
         int loop = ans.getLoopState();
         Expr trace = ExprConstant.TRUE;
         for (int s = Math.min(count, length) - 1; s >= 0; s--) {
             Expr state = ExprConstant.TRUE;
-            for (Sig.Field field : fields) {
+            for (Expr field : fields) {
                 Expr value = null;
                 for (A4Tuple tuple : (A4TupleSet) ans.eval(field, s)) {
                     Expr t = null;
@@ -395,7 +414,7 @@ public final class AlloyIG {
         }
         if (withLoop) {
             Expr periodic = ExprConstant.TRUE;
-            for (Sig.Field field : fields) {
+            for (Expr field : fields) {
                 periodic = periodic.and(field.equal(repeat(field, length - loop, true)));
             }
             trace = trace.and(repeat(periodic.always(), loop, false));
@@ -536,6 +555,8 @@ public final class AlloyIG {
                         shown = ans;
                         stale = true;
                     } else {
+                        givenConfigurations = givenConfigurations.and(sameStates(ans, structure(world.getAllReachableSigs()), 1, false).not());
+                        shown = ans;
                         A4Solution nextAns = ans.next();
                         if (nextAns == ans) {
                             break;
@@ -548,10 +569,11 @@ public final class AlloyIG {
             } else if (operation instanceof ForkOperation || operation instanceof NextConfigurationOperation) {
                 // A fork of the trace shown last at a state: a trace with the same states before
                 // it. A new configuration: a trace whose relations that do not change over time
-                // differ from those of the traces given so far. Both differ from the traces given
-                // so far.
+                // differ from those of the traces given so far, or an instance of a static model
+                // whose structure differs from those of the instances given so far. Both differ
+                // from the traces given so far.
                 A4Solution other = null;
-                if (dynamic && shown != null) {
+                if ((dynamic || operation instanceof NextConfigurationOperation) && shown != null) {
                     List<Sig.Field> fields = stateFields(world.getAllReachableSigs());
                     Expr formula = operation instanceof ForkOperation
                             ? sameStates(shown, fields, ((ForkOperation) operation).getState(), false)
@@ -563,11 +585,17 @@ public final class AlloyIG {
                     writeMessage("True");
                     writeMessage(toXml(other));
                     List<Sig.Field> fields = stateFields(world.getAllReachableSigs());
-                    givenTraces = givenTraces.and(sameStates(other, fields, other.getTraceLength(), true).not());
-                    givenConfigurations = givenConfigurations.and(sameStates(other, staticFields(fields), 1, false).not());
                     shown = other;
-                    ans = other;
-                    stale = true;
+                    if (dynamic) {
+                        givenTraces = givenTraces.and(sameStates(other, fields, other.getTraceLength(), true).not());
+                        givenConfigurations = givenConfigurations.and(sameStates(other, staticFields(fields), 1, false).not());
+                        ans = other;
+                        stale = true;
+                    } else {
+                        // the next instances continue from this one, without the configurations so far
+                        givenConfigurations = givenConfigurations.and(sameStates(other, structure(world.getAllReachableSigs()), 1, false).not());
+                        ans = other.next();
+                    }
                 } else {
                     writeMessage("False");
                 }

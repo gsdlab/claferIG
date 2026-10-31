@@ -218,6 +218,23 @@ case_DynamicModelForkAndConfiguration = do
                 (("EU" `isInfixOf` show state) /= ("EU" `isInfixOf` show state')) @? "The configurations differ in EU"
             _ -> assertFailure "Two configurations"
 
+-- | A static model gives an instance with another structure, regardless of the values.
+case_StaticModelConfiguration :: Assertion
+case_StaticModelConfiguration = do
+        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
+        createDirectoryIfMissing True dir
+        writeFile (dir </> "static.cfr") $ unlines
+            [ "EU ?"
+            , "age -> integer"
+            ]
+        result <- runClaferIGT (defaultIGArgs $ dir </> "static.cfr") $ do
+            solve
+            sequence [next, nextConfiguration, nextConfiguration]
+        case fromRight result of
+            [Instance (ClaferInstance model) _, Instance (ClaferInstance model') _, NoInstance] ->
+                (("EU" `isInfixOf` show model) /= ("EU" `isInfixOf` show model')) @? "The configurations differ in EU"
+            _ -> assertFailure "Two configurations"
+
 -- | The traces given by next are distinct, and limited by the maximum trace length.
 case_DynamicModelTraces :: Assertion
 case_DynamicModelTraces = do

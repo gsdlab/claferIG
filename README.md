@@ -279,6 +279,8 @@ Two commands explore other traces than the next one:
 * `fork <number>` gives another trace with the same states as the last trace before the state `<number>`: what else can happen from there. E.g., `fork 2` keeps the states 0 and 1.
 * `config` gives a trace with another configuration: the clafers that do not change over time, e.g., the features of a product line declared `final`, differ from those of the traces given so far.
 
+`config` also works on static models, whose next instances often differ only in a value: it gives an instance whose structure, its clafers without the values of their references, differs from those of the instances given so far. Each `config` gives, e.g., another selection of features of a product line. The next instances then continue from it, without the structures given so far.
+
 The command `dot` saves the most recent solution as a Graphviz graph: a node for each state, with the instance as its label, an edge to the next state, and a dashed edge back to the loop state. In the diff view, the first state is in full and each next state shows its changes, which keeps the graph of a large model readable. With `--dot`, solutions are given as such graphs, and `--all` saves them to `.dot` files. To render one:
 
 ```bash
@@ -336,7 +338,8 @@ You can invoke the following commands as indicated by single quotes:
                      (+ appears, - disappears, ~ changes its value)
 'fork'             - to produce another trace with the same first states as the last trace
 'config'           - to produce a trace of a dynamic model whose clafers that do not change over time
-                     differ from those of the traces so far
+                     differ from those of the traces so far, or an instance of a static model whose
+                     clafers, without the values of their references, differ from those so far
 sa'v'e             - to save all instances displayed so far or a counterexample to files named 
                      <model file name>.cfr.<instance number>.data, one instance per file
 'dot'              - to save the most recent solution as a Graphviz graph, for a trace its states

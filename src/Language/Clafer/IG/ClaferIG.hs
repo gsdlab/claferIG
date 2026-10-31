@@ -383,12 +383,12 @@ next = do
                 Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
 
-    -- the instance of a static model, or the trace of a dynamic model
-    xmlToSolution :: Bool -> Bool -> Bool -> UIDIClaferMap -> String -> Map Int String -> ClaferSolution
-    xmlToSolution False useUids' addTypes' uidIClaferMap' xml sMap = ClaferInstance $ (sugarClaferModel useUids' addTypes' uidIClaferMap' $ buildClaferModel $ parseSolution xml) sMap
-    xmlToSolution True  useUids' addTypes' uidIClaferMap' xml sMap = ClaferTrace (sugarClaferStates useUids' addTypes' uidIClaferMap' (map buildStateModel states) sMap) loopState
-        where
-        (states, loopState) = parseTrace xml
+-- | The instance of a static model, or the trace of a dynamic model
+xmlToSolution :: Bool -> Bool -> Bool -> UIDIClaferMap -> String -> Map Int String -> ClaferSolution
+xmlToSolution False useUids' addTypes' uidIClaferMap' xml sMap = ClaferInstance $ (sugarClaferModel useUids' addTypes' uidIClaferMap' $ buildClaferModel $ parseSolution xml) sMap
+xmlToSolution True  useUids' addTypes' uidIClaferMap' xml sMap = ClaferTrace (sugarClaferStates useUids' addTypes' uidIClaferMap' (map buildStateModel states) sMap) loopState
+    where
+    (states, loopState) = parseTrace xml
 
 -- | A trace with the same states as the trace given last before the given state, which differs
 --   from the traces given so far, if any
@@ -396,7 +396,8 @@ fork :: MonadIO m => Integer -> ClaferIGT m Instance
 fork state = otherTrace $ AlloyIG.sendForkCommand state
 
 -- | A trace whose configuration, its clafers that do not change over time, differs from those of
---   the traces given so far, if any
+--   the traces given so far, or an instance of a static model whose structure, its clafers without
+--   the values of their references, differs from those of the instances given so far, if any
 nextConfiguration :: MonadIO m => ClaferIGT m Instance
 nextConfiguration = otherTrace AlloyIG.sendNextConfigurationCommand
 
@@ -405,11 +406,10 @@ otherTrace command = do
     claferIGArgs' <- getClaferIGArgs
     uidIClaferMap' <- getUIDIClaferMap
     sMap <- getStrMap
+    dynamic <- isDynamicModel
     xmlSolution <- ClaferIGT $ lift command
     return $ case xmlSolution of
-        Just xml -> Instance (ClaferTrace (sugarClaferStates (useUids claferIGArgs') (addTypes claferIGArgs') uidIClaferMap' (map buildStateModel states) sMap) loopState) xml
-            where
-            (states, loopState) = parseTrace xml
+        Just xml -> Instance (xmlToSolution dynamic (useUids claferIGArgs') (addTypes claferIGArgs') uidIClaferMap' xml sMap) xml
         Nothing  -> NoInstance
 
 -- | Whether the model is dynamic, with traces as its solutions
