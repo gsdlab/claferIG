@@ -279,7 +279,7 @@ Two commands explore other traces than the next one:
 * `fork <number>` gives another trace with the same states as the last trace before the state `<number>`: what else can happen from there. E.g., `fork 2` keeps the states 0 and 1.
 * `config` gives a trace with another configuration: the clafers that do not change over time, e.g., the features of a product line declared `final`, differ from those of the traces given so far.
 
-The command `dot` saves the most recent solution as a Graphviz graph: a node for each state, with the instance as its label, an edge to the next state, and a dashed edge back to the loop state. With `--dot`, solutions are given as such graphs, and `--all` saves them to `.dot` files. To render one:
+The command `dot` saves the most recent solution as a Graphviz graph: a node for each state, with the instance as its label, an edge to the next state, and a dashed edge back to the loop state. In the diff view, the first state is in full and each next state shows its changes, which keeps the graph of a large model readable. With `--dot`, solutions are given as such graphs, and `--all` saves them to `.dot` files. To render one:
 
 ```bash
 dot -Tsvg TrafficLight.cfr.1.dot -o trace.svg

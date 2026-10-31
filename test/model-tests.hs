@@ -161,6 +161,13 @@ case_SolutionGraph = do
                 forM_ [1 .. lastState] $ \i -> has $ "s" ++ show (i - 1) ++ " -> s" ++ show i ++ ";"
                 has $ "s" ++ show lastState ++ " -> s" ++ show loopState ++ " [style=dashed"
                 has "s0 [label=\"State 0\\l"
+                let
+                    diffGraph = solutionDiffDot id solution
+                    diffHas line = (line `isInfixOf` diffGraph) @? ("The diff graph has " ++ line ++ ": " ++ diffGraph)
+                diffHas "s0 [label=\"State 0\\l+ "
+                diffHas "s1 [label=\"State 1\\l"
+                diffHas $ "s" ++ show lastState ++ " -> s" ++ show loopState ++ " [style=dashed"
+                diffHas "\\l- "
             _ -> assertFailure "A trace"
         let
             value = Clafer (Id "c" 0) "c" (Just $ StringValue "\"a\"") []

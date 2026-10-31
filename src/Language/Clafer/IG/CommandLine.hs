@@ -241,7 +241,10 @@ runCommandLine =
                 solution : _ -> do
                     claferModelFile' <- lift getModelFileName
                     let saveName = claferModelFile' ++ "." ++ show (length solutions) ++ ".dot"
-                    liftIO $ writeFile saveName (solutionDot solution)
+                    qNameMaps' <- lift getQNameMaps
+                    liftIO $ writeFile saveName $ if diffView context
+                        then solutionDiffDot (lpqName qNameMaps') solution
+                        else solutionDot solution
                     outputStrLn $ "Saved to " ++ saveName
             nextLoop context
 
@@ -540,7 +543,7 @@ runCommandLine =
             outputStrLn $ if json claferIGArgs'
                 then solutionJSON uidIClaferMap' claferSolution
                 else if dot claferIGArgs'
-                then solutionDot claferSolution
+                then (if diffView context then solutionDiffDot (lpqName qNameMaps') claferSolution else solutionDot claferSolution)
                 else if diffView context
                     then showSolutionDiff (lpqName qNameMaps') iNumber previous claferSolution
                     else showSolution iNumber claferSolution

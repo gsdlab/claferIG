@@ -22,7 +22,7 @@
 -- | The views of the solutions: a static model has instances, and a dynamic model has traces,
 --   whose states are instances. Both are sequences of snapshots, which the full view shows
 --   one by one, and the diff view shows as the changes from the previous snapshot.
-module Language.Clafer.IG.SolutionView (showSolution, showSolutionDiff, solutionText, solutionJSON, solutionDot, lpqName) where
+module Language.Clafer.IG.SolutionView (showSolution, showSolutionDiff, solutionText, solutionJSON, solutionDot, solutionDiffDot, lpqName) where
 
 import Data.Char (isDigit)
 import Data.List
@@ -97,19 +97,32 @@ solutionJSON uidIClaferMap' (ClaferTrace states loopState) =
 -- | The Graphviz graph of a solution: an instance is a single node, and a trace is a node per state
 --   with an edge to the next state, and a dashed edge from the last state back to the loop state.
 solutionDot :: ClaferSolution -> String
-solutionDot solution =
+solutionDot solution = graphWith (map show $ solutionModels solution) solution
+
+-- | The Graphviz graph of a solution in the diff view, which keeps large traces readable: the first
+--   state in full, and each next state as its changes from the previous one.
+solutionDiffDot :: (String -> String) -> ClaferSolution -> String
+solutionDiffDot names solution@(ClaferTrace states _) =
+    graphWith labels solution
+    where
+    labels = appears (head states) : zipWith (\previous state -> showChanges (instanceDiff names previous state)) states (tail states)
+solutionDiffDot _ solution = solutionDot solution
+
+-- | The graph of a solution, given the label of the instance, or of each state
+graphWith :: [String] -> ClaferSolution -> String
+graphWith labels solution =
     "digraph solution {\n    node [shape=box, fontname=\"monospace\"];\n" ++ body solution ++ "}\n"
     where
-    body (ClaferInstance model) = dotNode "instance" (show model)
+    body (ClaferInstance _) = dotNode "instance" (concat labels)
     body (ClaferTrace states loopState) =
         "    start [shape=point];\n" ++
-        concat (zipWith showState [0 ..] states) ++
+        concat (zipWith showState [0 ..] labels) ++
         "    start -> " ++ stateNode 0 ++ ";\n" ++
         concatMap showEdge [1 .. lastState] ++
         "    " ++ stateNode lastState ++ " -> " ++ stateNode loopState ++ " [style=dashed, label=\"loop\"];\n"
         where
         lastState = length states - 1
-    showState i state = dotNode (stateNode i) ("State " ++ show i ++ "\n" ++ show state)
+    showState i label = dotNode (stateNode i) ("State " ++ show i ++ "\n" ++ label)
     showEdge i = "    " ++ stateNode (i - 1) ++ " -> " ++ stateNode i ++ ";\n"
     stateNode i = "s" ++ show (i :: Int)
 
