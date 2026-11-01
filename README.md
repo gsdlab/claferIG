@@ -281,7 +281,7 @@ Two commands explore other traces than the next one:
 
 `config` also works on static models, whose next instances often differ only in a value: it gives an instance whose structure, its clafers without the values of their references, differs from those of the instances given so far. Each `config` gives, e.g., another selection of features of a product line. The next instances then continue from it, without the structures given so far.
 
-The command `check` checks the assertions of the model, also the nested ones and those of temporal models, one by one. An assertion holds for all the solutions within the scopes and the maximum trace length, so `No counterexample` does not prove it for larger scopes or longer traces. A counterexample is shown like any other solution, and the next solution of the model stays as it is. Checking a large model can take much longer than generating a solution; lower the maximum trace length (`tl`) to get a faster answer.
+The command `check` checks the assertions of the model, also the nested ones and those of temporal models, one by one. An assertion holds for all the solutions within the scopes and the maximum trace length, so `No counterexample` does not prove it for larger scopes or longer traces. A counterexample is shown like any other solution, and the next solution of the model stays as it is. Checking a large model can take much longer than generating a solution; lower the maximum trace length (`tl`) to get a faster answer. `check <number>` checks only the assertions on that line.
 
 ```
 claferIG> check
@@ -378,6 +378,7 @@ Parameterized command usage:
 'f <name>'          - to display a clafer <name>
 'tl <number>'       - to set the maximum trace length to <number>
 'fork <number>'     - to produce another trace with the states of the last trace before state <number>
+'check <number>'    - to check only the assertions on line <number>
 'setUnsatCoreMinimization fastest' - fastest but the worst
 'setUnsatCoreMinimization medium'
 'setUnsatCoreMinimization best' - best but slowest even for modest size cores

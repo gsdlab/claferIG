@@ -208,6 +208,11 @@ case_Assertions = do
     dynamic @?= [("a => X b", False), ("never s.b", True), ("s.a => X s.a", True)]
     (static, solution) <- results "static.cfr"
     static @?= [("age >= 0", False), ("age >= 3", True)]
+    onLine <- runClaferIGT (defaultIGArgs $ dir </> "static.cfr") $ do
+        solve
+        assertions <- getAssertions
+        return $ map (\n -> map (syntax . snd) $ filter (isOnLine n . snd) assertions) [4, 5, 6]
+    fromRight onLine @?= [["age >= 0"], ["age >= 3"], []]
     case solution of
         Instance{} -> return ()
         _ -> assertFailure "The next solution stays as it is"

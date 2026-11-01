@@ -22,7 +22,7 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.Constraints (Constraint(..), Cardinality(..), ClaferInfo(..), ConstraintInfo(..), isLowerCardinalityConstraint, isUpperCardinalityConstraint, lookupConstraint, parseConstraints, parseAssertions)  where
+module Language.Clafer.IG.Constraints (Constraint(..), Cardinality(..), ClaferInfo(..), ConstraintInfo(..), isLowerCardinalityConstraint, isUpperCardinalityConstraint, lookupConstraint, parseConstraints, parseAssertions, isOnLine)  where
 
 import Data.List
 import Data.Maybe
@@ -63,10 +63,14 @@ instance Show ClaferInfo where
 
 -- | A constraint of the model: its position in the complete model, its text, and its position
 --   as shown, the file and the position in it (@file.cfr:3:5@).
-data ConstraintInfo = ConstraintInfo {pId::String, pos::Span, syntax::String, position::String} deriving Eq
+data ConstraintInfo = ConstraintInfo {pId::String, pos::Span, syntax::String, position::String, fileLine::Integer} deriving Eq
 
 instance Show ConstraintInfo where
     show ConstraintInfo{syntax, position} = syntax ++ " (" ++ position ++ ")"
+
+-- | Whether a constraint spans the given line of its file.
+isOnLine :: Integer -> ConstraintInfo -> Bool
+isOnLine n ConstraintInfo{pos = Span (Pos l1 _) (Pos l2 _), fileLine} = fileLine <= n && n <= fileLine + l2 - l1
 
 isLowerCardinalityConstraint :: Constraint -> Bool
 isLowerCardinalityConstraint LowerCardinalityConstraint{} = True
@@ -129,11 +133,12 @@ parseAssertions modelFiles imodule =
 
 -- | The information of a constraint: its text and position in the files of the model.
 constraintInfoOf :: [ModelFile] -> PExp -> ConstraintInfo
-constraintInfoOf modelFiles pexp = ConstraintInfo (_pid pexp) (_inPos pexp) (extract $ _inPos pexp) (showPosition $ _inPos pexp)
+constraintInfoOf modelFiles pexp = ConstraintInfo (_pid pexp) (_inPos pexp) (extract $ _inPos pexp) (showPosition $ _inPos pexp) (positionLine $ _inPos pexp)
     where
     -- the columns count a tab up to the next multiple of 8, as the compiler does
     text = map expandTabs $ lines $ modelText modelFiles
     showPosition (Span (Pos l c) _) = let (path, l') = modelPosition modelFiles l in path ++ ":" ++ show l' ++ ":" ++ show c
+    positionLine (Span (Pos l _) _) = snd $ modelPosition modelFiles l
     -- an expression's span ends before the parentheses that close its last operand, e.g.,
     -- `initially (a --> b` of `initially (a --> b)`, which are added
     extract (Span (Pos l1 c1) (Pos l2 c2)) = closeParentheses (extract' l1 c1 l2 c2) (drop (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1))

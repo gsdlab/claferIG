@@ -224,6 +224,7 @@ runCommandLine =
                 "'f <name>'          - to display a clafer <name>\n" ++
                 "'tl <number>'       - to set the maximum trace length to <number>\n" ++
                 "'fork <number>'     - to produce another trace with the states of the last trace before state <number>\n" ++
+                "'check <number>'    - to check only the assertions on line <number>\n" ++
                 "'setUnsatCoreMinimization fastest' - fastest but the worst\n" ++
                 "'setUnsatCoreMinimization medium'\n" ++
                 "'setUnsatCoreMinimization best' - best but slowest even for modest size cores"
@@ -251,11 +252,12 @@ runCommandLine =
                     outputStrLn $ "Saved to " ++ saveName
             nextLoop context
 
-    loop Check context =
+    loop (Check line) context =
         do
-            assertions <- lift getAssertions
+            allAssertions <- lift getAssertions
+            let assertions = maybe allAssertions (\n -> filter (isOnLine n . snd) allAssertions) line
             dynamic <- lift isDynamicModel
-            when (null assertions) $ outputStrLn "The model has no assertions."
+            when (null assertions) $ outputStrLn $ maybe "The model has no assertions." (\n -> "The model has no assertion on line " ++ show n ++ ".") line
             (context', failed) <- foldM checkAssertion' (context, 0 :: Int) assertions
             let bounds = if dynamic then "the scopes and the maximum trace length" else "the scopes"
             unless (null assertions) $ outputStrLn $
@@ -515,7 +517,7 @@ runCommandLine =
                 getCommentLines = foldr (\((Span (Pos l1 _) (Pos l2 _)), _) acc -> [l1..l2] ++ acc) [] . getComments
 
                 getConstraintInfo :: Constraint -> (Maybe Integer, String)
-                getConstraintInfo (UserConstraint _ info@(ConstraintInfo _ (Span (Pos l _) _) _ _)) = (Just l, show info)
+                getConstraintInfo (UserConstraint _ info@(ConstraintInfo _ (Span (Pos l _) _) _ _ _)) = (Just l, show info)
                 getConstraintInfo x = (Nothing, show $ claferInfo x)
 
     loop ShowAlloyModel context =
