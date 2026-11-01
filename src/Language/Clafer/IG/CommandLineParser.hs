@@ -38,7 +38,13 @@ data Command = Next |
                SetScope String Integer |
                SetBitwidth Integer |
                SetMaxInt Integer |
+               SetMaxTraceLength Integer |
+               ToggleDiff |
+               Fork Integer |
+               NextConfiguration |
+               Check (Maybe Integer) |
                Save |
+               SaveGraph |
                Quit |
                Reload |
                Help |
@@ -127,10 +133,16 @@ commandMap =
     ("b", setBitwidthCommand):
     ("m", setMaxIntCommand):
     ("maxint", setMaxIntCommand):
+    ("tl", setMaxTraceLengthCommand):
+    ("d", toggleDiffCommand):
+    ("fork", forkCommand):
+    ("config", nextConfigurationCommand):
+    ("check", checkCommand):
     ("n", nextCommand):
     ("f", findCommand):
     ("q", quitCommand):
     ("v", saveCommand):
+    ("dot", saveGraphCommand):
     ("r", reloadCommand):
     ("scope", showScopesCommand):
     ("saveScopes", saveScopesCommand):
@@ -154,12 +166,24 @@ setBitwidthCommand :: Parser Command
 setBitwidthCommand       = setBitwidth
 setMaxIntCommand :: Parser Command
 setMaxIntCommand       = setMaxInt
+setMaxTraceLengthCommand :: Parser Command
+setMaxTraceLengthCommand = SetMaxTraceLength `liftM` (gap >> number)
+forkCommand :: Parser Command
+forkCommand              = Fork `liftM` (gap >> number)
+nextConfigurationCommand :: ParsecT String () Identity Command
+nextConfigurationCommand = return NextConfiguration
+checkCommand :: Parser Command
+checkCommand             = (Check . mfilter (> 0)) `liftM` optionMaybe (try (gap >> signedNumber))
+toggleDiffCommand :: ParsecT String () Identity Command
+toggleDiffCommand        = return ToggleDiff
 nextCommand :: ParsecT String () Identity Command
 nextCommand              = return Next
 quitCommand :: ParsecT String () Identity Command
 quitCommand              = return Quit
 saveCommand :: ParsecT String () Identity Command
 saveCommand              = return Save
+saveGraphCommand :: ParsecT String () Identity Command
+saveGraphCommand         = return SaveGraph
 reloadCommand :: ParsecT String () Identity Command
 reloadCommand            = return Reload
 findCommand :: ParsecT String () Identity Command

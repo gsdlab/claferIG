@@ -20,7 +20,7 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), c_name, buildClaferModel, traverseModel) where
+module Language.Clafer.IG.ClaferModel (ClaferModel(..), Clafer(..), Id(..), Value(..), ClaferSolution(..), c_name, buildClaferModel, buildStateModel, solutionModels, traverseModel) where
 
 import Data.List
 import Data.Either
@@ -31,7 +31,8 @@ import Prelude hiding (id)
 
 -- | Clafer model instance
 data ClaferModel = ClaferModel {c_topLevel::[Clafer]}
-data Clafer = Clafer {c_id::Id, c_value::Maybe Value, c_children::[Clafer]} deriving Eq
+-- | An instance of a clafer: its name, the UID of its clafer, its value and its children
+data Clafer = Clafer {c_id::Id, c_uid::String, c_value::Maybe Value, c_children::[Clafer]} deriving Eq
 data Value = AliasValue {c_alias::Id} | IntValue {v_value::Int} | StringValue {v_str ::String} deriving (Show, Eq)
 
 c_name :: Clafer -> String
@@ -60,7 +61,7 @@ instance Show ClaferModel where
 instance Show Clafer where
     show clafer = displayClafer "" clafer
         where
-        displayClafer indent (Clafer id value children) =
+        displayClafer indent (Clafer id _ value children) =
             indent ++ i_name id ++ maybe "" displayValue value ++
             "\n" ++ concatMap (displayClafer $ indent ++ "  ") children
         displayValue (AliasValue alias) = " -> " ++ i_name alias
@@ -169,11 +170,34 @@ buildSigMap (Solution sigs _) = Map.fromList $ zip (map s_label sigs) sigs
 
 
 buildClaferModel :: Solution -> ClaferModel
-buildClaferModel solution =
-    ClaferModel $ removeDups [] $ lefts $ map buildClafer (getRoots ftree)
+buildClaferModel solution = buildClafers solution ftree (getRoots ftree)
+    where
+    ftree = buildFamilyTree solution
+
+-- | The instance in a state of a trace of a dynamic model. The sigs of a dynamic model are pools
+--   of atoms, which exist in every state; the clafers that exist in the state are those reachable
+--   from the root through their containment relations (r_c0_name). The parent relations
+--   (p_c0_name) of the atoms are static, and do not belong to the tree.
+buildStateModel :: Solution -> ClaferModel
+buildStateModel solution = buildClafers solution ftree (getChildren (Id "root" 0) ftree)
+    where
+    ftree = buildFamilyTree solution{s_fields = filter isTreeField $ s_fields solution}
+    isTreeField Field{f_label = label} = "r_" `isPrefixOf` label || "_ref" `isSuffixOf` label
+
+-- | A solution of a model: an instance of a static model, or a trace of a dynamic model, whose
+--   states are instances, and the state to which its last state loops back
+data ClaferSolution = ClaferInstance ClaferModel | ClaferTrace [ClaferModel] Int
+
+-- | The instances of a solution: the instance, or the states of the trace
+solutionModels :: ClaferSolution -> [ClaferModel]
+solutionModels (ClaferInstance model) = [model]
+solutionModels (ClaferTrace states _) = states
+
+buildClafers :: Solution -> FamilyTree -> [Node] -> ClaferModel
+buildClafers solution ftree nodes =
+    ClaferModel $ removeDups [] $ lefts $ map buildClafer nodes
     where
     sigMap = buildSigMap solution
-    ftree = buildFamilyTree solution
 
     removeDups :: [Clafer] -> [Clafer] -> [Clafer]
     removeDups acc [] = acc
@@ -188,7 +212,7 @@ buildClaferModel solution =
 
     buildClafer :: Node -> Either Clafer Value
     buildClafer (ClaferNode id _) =
-        Left $ Clafer id (checkSingle $ nub valueChildren) claferChildren
+        Left $ Clafer id (i_name id) (checkSingle $ nub valueChildren) claferChildren
         where
         (claferChildren, valueChildren) = partitionEithers $ map buildClafer children
         children = getChildren id ftree

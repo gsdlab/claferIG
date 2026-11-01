@@ -36,7 +36,7 @@ generateJSON    uidIClaferMap'   (M.ClaferModel topLevelClafers) =
     convertString $ toJsonBS $ constructElements $ map (printClafer uidIClaferMap') topLevelClafers
 
 printClafer :: UIDIClaferMap -> M.Clafer                           -> Object
-printClafer    uidIClaferMap'      (M.Clafer id value children) =
+printClafer    uidIClaferMap'      (M.Clafer id _ value children) =
     map (printClafer uidIClaferMap') children `addElements` completeClaferObject
     where
         uid' = M.i_name id

@@ -22,7 +22,7 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.Constraints (Constraint(..), Cardinality(..), ClaferInfo(..), ConstraintInfo(..), isLowerCardinalityConstraint, isUpperCardinalityConstraint, lookupConstraint, parseConstraints)  where
+module Language.Clafer.IG.Constraints (Constraint(..), Cardinality(..), ClaferInfo(..), ConstraintInfo(..), isLowerCardinalityConstraint, isUpperCardinalityConstraint, lookupConstraint, parseConstraints, parseAssertions, isOnLine)  where
 
 import Data.List
 import Data.Maybe
@@ -63,10 +63,14 @@ instance Show ClaferInfo where
 
 -- | A constraint of the model: its position in the complete model, its text, and its position
 --   as shown, the file and the position in it (@file.cfr:3:5@).
-data ConstraintInfo = ConstraintInfo {pId::String, pos::Span, syntax::String, position::String} deriving Eq
+data ConstraintInfo = ConstraintInfo {pId::String, pos::Span, syntax::String, position::String, fileLine::Integer} deriving Eq
 
 instance Show ConstraintInfo where
     show ConstraintInfo{syntax, position} = syntax ++ " (" ++ position ++ ")"
+
+-- | Whether a constraint spans the given line of its file.
+isOnLine :: Integer -> ConstraintInfo -> Bool
+isOnLine n ConstraintInfo{pos = Span (Pos l1 _) (Pos l2 _), fileLine} = fileLine <= n && n <= fileLine + l2 - l1
 
 isLowerCardinalityConstraint :: Constraint -> Bool
 isLowerCardinalityConstraint LowerCardinalityConstraint{} = True
@@ -98,7 +102,7 @@ parseConstraints modelFiles imodule mapping =
     clafers = _mDecls imodule >>= subclafers
     pexps = (mapMaybe constraint $ _mDecls imodule ++ concatMap _elements clafers) >>= subexpressions
     convert s IrPExp{pUid} =
-        Just $ UserConstraint s $ ConstraintInfo pUid (_inPos $ findPExp pUid) (extract $ _inPos $ findPExp pUid) (showPosition $ _inPos $ findPExp pUid)
+        Just $ UserConstraint s $ constraintInfoOf modelFiles $ findPExp pUid
     convert s LowerCard{pUid, isGroup = False} =
         Just $ LowerCardinalityConstraint s $ claferInfo pUid
     convert s UpperCard{pUid, isGroup = False} =
@@ -109,15 +113,6 @@ parseConstraints modelFiles imodule mapping =
 
     findPExp pUid   = fromMaybe (error $ "Unknown constraint " ++ pUid) $ find ((== pUid) . _pid) pexps
     findClafer pUid = fromMaybe (error $ "Unknown clafer " ++ pUid) $ find ((== pUid) . _uid) clafers
-    text = lines $ modelText modelFiles
-    showPosition (Span (Pos l c) _) = let (path, l') = modelPosition modelFiles l in path ++ ":" ++ show l' ++ ":" ++ show c
-    extract (Span (Pos l1 c1) (Pos l2 c2))
-        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
-        | otherwise = unlines $ f1 : fs ++ [fn]
-        where
-        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
-        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
-        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
     convertCard (l, -1) = Cardinality l Nothing
     convertCard (l, h)  = Cardinality l $ Just h
     claferInfo pUid =
@@ -125,6 +120,49 @@ parseConstraints modelFiles imodule mapping =
         where
         claf = findClafer pUid
 
+
+-- | The assertions of the model, in the order of the model, with their names in the Alloy output.
+parseAssertions :: [ModelFile] -> IModule -> [(String, ConstraintInfo)]
+parseAssertions modelFiles imodule =
+    [ (assertionName pexp, constraintInfoOf modelFiles pexp) | pexp <- sortOn _inPos $ mapMaybe assertion elements ]
+    where
+    elements = _mDecls imodule ++ concatMap _elements (_mDecls imodule >>= subclafers)
+    assertion (IEConstraint False pexp) = Just pexp
+    assertion _ = Nothing
+
+
+-- | The information of a constraint: its text and position in the files of the model.
+constraintInfoOf :: [ModelFile] -> PExp -> ConstraintInfo
+constraintInfoOf modelFiles pexp = ConstraintInfo (_pid pexp) (_inPos pexp) (extract $ _inPos pexp) (showPosition $ _inPos pexp) (positionLine $ _inPos pexp)
+    where
+    -- the columns count a tab up to the next multiple of 8, as the compiler does
+    text = map expandTabs $ lines $ modelText modelFiles
+    showPosition (Span (Pos l c) _) = let (path, l') = modelPosition modelFiles l in path ++ ":" ++ show l' ++ ":" ++ show c
+    positionLine (Span (Pos l _) _) = snd $ modelPosition modelFiles l
+    -- an expression's span ends before the parentheses that close its last operand, e.g.,
+    -- `initially (a --> b` of `initially (a --> b)`, which are added
+    extract (Span (Pos l1 c1) (Pos l2 c2)) = closeParentheses (extract' l1 c1 l2 c2) (drop (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1))
+    extract' l1 c1 l2 c2
+        | l1 == l2  = drop (fromInteger $ c1 - 1) $ take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l1 - 1)
+        | otherwise = unlines $ f1 : fs ++ [fn]
+        where
+        f1 = drop (fromInteger $ c1 - 1) $ text !! (fromInteger $ l1 - 1)
+        fs = map (text !!) [(fromInteger $ l1) .. (fromInteger $ l2 - 2)]
+        fn = take (fromInteger $ c2 - 1) $ text !! (fromInteger $ l2 - 1)
+    closeParentheses extracted rest
+        | open > 0, ')' : rest' <- dropWhile (== ' ') rest = closeParentheses (extracted ++ takeWhile (== ' ') rest ++ ")") rest'
+        | otherwise = extracted
+        where
+        open = length (filter (== '(') extracted) - length (filter (== ')') extracted)
+
+
+-- | The line with its tabs as spaces, up to the next multiple of 8
+expandTabs :: String -> String
+expandTabs = expand 0
+    where
+    expand column ('\t' : rest) = let n = 8 - column `mod` 8 in replicate n ' ' ++ expand (column + n) rest
+    expand column (x : rest) = x : expand (column + 1) rest
+    expand _ [] = []
 
 subclafers :: IElement -> [IClafer]
 subclafers (IEClafer claf) = claf : (_elements claf >>= subclafers)

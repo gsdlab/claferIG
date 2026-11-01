@@ -1,6 +1,6 @@
 # Clafer Instance Generator
 
-##### v0.5.5
+##### v0.5.6
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model.
 
@@ -22,7 +22,7 @@ Clafer can be installed from a binary distribution (preferred), from Hackage, an
 
 Regardless of the installation method, the following are required:
 
-* [Clafer](https://github.com/gsdlab/clafer) v0.5.5
+* [Clafer](https://github.com/gsdlab/clafer) v0.5.6
 * [Java Platform (JDK)](https://adoptium.net) v17+, 64bit
 * [Alloy 6.2.0](https://github.com/AlloyTools/org.alloytools.alloy/releases/tag/v6.2.0) (`alloy6.2.0.jar`)
   * it includes the MiniSat solver with UnSAT cores for Linux and macOS; on Windows, ClaferIG generates instances but cannot compute UnSAT cores and near-miss instances
@@ -126,62 +126,95 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG 0.5.5
+ClaferIG 0.5.6
 
 claferig [OPTIONS] FILE
 
 Common flags:
-     --all[=INTEGER]                           Saves all instances or a
-                                               counterexample. Reads scopes
-                                               from a `.cfr.scope` file or uses
-                                               the provided global scope.
-     --savedir=FILE                            Specify the directory for
-                                               storing saved files.
-     --import=FILE                             Compile the model together
-                                               with the given file or URL,
-                                               which is relative to the current
-                                               directory. A model also imports
-                                               files with --import in its //#
-                                               OPTIONS directive, relative to
-                                               its own folder or URL.
-     --import-root=DIR                         Allow only local imports
-                                               inside DIR, after resolving '..'
-                                               and symbolic links (command line
-                                               only). Can be repeated.
-     --public-imports                          Allow only URL imports from
-                                               public addresses (command line
-                                               only).
-     --import-base=URL                         The URL from which the model's
-                                               text was read: its imports are
-                                               relative to the URL (command
-                                               line only).
-     --alloysolution=FILE                      Convert Alloy solution to a
-                                               Clafer solution.
-  -b --bitwidth=INTEGER                        Set the bitwidth for integers.
-  -m --maxint=INTEGER                          Set the bitwidth for integers
-                                               based on the largest required
-                                               number. Overrides --bitwidth
-                                               argument.
-  -u --useuids                                 Use unique clafer names in the
-                                               Clafer solution.
-     --addtypes                                Add colon/reference types to
-                                               the Clafer solution.
-  -j --json                                    Render solution as JSON
-                                               (forces 'addUids').
-  -i --flatten-inheritance-comp                Flatten inheritance during
-                                               compiling ('alloy' mode only)
-  -l --no-layout-comp                          Don't resolve off-side rule
-                                               layout during compiling
-  -c --check-duplicates-comp                   Check duplicated clafer names
-                                               during compiling
-  -f --skip-resolver-comp                      Skip name resolution during
-                                               compiling
-     --ss=SCOPESTRATEGY --scope-strategy-comp  Use scope computation strategy
-                                               during compiling: none, simple
-                                               (default), or full.
-  -? --help                                    Display help message
-  -V --version                                 Print version information
-     --numeric-version                         Print just the version number
+             --all[=INTEGER]                           Saves all instances or
+                                                       a counterexample. Reads
+                                                       scopes from a
+                                                       `.cfr.scope` file or
+                                                       uses the provided global
+                                                       scope.
+  -n=INTEGER                                           Specify the maximum
+                                                       number of instances
+                                                       saved by --all.
+             --savedir=FILE                            Specify the directory
+                                                       for storing saved files.
+             --import=FILE                             Compile the model
+                                                       together with the given
+                                                       file or URL, which is
+                                                       relative to the current
+                                                       directory. A model also
+                                                       imports files with
+                                                       --import in its //#
+                                                       OPTIONS directive,
+                                                       relative to its own
+                                                       folder or URL.
+             --import-root=DIR                         Allow only local
+                                                       imports inside DIR,
+                                                       after resolving '..' and
+                                                       symbolic links (command
+                                                       line only). Can be
+                                                       repeated.
+             --public-imports                          Allow only URL imports
+                                                       from public addresses
+                                                       (command line only).
+             --import-base=URL                         The URL from which the
+                                                       model's text was read:
+                                                       its imports are relative
+                                                       to the URL (command line
+                                                       only).
+             --alloysolution=FILE                      Convert Alloy solution
+                                                       to a Clafer solution.
+  -b         --bitwidth=INTEGER                        Set the bitwidth for
+                                                       integers.
+  -m         --maxint=INTEGER                          Set the bitwidth for
+                                                       integers based on the
+                                                       largest required number.
+                                                       Overrides --bitwidth
+                                                       argument.
+  -u         --useuids                                 Use unique clafer
+                                                       names in the Clafer
+                                                       solution.
+             --addtypes                                Add colon/reference
+                                                       types to the Clafer
+                                                       solution.
+  -j         --json                                    Render solution as
+                                                       JSON (forces 'addUids').
+  -d         --diff                                    Show each next
+                                                       instance, or state of a
+                                                       trace, as its changes
+                                                       from the previous one.
+             --dot                                     Render solution as a
+                                                       Graphviz graph: for a
+                                                       trace, its states and
+                                                       transitions.
+             --tl=INTEGER                              Set the maximum length
+                                                       of the traces of a
+                                                       dynamic model (default:
+                                                       10).
+  -i         --flatten-inheritance-comp                Flatten inheritance
+                                                       during compiling
+                                                       ('alloy' mode only)
+  -l         --no-layout-comp                          Don't resolve off-side
+                                                       rule layout during
+                                                       compiling
+  -c         --check-duplicates-comp                   Check duplicated
+                                                       clafer names during
+                                                       compiling
+  -f         --skip-resolver-comp                      Skip name resolution
+                                                       during compiling
+             --ss=SCOPESTRATEGY --scope-strategy-comp  Use scope computation
+                                                       strategy during
+                                                       compiling: none, simple
+                                                       (default), or full.
+  -?         --help                                    Display help message
+  -V         --version                                 Print version
+                                                       information
+             --numeric-version                         Print just the version
+                                                       number
 ```
 
 `claferIG <model file name>.cfr`
@@ -203,23 +236,127 @@ MyPhone : Phone
 
 `claferIG MyPhone.cfr` generates the instances of `MyPhone.cfr` with the clafers of `products.cfr`. The other options of the directives (e.g., `--maxint`, `--no-layout`) apply too, and an error names the file in which it is (`products.cfr:3:11`).
 
+### Dynamic models
+
+A dynamic model, with temporal operators (e.g., `X`, `U`, `initially`) or the temporal modifiers `initial` and `final`, describes how its instances change over time. Its solutions are traces: each `n`ext gives a trace, and the trace is a sequence of states, each an instance of the model. Alloy's traces are lassos: after the last state, the trace loops back to an earlier state, and repeats the states from there forever.
+
+```
+//# OPTIONS --import=TrafficLight.cfr
+tl : TrafficLight
+    [ initially (green --> yellow --> red --> green --> yellow_on --> yellow_off --> off) ]
+```
+
+```
+=== Trace 1 Begin ===
+
+--- State 0 ---
+tl
+  on
+    normal
+      green
+
+--- State 1 ---
+tl
+  on
+    normal
+      yellow
+
+...
+
+--- State 6 ---
+tl
+  off
+
+--- Loop back to state 3 ---
+
+--- Trace 1 End ---
+```
+
+`--tl=INTEGER` and the command `tl <number>` set the maximum length of the traces (by default, 10 states). The traces are given from the shortest, and each trace is different from the traces given before, as the states in which the instances are, regardless of the names of their atoms. `--all` saves each trace to its own file, and `--json` gives a trace as `{"states": [...], "loop": 3}`.
+
+Two commands explore other traces than the next one:
+
+* `fork <number>` gives another trace with the same states as the last trace before the state `<number>`: what else can happen from there. E.g., `fork 2` keeps the states 0 and 1.
+* `config` gives a trace with another configuration: the clafers that do not change over time, e.g., the features of a product line declared `final`, differ from those of the traces given so far.
+
+`config` also works on static models, whose next instances often differ only in a value: it gives an instance whose structure, its clafers without the values of their references, differs from those of the instances given so far. Each `config` gives, e.g., another selection of features of a product line. The next instances then continue from it, without the structures given so far.
+
+The command `check` checks the assertions of the model, also the nested ones and those of temporal models, one by one. An assertion holds for all the solutions within the scopes and the maximum trace length, so `No counterexample` does not prove it for larger scopes or longer traces. A counterexample is shown like any other solution, and the next solution of the model stays as it is. Checking a large model can take much longer than generating a solution; lower the maximum trace length (`tl`) to get a faster answer. `check <number>` checks only the assertions on that line, or all of them if the number is not positive.
+
+```
+claferIG> check
+No counterexample: tl.off => X tl.on (TrafficLight.cfr:13:10)
+Counterexample of: never tl.off (TrafficLight.cfr:12:10)
+=== Trace 3 Begin ===
+...
+2 assertion(s) checked within the scopes and the maximum trace length: 1 with a counterexample.
+```
+
+The command `dot` saves the most recent solution as a Graphviz graph: a node for each state, with the instance as its label and the name of the state (`S0`, `S1`, ...) outside it, an edge to the next state, and a dashed edge back to the loop state. In the diff view, the first state is in full and each next state shows its changes, which keeps the graph of a large model readable. With `--dot`, solutions are given as such graphs, and `--all` saves them to `.dot` files. To render one:
+
+```bash
+dot -Tsvg TrafficLight.cfr.1.dot -o trace.svg
+```
+
+A dynamic model, or a scenario, with no traces has an unsat core: the constraints that contradict each other, e.g., a scenario and the transition it does not follow, and a near-miss trace without one of them, as for a static model.
+
+```
+  1) green --> yellow (TrafficLight.cfr:6:33)
+  2) initially (green --> red) (scenario.cfr:3:7)
+```
+
+With `--diff`, or after the command `d`, the first state, whose clafers all appear, is shown with `+` on each line, and each next state as its changes from the previous state: the clafers that appear (`+`), with their children, the clafers that disappear (`-`), and the values that change (`~`). Each change is indented as the clafer in the tree, and has the least-partially-qualified name of the clafer, which is qualified only as much as needed to tell it from the other clafers with the same name, e.g., `normal.yellow` if `flashing` also had a `yellow`. An instance has the same name in all the states of a trace, so a clafer that disappears and appears again is the same instance.
+
+```
+--- State 0 ---
++ tl
++   on
++     normal
++       green
+
+...
+
+--- State 3 ---
+-       red
++       green
+
+--- State 4 ---
+-     normal
++     flashing
++       yellow_on
+```
+
+In a static model, the diff view shows the first instance with `+` on each line, and each next instance as its differences from the previous instance, by their structure: the names of the instances of different solutions are unrelated, so the numbers of the instances are left out.
+
 ## Interactive Session Usage
 
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
 ```
-ClaferIG v0.5.5
+ClaferIG v0.5.6
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands
                    - auto-complete command name, a clafer name, or clafer instance name in a given context
-'n'ext, [enter]    - to produce the next instance if available or to output a message that no more
-                     instances exist within the given scope
+'n'ext, [enter]    - to produce the next solution if available, an instance of a static model or a trace
+                     of a dynamic model, or to output a message that no more solutions exist within
+                     the given scope
 'i'ncrease         - to increase the maximum number of instances of a given clafer or all clafers (scope)
 's'et              - to set the maximum number of instances of a given clafer or all clafers (scope)
 'm'axint, 'maxint' - to set the bitwidth by providing the largest integer
-sa'v'e             - to save all instances displayed so far or a counterexample to files named
+'tl'               - to set the maximum length of the traces of a dynamic model
+'d'iff             - to show each next instance or state as its changes from the previous one, or in full
+                     (+ appears, - disappears, ~ changes its value)
+'fork'             - to produce another trace with the same first states as the last trace
+'config'           - to produce a trace of a dynamic model whose clafers that do not change over time
+                     differ from those of the traces so far, or an instance of a static model whose
+                     clafers, without the values of their references, differ from those so far
+sa'v'e             - to save all instances displayed so far or a counterexample to files named 
                      <model file name>.cfr.<instance number>.data, one instance per file
+'check'            - to check the assertions of the model within the scopes and the maximum trace
+                     length, and to give a counterexample of each one that fails
+'dot'              - to save the most recent solution as a Graphviz graph, for a trace its states
+                     and transitions, to <model file name>.cfr.<solution number>.dot
 'q'uit             - to quit the interactive session
 'r'eload           - to reload your clafer model
 'h'elp             - to display this menu options summary
@@ -239,6 +376,9 @@ Parameterized command usage:
 's <number> [enter]'- to set for the clafers to <number>
 's <name> <number>' - to set for the clafer <name> to <number>
 'f <name>'          - to display a clafer <name>
+'tl <number>'       - to set the maximum trace length to <number>
+'fork <number>'     - to produce another trace with the states of the last trace before state <number>
+'check <number>'    - to check only the assertions on line <number>, or all of them if it is not positive
 'setUnsatCoreMinimization fastest' - fastest but the worst
 'setUnsatCoreMinimization medium'
 'setUnsatCoreMinimization best' - best but slowest even for modest size cores

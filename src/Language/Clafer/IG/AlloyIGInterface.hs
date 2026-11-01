@@ -154,6 +154,18 @@ sendNextCommand =
             False -> return Nothing
 
 
+-- | Check an assertion in alloyIG: its counterexample, if any
+sendCheckCommand :: MonadIO m => String -> AlloyIGT m (Maybe String)
+sendCheckCommand assertion =
+    do
+        putMsg "check"
+        putMsg assertion
+        status <- readMsg
+        case status of
+            True  -> Just `liftM` getMsg
+            False -> return Nothing
+
+
 getScope :: MonadIO m => String -> AlloyIGT m Integer
 getScope sig =
     do
@@ -265,6 +277,40 @@ sendSetBitwidthCommand bitwidth =
         when (bitwidth < 0) $ error (show bitwidth ++ " is not a valid bitwidth.")
         putMsg "setBitwidth"
         putMsg $ show bitwidth
+
+
+-- | Get a trace of a dynamic model with the same states as the trace given last before the given
+--   state, which differs from the traces given so far
+sendForkCommand :: MonadIO m => Integer -> AlloyIGT m (Maybe String)
+sendForkCommand state =
+    do
+        putMsg "fork"
+        putMsg $ show state
+        status <- readMsg
+        case status of
+            True  -> Just `liftM` getMsg
+            False -> return Nothing
+
+
+-- | Get a trace of a dynamic model whose relations that do not change over time differ from those
+--   of the traces given so far
+sendNextConfigurationCommand :: MonadIO m => AlloyIGT m (Maybe String)
+sendNextConfigurationCommand =
+    do
+        putMsg "nextConfiguration"
+        status <- readMsg
+        case status of
+            True  -> Just `liftM` getMsg
+            False -> return Nothing
+
+
+-- | Tell alloyIG to change the maximum length of the traces of a dynamic model
+sendSetMaxTraceLengthCommand :: MonadIO m => Integer -> AlloyIGT m ()
+sendSetMaxTraceLengthCommand traceLength =
+    do
+        when (traceLength < 1) $ error (show traceLength ++ " is not a valid trace length.")
+        putMsg "setMaxTraceLength"
+        putMsg $ show traceLength
 
 
 -- | Tell alloyIG to quit

@@ -29,12 +29,18 @@ import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
 import edu.mit.csail.sdg.ast.Command;
 import edu.mit.csail.sdg.ast.CommandScope;
+import edu.mit.csail.sdg.ast.Decl;
+import edu.mit.csail.sdg.ast.Expr;
+import edu.mit.csail.sdg.ast.ExprConstant;
+import edu.mit.csail.sdg.ast.ExprQt;
 import edu.mit.csail.sdg.ast.Func;
 import edu.mit.csail.sdg.ast.Sig;
 import edu.mit.csail.sdg.parser.CompUtil;
 import edu.mit.csail.sdg.parser.CompModule;
 import edu.mit.csail.sdg.translator.A4Options;
 import edu.mit.csail.sdg.translator.A4Solution;
+import edu.mit.csail.sdg.translator.A4Tuple;
+import edu.mit.csail.sdg.translator.A4TupleSet;
 import edu.mit.csail.sdg.translator.TranslateAlloyToKodkod;
 import java.io.EOFException;
 import java.io.IOException;
@@ -42,7 +48,9 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import kodkod.engine.satlab.SATFactory;
 import org.alloytools.solvers.natv.minisatprover.FixedMiniSatProver;
@@ -192,6 +200,49 @@ public final class AlloyIG {
         }
     }
 
+    private static class SetMaxTraceLengthOperation implements Operation {
+        private final int maxTraceLength;
+
+        public SetMaxTraceLengthOperation(int maxTraceLength) {
+            if (maxTraceLength < 1) {
+                throw new IllegalArgumentException(maxTraceLength + " is an invalid trace length.");
+            }
+            this.maxTraceLength = maxTraceLength;
+        }
+
+        public int getMaxTraceLength() {
+            return maxTraceLength;
+        }
+    }
+
+    private static class ForkOperation implements Operation {
+        private final int state;
+
+        public ForkOperation(int state) {
+            this.state = state;
+        }
+
+        public int getState() {
+            return state;
+        }
+    }
+
+    private static class NextConfigurationOperation implements Operation {
+    }
+
+    private static class CheckOperation implements Operation {
+
+        private final String assertion;
+
+        public CheckOperation(String assertion) {
+            this.assertion = assertion;
+        }
+
+        public String getAssertion() {
+            return assertion;
+        }
+    }
+
     private static Operation nextOperation() throws IOException {
         String op = readMessage();
         if (op == null || op.equals("quit")) {
@@ -226,6 +277,14 @@ public final class AlloyIG {
         } else if (op.equals("setBitwidth")) {
             int bitwidth = readIntMessage();
             return new SetBitwidthOperation(bitwidth);
+        } else if (op.equals("setMaxTraceLength")) {
+            return new SetMaxTraceLengthOperation(readIntMessage());
+        } else if (op.equals("fork")) {
+            return new ForkOperation(readIntMessage());
+        } else if (op.equals("nextConfiguration")) {
+            return new NextConfigurationOperation();
+        } else if (op.equals("check")) {
+            return new CheckOperation(readMessage());
         }
         throw new AlloyIGException("Unknown op " + op);
     }
@@ -259,6 +318,134 @@ public final class AlloyIG {
         StringWriter xml = new StringWriter();
         ans.writeXML(new PrintWriter(xml), Collections.<Func>emptyList(), null);
         return xml.toString();
+    }
+
+    // A dynamic model has mutable sigs or fields; its solutions are traces.
+    private static boolean isDynamic(SafeList<Sig> sigs) {
+        for (Sig sig : sigs) {
+            if (sig.isVariable != null) {
+                return true;
+            }
+            for (Sig.Field field : sig.getFields()) {
+                if (field.isVariable != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // The relations of the instance in a state of a trace: the containment relations of the
+    // clafers (r_c0_name) and their references (c0_name_ref).
+    private static List<Sig.Field> stateFields(Iterable<Sig> sigs) {
+        List<Sig.Field> fields = new ArrayList<Sig.Field>();
+        for (Sig sig : sigs) {
+            for (Sig.Field field : sig.getFields()) {
+                if (field.label.startsWith("r_") || field.label.endsWith("_ref")) {
+                    fields.add(field);
+                }
+            }
+        }
+        return fields;
+    }
+
+    // The expression applied n times.
+    private static Expr repeat(Expr e, int n, boolean prime) {
+        for (int i = 0; i < n; i++) {
+            e = prime ? e.prime() : e.after();
+        }
+        return e;
+    }
+
+    // The expression of an atom: the sig of a one sig, a number, or a variable for the atom.
+    private static Expr atom(String label, Sig.PrimSig sig, Map<String, Decl> vars) throws Err {
+        if (sig.isOne != null) {
+            return sig;
+        }
+        if (sig.builtin) {
+            return ExprConstant.makeNUMBER(Integer.parseInt(label));
+        }
+        Decl decl = vars.get(label);
+        if (decl == null) {
+            decl = sig.oneOf("atom" + vars.size());
+            vars.put(label, decl);
+        }
+        return decl.get();
+    }
+
+    // The relations of a configuration of a dynamic model, which do not change over time.
+    private static List<Sig.Field> staticFields(List<Sig.Field> fields) {
+        List<Sig.Field> statics = new ArrayList<Sig.Field>();
+        for (Sig.Field field : fields) {
+            if (field.isVariable == null) {
+                statics.add(field);
+            }
+        }
+        return statics;
+    }
+
+    // The relations of a configuration of a static model: its structure, which clafers there
+    // are, without the values of its references. A top-level clafer has no parent relation,
+    // so the sigs say which clafers there are.
+    private static List<Expr> structure(Iterable<Sig> sigs) {
+        List<Expr> structure = new ArrayList<Expr>();
+        for (Sig sig : sigs) {
+            if (!sig.builtin && sig.isAbstract == null) {
+                structure.add(sig);
+            }
+            for (Sig.Field field : sig.getFields()) {
+                if (field.label.startsWith("r_")) {
+                    structure.add(field);
+                }
+            }
+        }
+        return structure;
+    }
+
+    // Some distinct atoms make the given relations in the first states of the trace equal to those
+    // of the given trace, up to a renaming of its atoms; with the loop, from the loop state, the
+    // trace repeats the loop, so that it is the given trace.
+    private static Expr sameStates(A4Solution ans, List<? extends Expr> fields, int count, boolean withLoop) throws Err {
+        Map<String, Decl> vars = new LinkedHashMap<String, Decl>();
+        // an instance of a static model has no trace, but it is one state
+        int length = Math.max(ans.getTraceLength(), 1);
+        int loop = ans.getLoopState();
+        Expr trace = ExprConstant.TRUE;
+        for (int s = Math.min(count, length) - 1; s >= 0; s--) {
+            Expr state = ExprConstant.TRUE;
+            for (Expr field : fields) {
+                Expr value = null;
+                for (A4Tuple tuple : (A4TupleSet) ans.eval(field, s)) {
+                    Expr t = null;
+                    for (int i = 0; i < tuple.arity(); i++) {
+                        Expr a = atom(tuple.atom(i), tuple.sig(i), vars);
+                        t = t == null ? a : t.product(a);
+                    }
+                    value = value == null ? t : value.plus(t);
+                }
+                state = state.and(value == null ? field.no() : field.equal(value));
+            }
+            trace = s == Math.min(count, length) - 1 ? state : state.and(trace.after());
+        }
+        if (withLoop) {
+            Expr periodic = ExprConstant.TRUE;
+            for (Expr field : fields) {
+                periodic = periodic.and(field.equal(repeat(field, length - loop, true)));
+            }
+            trace = trace.and(repeat(periodic.always(), loop, false));
+        }
+        List<Decl> decls = new ArrayList<Decl>(vars.values());
+        for (int i = 0; i < decls.size(); i++) {
+            for (int j = i + 1; j < decls.size(); j++) {
+                trace = decls.get(i).get().equal(decls.get(j).get()).not().and(trace);
+            }
+        }
+        return decls.isEmpty() ? trace : ExprQt.Op.SOME.make(Pos.UNKNOWN, Pos.UNKNOWN, decls, trace);
+    }
+
+    // The command with the given bounds of the trace length.
+    private static Command withTraceLength(Command c, int minTraceLength, int maxTraceLength) {
+        return new Command(c.pos, c.nameExpr, c.label, c.check, c.overall, c.bitwidth, c.maxseq, minTraceLength, maxTraceLength, c.expects, c.scope, c.additionalExactScopes, c.commandKeyword, c.formula, c.parent);
     }
 
     private static String multiplicity(Sig sig) {
@@ -300,7 +487,18 @@ public final class AlloyIG {
         String modelFile = "";
 
         A4Solution ans = null;
+        // The solution of the model, as solved by the last resolve: if it is unsatisfiable, the
+        // model has no instances, and its unsat core explains why.
+        A4Solution resolved = null;
         Operation operation = null;
+        boolean dynamic = false;
+        // In a dynamic model, the traces given so far are excluded from the next solutions, and the
+        // configurations given so far from the next configuration. The next trace is solved for
+        // when it is asked for, after the trace shown last.
+        Expr givenTraces = ExprConstant.TRUE;
+        Expr givenConfigurations = ExprConstant.TRUE;
+        A4Solution shown = null;
+        boolean stale = false;
 
         A4Options options = new A4Options();
         // Use fastest
@@ -320,6 +518,7 @@ public final class AlloyIG {
 
                 world = CompUtil.parseEverything_fromString(rep, load.getModel());
                 sigs = world.getAllSigs();
+                dynamic = isDynamic(sigs);
                 command = world.getAllCommands().get(0);
                 modelFile = command.pos.filename;
 
@@ -343,18 +542,98 @@ public final class AlloyIG {
             } else if (operation instanceof ResolveOperation) {
                 rep.minimizedBefore = 0;
                 rep.minimizedAfter = 0;
+                givenTraces = ExprConstant.TRUE;
+                givenConfigurations = ExprConstant.TRUE;
+                shown = null;
+                stale = false;
                 // Reexecute the command
                 ans = TranslateAlloyToKodkod.execute_command(rep, world.getAllReachableSigs(), command, options);
+                resolved = ans;
             } else if (operation instanceof NextOperation) {
+                if (dynamic && stale) {
+                    // Alloy does not enumerate the traces of a temporal model: it gives few of them,
+                    // of the length it found first, or none at all, depending on the model. Instead,
+                    // the next trace is solved for, without the traces given so far. The reporter of
+                    // the model stays as it is, since no more traces is not an unsat core of the model.
+                    ans = TranslateAlloyToKodkod.execute_command(new AlloyIGReporter(), world.getAllReachableSigs(),
+                            command.change(command.formula.and(givenTraces)), options);
+                    stale = false;
+                }
                 if (ans.satisfiable()) {
                     writeMessage("True");
                     writeMessage(toXml(ans));
 
-                    A4Solution nextAns = ans.next();
-                    if (nextAns == ans) {
-                        break;
+                    if (dynamic) {
+                        List<Sig.Field> fields = stateFields(world.getAllReachableSigs());
+                        givenTraces = givenTraces.and(sameStates(ans, fields, ans.getTraceLength(), true).not());
+                        givenConfigurations = givenConfigurations.and(sameStates(ans, staticFields(fields), 1, false).not());
+                        shown = ans;
+                        stale = true;
+                    } else {
+                        givenConfigurations = givenConfigurations.and(sameStates(ans, structure(world.getAllReachableSigs()), 1, false).not());
+                        shown = ans;
+                        A4Solution nextAns = ans.next();
+                        if (nextAns == ans) {
+                            break;
+                        }
+                        ans = nextAns;
                     }
-                    ans = nextAns;
+                } else {
+                    writeMessage("False");
+                }
+            } else if (operation instanceof ForkOperation || operation instanceof NextConfigurationOperation) {
+                // A fork of the trace shown last at a state: a trace with the same states before
+                // it. A new configuration: a trace whose relations that do not change over time
+                // differ from those of the traces given so far, or an instance of a static model
+                // whose structure differs from those of the instances given so far. Both differ
+                // from the traces given so far.
+                A4Solution other = null;
+                if ((dynamic || operation instanceof NextConfigurationOperation) && shown != null) {
+                    List<Sig.Field> fields = stateFields(world.getAllReachableSigs());
+                    Expr formula = operation instanceof ForkOperation
+                            ? sameStates(shown, fields, ((ForkOperation) operation).getState(), false)
+                            : givenConfigurations;
+                    other = TranslateAlloyToKodkod.execute_command(new AlloyIGReporter(), world.getAllReachableSigs(),
+                            command.change(command.formula.and(givenTraces).and(formula)), options);
+                }
+                if (other != null && other.satisfiable()) {
+                    writeMessage("True");
+                    writeMessage(toXml(other));
+                    List<Sig.Field> fields = stateFields(world.getAllReachableSigs());
+                    shown = other;
+                    if (dynamic) {
+                        givenTraces = givenTraces.and(sameStates(other, fields, other.getTraceLength(), true).not());
+                        givenConfigurations = givenConfigurations.and(sameStates(other, staticFields(fields), 1, false).not());
+                        ans = other;
+                        stale = true;
+                    } else {
+                        // the next instances continue from this one, without the configurations so far
+                        givenConfigurations = givenConfigurations.and(sameStates(other, structure(world.getAllReachableSigs()), 1, false).not());
+                        ans = other.next();
+                    }
+                } else {
+                    writeMessage("False");
+                }
+            } else if (operation instanceof CheckOperation) {
+                // The check of an assertion, at the scopes and the trace length of the model. A
+                // solution is a counterexample. It has no unsat core, so the solver is not the
+                // prover, which logs its translation to a file for an unsat core. The solutions of
+                // the model stay as they are.
+                A4Options checkOptions = options.dup();
+                SATFactory minisat = SATFactory.get("minisat");
+                checkOptions.solver = minisat.isPresent() ? minisat : SATFactory.get("sat4j");
+                A4Solution counterexample = null;
+                for (Command assertion : world.getAllCommands()) {
+                    if (assertion.check && assertion.label.equals(((CheckOperation) operation).getAssertion())) {
+                        Command c = command;
+                        counterexample = TranslateAlloyToKodkod.execute_command(new AlloyIGReporter(), world.getAllReachableSigs(),
+                                new Command(assertion.pos, assertion.nameExpr, assertion.label, true, c.overall, c.bitwidth, c.maxseq, c.minprefix, c.maxprefix, assertion.expects, c.scope, c.additionalExactScopes, assertion.commandKeyword, assertion.formula, assertion.parent),
+                                checkOptions);
+                    }
+                }
+                if (counterexample != null && counterexample.satisfiable()) {
+                    writeMessage("True");
+                    writeMessage(toXml(counterexample));
                 } else {
                     writeMessage("False");
                 }
@@ -375,13 +654,15 @@ public final class AlloyIG {
                 Command c = command;
                 command = new Command(c.pos, c.nameExpr, c.label, c.check, c.overall, c.bitwidth, c.maxseq, c.minprefix, c.maxprefix, c.expects, scope, c.additionalExactScopes, c.commandKeyword, c.formula, c.parent);
             } else if (operation instanceof SaveStateOperation) {
-                state = saveState(sigs, new StateExtra(rep.minimizedBefore, rep.minimizedAfter, ans, command));
+                state = saveState(sigs, new StateExtra(rep.minimizedBefore, rep.minimizedAfter, ans, resolved, command, givenTraces));
             } else if (operation instanceof RestoreStateOperation) {
                 StateExtra extra = restoreState(state, sigs);
                 rep.minimizedBefore = extra.getMinimizedBefore();
                 rep.minimizedAfter = extra.getMinimizedAfter();
                 ans = extra.getAnswer();
+                resolved = extra.getResolved();
                 command = extra.getCommand();
+                givenTraces = extra.getGivenTraces();
             } else if (operation instanceof RemoveConstraintOperation) {
                 RemoveConstraintOperation removeConstraint = (RemoveConstraintOperation) operation;
                 Pos at = removeConstraint.getPos();
@@ -398,9 +679,11 @@ public final class AlloyIG {
                     command = newCommand;
                 }
             } else if (operation instanceof UnsatCoreOperation) {
-                // Without this check, the highLevelCore can return garbage.
-                // Learned the hard way.
-                if (rep.minimizedAfter > 0) {
+                // Only the model has an unsat core: not the next solution, when the solutions of the
+                // model run out. Alloy reports no minimized core when it finds the model
+                // unsatisfiable without solving, e.g., [ some b ] and [ no b ], so the core is not
+                // checked by its size.
+                if (ans == resolved && !ans.satisfiable()) {
                     Set<Pos> unsatCore = ans.highLevelCore().a;
 
                     writeMessage(unsatCore.size());
@@ -422,6 +705,9 @@ public final class AlloyIG {
                 SetBitwidthOperation setBitwidth = (SetBitwidthOperation) operation;
                 Command c = command;
                 command = new Command(c.pos, c.nameExpr, c.label, c.check, c.overall, setBitwidth.getBitwidth(), c.maxseq, c.minprefix, c.maxprefix, c.expects, c.scope, c.additionalExactScopes, c.commandKeyword, c.formula, c.parent);
+            } else if (operation instanceof SetMaxTraceLengthOperation) {
+                int maxTraceLength = ((SetMaxTraceLengthOperation) operation).getMaxTraceLength();
+                command = withTraceLength(command, Math.min(command.minprefix, maxTraceLength), maxTraceLength);
             } else if (operation instanceof QuitOperation) {
                 break;
             } else {
@@ -435,13 +721,25 @@ public final class AlloyIG {
         private final int minimizedBefore;
         private final int minimizedAfter;
         private final A4Solution answer;
+        private final A4Solution resolved;
         private final Command command;
+        private final Expr givenTraces;
 
-        public StateExtra(int minimizedBefore, int minimizedAfter, A4Solution answer, Command command) {
+        public StateExtra(int minimizedBefore, int minimizedAfter, A4Solution answer, A4Solution resolved, Command command, Expr givenTraces) {
             this.minimizedBefore = minimizedBefore;
             this.minimizedAfter = minimizedAfter;
             this.answer = notNull(answer);
+            this.resolved = resolved;
             this.command = notNull(command);
+            this.givenTraces = notNull(givenTraces);
+        }
+
+        public A4Solution getResolved() {
+            return resolved;
+        }
+
+        public Expr getGivenTraces() {
+            return givenTraces;
         }
 
         public int getMinimizedBefore() {
