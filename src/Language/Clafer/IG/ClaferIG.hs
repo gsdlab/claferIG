@@ -52,6 +52,8 @@ module Language.Clafer.IG.ClaferIG (
     setScope,
     setAlloyScope,
     next,
+    getAssertions,
+    checkAssertion,
     isDynamicModel,
     setMaxTraceLength,
     fork,
@@ -341,6 +343,24 @@ setAlloyScope value sigName =
         subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName value
         subsetName <- traverse claferNameOfSig subset
         runExceptT $ maybe (return ()) throwError subsetName
+
+-- | The assertions of the model, with their names in the Alloy model
+getAssertions :: MonadIO m => ClaferIGT m [(String, ConstraintInfo)]
+getAssertions = do
+    env <- getClaferEnv
+    modelFiles' <- getModelFiles
+    return $ parseAssertions modelFiles' $ fst3 $ fromJust $ cIr env
+
+-- | The counterexample of an assertion within the scopes and the maximum trace length, if any,
+--   which leaves the next solution of the model as it is
+checkAssertion :: MonadIO m => String -> ClaferIGT m (Maybe (ClaferSolution, String))
+checkAssertion assertion = do
+    claferIGArgs' <- getClaferIGArgs
+    uidIClaferMap' <- getUIDIClaferMap
+    dynamic <- isDynamicModel
+    sMap <- getStrMap
+    xmlSolution <- ClaferIGT $ lift $ AlloyIG.sendCheckCommand assertion
+    return $ fmap (\xml -> (xmlToSolution dynamic (useUids claferIGArgs') (addTypes claferIGArgs') uidIClaferMap' xml sMap, xml)) xmlSolution
 
 next :: MonadIO m => ClaferIGT m Instance
 next = do

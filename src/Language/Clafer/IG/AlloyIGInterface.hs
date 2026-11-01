@@ -154,6 +154,18 @@ sendNextCommand =
             False -> return Nothing
 
 
+-- | Check an assertion in alloyIG: its counterexample, if any
+sendCheckCommand :: MonadIO m => String -> AlloyIGT m (Maybe String)
+sendCheckCommand assertion =
+    do
+        putMsg "check"
+        putMsg assertion
+        status <- readMsg
+        case status of
+            True  -> Just `liftM` getMsg
+            False -> return Nothing
+
+
 getScope :: MonadIO m => String -> AlloyIGT m Integer
 getScope sig =
     do

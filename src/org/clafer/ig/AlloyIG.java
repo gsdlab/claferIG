@@ -230,6 +230,19 @@ public final class AlloyIG {
     private static class NextConfigurationOperation implements Operation {
     }
 
+    private static class CheckOperation implements Operation {
+
+        private final String assertion;
+
+        public CheckOperation(String assertion) {
+            this.assertion = assertion;
+        }
+
+        public String getAssertion() {
+            return assertion;
+        }
+    }
+
     private static Operation nextOperation() throws IOException {
         String op = readMessage();
         if (op == null || op.equals("quit")) {
@@ -270,6 +283,8 @@ public final class AlloyIG {
             return new ForkOperation(readIntMessage());
         } else if (op.equals("nextConfiguration")) {
             return new NextConfigurationOperation();
+        } else if (op.equals("check")) {
+            return new CheckOperation(readMessage());
         }
         throw new AlloyIGException("Unknown op " + op);
     }
@@ -596,6 +611,29 @@ public final class AlloyIG {
                         givenConfigurations = givenConfigurations.and(sameStates(other, structure(world.getAllReachableSigs()), 1, false).not());
                         ans = other.next();
                     }
+                } else {
+                    writeMessage("False");
+                }
+            } else if (operation instanceof CheckOperation) {
+                // The check of an assertion, at the scopes and the trace length of the model. A
+                // solution is a counterexample. It has no unsat core, so the solver is not the
+                // prover, which logs its translation to a file for an unsat core. The solutions of
+                // the model stay as they are.
+                A4Options checkOptions = options.dup();
+                SATFactory minisat = SATFactory.get("minisat");
+                checkOptions.solver = minisat.isPresent() ? minisat : SATFactory.get("sat4j");
+                A4Solution counterexample = null;
+                for (Command assertion : world.getAllCommands()) {
+                    if (assertion.check && assertion.label.equals(((CheckOperation) operation).getAssertion())) {
+                        Command c = command;
+                        counterexample = TranslateAlloyToKodkod.execute_command(new AlloyIGReporter(), world.getAllReachableSigs(),
+                                new Command(assertion.pos, assertion.nameExpr, assertion.label, true, c.overall, c.bitwidth, c.maxseq, c.minprefix, c.maxprefix, assertion.expects, c.scope, c.additionalExactScopes, assertion.commandKeyword, assertion.formula, assertion.parent),
+                                checkOptions);
+                    }
+                }
+                if (counterexample != null && counterexample.satisfiable()) {
+                    writeMessage("True");
+                    writeMessage(toXml(counterexample));
                 } else {
                     writeMessage("False");
                 }

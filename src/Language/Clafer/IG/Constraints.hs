@@ -22,7 +22,7 @@
  SOFTWARE.
 -}
 
-module Language.Clafer.IG.Constraints (Constraint(..), Cardinality(..), ClaferInfo(..), ConstraintInfo(..), isLowerCardinalityConstraint, isUpperCardinalityConstraint, lookupConstraint, parseConstraints)  where
+module Language.Clafer.IG.Constraints (Constraint(..), Cardinality(..), ClaferInfo(..), ConstraintInfo(..), isLowerCardinalityConstraint, isUpperCardinalityConstraint, lookupConstraint, parseConstraints, parseAssertions)  where
 
 import Data.List
 import Data.Maybe
@@ -98,7 +98,7 @@ parseConstraints modelFiles imodule mapping =
     clafers = _mDecls imodule >>= subclafers
     pexps = (mapMaybe constraint $ _mDecls imodule ++ concatMap _elements clafers) >>= subexpressions
     convert s IrPExp{pUid} =
-        Just $ UserConstraint s $ ConstraintInfo pUid (_inPos $ findPExp pUid) (extract $ _inPos $ findPExp pUid) (showPosition $ _inPos $ findPExp pUid)
+        Just $ UserConstraint s $ constraintInfoOf modelFiles $ findPExp pUid
     convert s LowerCard{pUid, isGroup = False} =
         Just $ LowerCardinalityConstraint s $ claferInfo pUid
     convert s UpperCard{pUid, isGroup = False} =
@@ -109,6 +109,28 @@ parseConstraints modelFiles imodule mapping =
 
     findPExp pUid   = fromMaybe (error $ "Unknown constraint " ++ pUid) $ find ((== pUid) . _pid) pexps
     findClafer pUid = fromMaybe (error $ "Unknown clafer " ++ pUid) $ find ((== pUid) . _uid) clafers
+    convertCard (l, -1) = Cardinality l Nothing
+    convertCard (l, h)  = Cardinality l $ Just h
+    claferInfo pUid =
+        ClaferInfo (_ident claf) $ convertCard $ fromJust $ _card claf
+        where
+        claf = findClafer pUid
+
+
+-- | The assertions of the model, in the order of the model, with their names in the Alloy output.
+parseAssertions :: [ModelFile] -> IModule -> [(String, ConstraintInfo)]
+parseAssertions modelFiles imodule =
+    [ (assertionName pexp, constraintInfoOf modelFiles pexp) | pexp <- sortOn _inPos $ mapMaybe assertion elements ]
+    where
+    elements = _mDecls imodule ++ concatMap _elements (_mDecls imodule >>= subclafers)
+    assertion (IEConstraint False pexp) = Just pexp
+    assertion _ = Nothing
+
+
+-- | The information of a constraint: its text and position in the files of the model.
+constraintInfoOf :: [ModelFile] -> PExp -> ConstraintInfo
+constraintInfoOf modelFiles pexp = ConstraintInfo (_pid pexp) (_inPos pexp) (extract $ _inPos pexp) (showPosition $ _inPos pexp)
+    where
     -- the columns count a tab up to the next multiple of 8, as the compiler does
     text = map expandTabs $ lines $ modelText modelFiles
     showPosition (Span (Pos l c) _) = let (path, l') = modelPosition modelFiles l in path ++ ":" ++ show l' ++ ":" ++ show c
@@ -127,12 +149,6 @@ parseConstraints modelFiles imodule mapping =
         | otherwise = extracted
         where
         open = length (filter (== '(') extracted) - length (filter (== ')') extracted)
-    convertCard (l, -1) = Cardinality l Nothing
-    convertCard (l, h)  = Cardinality l $ Just h
-    claferInfo pUid =
-        ClaferInfo (_ident claf) $ convertCard $ fromJust $ _card claf
-        where
-        claf = findClafer pUid
 
 
 -- | The line with its tabs as spaces, up to the next multiple of 8

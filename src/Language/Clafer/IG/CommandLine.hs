@@ -198,6 +198,8 @@ runCommandLine =
                 "'config'           - to produce a trace of a dynamic model whose clafers that do not change over time\n" ++
                 "                     differ from those of the traces so far, or an instance of a static model whose\n" ++
                 "                     clafers, without the values of their references, differ from those so far\n" ++
+                "'check'            - to check the assertions of the model within the scopes and the maximum trace\n" ++
+                "                     length, and to give a counterexample of each one that fails\n" ++
                 "sa'v'e             - to save all instances displayed so far or a counterexample to files named \n" ++
                 "                     <model file name>.cfr.<instance number>.data, one instance per file\n" ++
                 "'dot'              - to save the most recent solution as a Graphviz graph, for a trace its states\n" ++
@@ -248,6 +250,27 @@ runCommandLine =
                         else solutionDot solution
                     outputStrLn $ "Saved to " ++ saveName
             nextLoop context
+
+    loop Check context =
+        do
+            assertions <- lift getAssertions
+            dynamic <- lift isDynamicModel
+            when (null assertions) $ outputStrLn "The model has no assertions."
+            (context', failed) <- foldM checkAssertion' (context, 0 :: Int) assertions
+            let bounds = if dynamic then "the scopes and the maximum trace length" else "the scopes"
+            unless (null assertions) $ outputStrLn $
+                show (length assertions) ++ " assertion(s) checked within " ++ bounds ++ ": " ++ show failed ++ " with a counterexample."
+            nextLoop context'
+        where
+        checkAssertion' (context', failed) (name, info) =
+            do
+                counterexample <- lift $ checkAssertion name
+                case counterexample of
+                    Nothing -> outputStrLn ("No counterexample: " ++ show info) >> return (context', failed)
+                    Just (claferSolution, xml) -> do
+                        outputStrLn $ "Counterexample of: " ++ show info
+                        context'' <- display claferSolution xml context'
+                        return (context'', failed + 1)
 
     loop Reload context =
         do
@@ -536,7 +559,10 @@ runCommandLine =
             nextLoop context
 
     -- shows a new solution, the next one
-    showNew claferSolution xml context =
+    showNew claferSolution xml context = display claferSolution xml context >>= nextLoop
+
+    -- shows a solution, which becomes the most recent one
+    display claferSolution xml context =
         do
             claferIGArgs' <- lift getClaferIGArgs
             uidIClaferMap' <- lift getUIDIClaferMap
@@ -553,7 +579,7 @@ runCommandLine =
                 else if diffView context
                     then showSolutionDiff (lpqName qNameMaps') iNumber previous claferSolution
                     else showSolution iNumber claferSolution
-            nextLoop context{unsaved=claferSolution:(unsaved context), currentAlloyInstance=Just xml}
+            return context{unsaved=claferSolution:(unsaved context), currentAlloyInstance=Just xml}
 
     -- shows a solution other than the next one: a fork, or another configuration
     otherSolution command none context =

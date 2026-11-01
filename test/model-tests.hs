@@ -175,6 +175,43 @@ case_SolutionGraph = do
             graph = solutionDot $ ClaferInstance $ ClaferModel [value]
         ("\\\"a\\\"" `isInfixOf` graph) @? ("The quotes are escaped: " ++ graph)
 
+-- | Each assertion, also a nested one or one on the line of another, is checked within the scopes:
+--   a failed one has a counterexample, which leaves the next solution as it is.
+case_Assertions :: Assertion
+case_Assertions = do
+    dir <- (</> "claferIG-test-assertions") <$> getTemporaryDirectory
+    createDirectoryIfMissing True dir
+    writeFile (dir </> "dynamic.cfr") $ unlines
+        [ "xor s"
+        , "    initial a --> b"
+        , "    b --> a"
+        , "    assert [ a => X b ]"
+        , "assert [ never s.b ]  assert [ s.a => X s.a ]" ]
+    writeFile (dir </> "static.cfr") $ unlines
+        [ "abstract P"
+        , "    age -> integer"
+        , "    [ age >= 0 ]"
+        , "    assert [ age >= 0 ]"
+        , "    assert [ age >= 3 ]"
+        , "x : P" ]
+    let
+        results file = do
+            result <- runClaferIGT (defaultIGArgs $ dir </> file) $ do
+                solve
+                _ <- next
+                assertions <- getAssertions
+                checks <- forM assertions $ \(name, info) -> ((,) (syntax info) . isJust) <$> checkAssertion name
+                solution <- next
+                return (checks, solution)
+            return $ fromRight result
+    (dynamic, _) <- results "dynamic.cfr"
+    dynamic @?= [("a => X b", False), ("never s.b", True), ("s.a => X s.a", True)]
+    (static, solution) <- results "static.cfr"
+    static @?= [("age >= 0", False), ("age >= 3", True)]
+    case solution of
+        Instance{} -> return ()
+        _ -> assertFailure "The next solution stays as it is"
+
 -- | A scenario that contradicts the model has an unsat core with the scenario and the transition
 --   it contradicts.
 case_DynamicModelUnsatCore :: Assertion

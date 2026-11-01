@@ -281,6 +281,17 @@ Two commands explore other traces than the next one:
 
 `config` also works on static models, whose next instances often differ only in a value: it gives an instance whose structure, its clafers without the values of their references, differs from those of the instances given so far. Each `config` gives, e.g., another selection of features of a product line. The next instances then continue from it, without the structures given so far.
 
+The command `check` checks the assertions of the model, also the nested ones and those of temporal models, one by one. An assertion holds for all the solutions within the scopes and the maximum trace length, so `No counterexample` does not prove it for larger scopes or longer traces. A counterexample is shown like any other solution, and the next solution of the model stays as it is. Checking a large model can take much longer than generating a solution; lower the maximum trace length (`tl`) to get a faster answer.
+
+```
+claferIG> check
+No counterexample: tl.off => X tl.on (TrafficLight.cfr:13:10)
+Counterexample of: never tl.off (TrafficLight.cfr:12:10)
+=== Trace 3 Begin ===
+...
+2 assertion(s) checked within the scopes and the maximum trace length: 1 with a counterexample.
+```
+
 The command `dot` saves the most recent solution as a Graphviz graph: a node for each state, with the instance as its label and the name of the state (`S0`, `S1`, ...) outside it, an edge to the next state, and a dashed edge back to the loop state. In the diff view, the first state is in full and each next state shows its changes, which keeps the graph of a large model readable. With `--dot`, solutions are given as such graphs, and `--all` saves them to `.dot` files. To render one:
 
 ```bash
@@ -342,6 +353,8 @@ You can invoke the following commands as indicated by single quotes:
                      clafers, without the values of their references, differ from those so far
 sa'v'e             - to save all instances displayed so far or a counterexample to files named 
                      <model file name>.cfr.<instance number>.data, one instance per file
+'check'            - to check the assertions of the model within the scopes and the maximum trace
+                     length, and to give a counterexample of each one that fails
 'dot'              - to save the most recent solution as a Graphviz graph, for a trace its states
                      and transitions, to <model file name>.cfr.<solution number>.dot
 'q'uit             - to quit the interactive session

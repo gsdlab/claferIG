@@ -42,6 +42,7 @@ data Command = Next |
                ToggleDiff |
                Fork Integer |
                NextConfiguration |
+               Check |
                Save |
                SaveGraph |
                Quit |
@@ -136,6 +137,7 @@ commandMap =
     ("d", toggleDiffCommand):
     ("fork", forkCommand):
     ("config", nextConfigurationCommand):
+    ("check", checkCommand):
     ("n", nextCommand):
     ("f", findCommand):
     ("q", quitCommand):
@@ -170,6 +172,8 @@ forkCommand :: Parser Command
 forkCommand              = Fork `liftM` (gap >> number)
 nextConfigurationCommand :: ParsecT String () Identity Command
 nextConfigurationCommand = return NextConfiguration
+checkCommand :: ParsecT String () Identity Command
+checkCommand             = return Check
 toggleDiffCommand :: ParsecT String () Identity Command
 toggleDiffCommand        = return ToggleDiff
 nextCommand :: ParsecT String () Identity Command
