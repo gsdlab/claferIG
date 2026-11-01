@@ -35,7 +35,9 @@ import Data.Maybe
 import Language.Clafer.Front.AbsClafer (Span(..), Pos(..))
 import Language.Clafer.IG.Process
 import Prelude
-import System.Directory (doesFileExist)
+import System.Directory (createDirectory, doesFileExist, getTemporaryDirectory, removeFile)
+import System.Environment (getEnvironment)
+import System.IO (hClose, openTempFile)
 import System.Info (os)
 
 -- | An interface to the Alloy Analyzer
@@ -87,11 +89,28 @@ runAlloyIGT run =
         let prover = execPath ++ "lib/" ++ (if os == "darwin" then "libminisatprover.dylib" else "libminisatprover.so")
         hasProver <- liftIO $ doesFileExist prover
         let proverArg = ["-Dalloy.native.lib.minisatprover=" ++ prover | hasProver]
-        proce     <- liftIO $ pipeProcess "java" (["--enable-native-access=ALL-UNNAMED"] ++ proverArg ++ ["-jar", execPath ++ "alloyIG.jar"])
+        tmpdir <- liftIO newSessionTmpdir
+        environment <- liftIO getEnvironment
+        let tmpdirArgs = ["-Djava.io.tmpdir=" ++ tmpdir, "-Dclafer.ig.sessionTmpdir=true"]
+        proce     <- liftIO $ pipeProcess "java" (["--enable-native-access=ALL-UNNAMED"] ++ proverArg ++ tmpdirArgs ++ ["-jar", execPath ++ "alloyIG.jar"])
+                        (("TMPDIR", tmpdir) : Prelude.filter ((/= "TMPDIR") . fst) environment)
 
         runReaderT (evalStateT (unwrap run) Nothing) proce
     where
     unwrap (AlloyIGT a) = a
+
+
+-- | A new folder for the temporary files of Alloy, which alloyIG removes when it exits.
+newSessionTmpdir :: IO FilePath
+newSessionTmpdir =
+    do
+        tmp <- getTemporaryDirectory
+        (name, handle) <- openTempFile tmp "claferIG"
+        hClose handle
+        let tmpdir = name ++ ".d"
+        createDirectory tmpdir
+        removeFile name
+        return tmpdir
 
 
 getAlloyModel :: MonadIO m => AlloyIGT m String

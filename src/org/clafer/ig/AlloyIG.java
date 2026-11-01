@@ -46,10 +46,14 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.Map;
 import java.util.Set;
 import kodkod.engine.satlab.SATFactory;
@@ -462,10 +466,25 @@ public final class AlloyIG {
     public static void main(String[] args) throws IOException, Err {
         // Alloy logs its progress at the info level and warns whenever a native solver is garbage collected.
         System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "error");
+        // Alloy leaves its temporary files behind, e.g., Kodkod's logs of large models. ClaferIG gives each
+        // session a folder of its own, which goes with the JVM, also when ClaferIG itself is killed and
+        // the JVM sees the end of its input.
+        if (Boolean.getBoolean("clafer.ig.sessionTmpdir")) {
+            Path tmpdir = Paths.get(System.getProperty("java.io.tmpdir"));
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> deleteRecursively(tmpdir)));
+        }
         try {
             run(args);
         } catch (EOFException e) {
             System.err.println("AlloyIG stream closed.");
+        }
+    }
+
+    private static void deleteRecursively(Path folder) {
+        try (Stream<Path> paths = Files.walk(folder)) {
+            paths.sorted(Collections.reverseOrder()).forEach(path -> path.toFile().delete());
+        } catch (IOException e) {
+            System.err.println("Could not remove " + folder + ": " + e.getMessage());
         }
     }
 
