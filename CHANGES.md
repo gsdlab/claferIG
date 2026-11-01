@@ -12,6 +12,7 @@ Minor release with Clafer 0.5.6.
 * The command `dot` saves the most recent solution as a Graphviz graph, for a trace its states and transitions, and `--dot` gives the solutions as such graphs. In the diff view, the states of the graph show their changes.
 * Unsat cores: a model with no instances, or a dynamic model with no traces, gives the constraints that contradict each other and a near-miss example. claferIG gave no unsat core when Alloy found the model unsatisfiable without solving, e.g., for `[ some b ]` and `[ no b ]`, and for dynamic models. The constraints are shown with the right text when their lines are indented with tabs, and with the parentheses that close them, e.g., `initially (green --> red)`.
 * `-n` limits the number of instances that `--all` saves, as chocosolver's `-n` does, e.g., `claferIG --all -n 2 model.cfr` to check whether a model has exactly one instance ([#43](https://github.com/gsdlab/claferIG/issues/43)).
+* Each session keeps the temporary files of Alloy in a folder of its own, which is removed when it ends, also when claferIG is killed. Kodkod's logs stayed in the temporary folder of the system, and those of large models filled it.
 
 ##### ClaferIG Version 0.5.5, Oct 27, 2026
 

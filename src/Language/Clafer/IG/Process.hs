@@ -37,11 +37,11 @@ executableDirectory :: IO FilePath
 executableDirectory = fst `liftM` splitExecutablePath
 
 
--- | Start another process and return the piped std_in, std_out stream
-pipeProcess :: FilePath -> [String] -> IO Process
-pipeProcess exec args =
+-- | Start another process with the given environment and return the piped std_in, std_out stream
+pipeProcess :: FilePath -> [String] -> [(String, String)] -> IO Process
+pipeProcess exec args environment =
     do
-        let process = (proc exec args) { std_in = CreatePipe, std_out = CreatePipe }
+        let process = (proc exec args) { std_in = CreatePipe, std_out = CreatePipe, env = Just environment }
         (Just stdIn', Just stdOut', _, proceHandle) <- createProcess process
         hSetNewlineMode stdIn' noNewlineTranslation
         return $ Process stdIn' stdOut' proceHandle -- Pipe always has a handle according to docs
