@@ -173,7 +173,7 @@ forkCommand              = Fork `liftM` (gap >> number)
 nextConfigurationCommand :: ParsecT String () Identity Command
 nextConfigurationCommand = return NextConfiguration
 checkCommand :: Parser Command
-checkCommand             = Check `liftM` optionMaybe (try (gap >> number))
+checkCommand             = (Check . mfilter (> 0)) `liftM` optionMaybe (try (gap >> signedNumber))
 toggleDiffCommand :: ParsecT String () Identity Command
 toggleDiffCommand        = return ToggleDiff
 nextCommand :: ParsecT String () Identity Command

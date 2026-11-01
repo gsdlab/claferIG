@@ -224,7 +224,7 @@ runCommandLine =
                 "'f <name>'          - to display a clafer <name>\n" ++
                 "'tl <number>'       - to set the maximum trace length to <number>\n" ++
                 "'fork <number>'     - to produce another trace with the states of the last trace before state <number>\n" ++
-                "'check <number>'    - to check only the assertions on line <number>\n" ++
+                "'check <number>'    - to check only the assertions on line <number>, or all of them if it is not positive\n" ++
                 "'setUnsatCoreMinimization fastest' - fastest but the worst\n" ++
                 "'setUnsatCoreMinimization medium'\n" ++
                 "'setUnsatCoreMinimization best' - best but slowest even for modest size cores"
