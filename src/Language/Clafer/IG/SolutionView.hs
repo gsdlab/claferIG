@@ -111,24 +111,26 @@ solutionDiffDot _ solution = solutionDot solution
 -- | The graph of a solution, given the label of the instance, or of each state
 graphWith :: [String] -> ClaferSolution -> String
 graphWith labels solution =
-    "digraph solution {\n    node [shape=box, fontname=\"monospace\"];\n" ++ body solution ++ "}\n"
+    -- no minimum size, so that a box fits its text
+    "digraph solution {\n    node [shape=box, fontname=\"monospace\", width=0, height=0, margin=\"0.08,0.04\"];\n" ++ body solution ++ "}\n"
     where
-    body (ClaferInstance _) = dotNode "instance" (concat labels)
+    body (ClaferInstance _) = dotNode "instance" "" (concat labels)
     body (ClaferTrace states loopState) =
-        "    start [shape=point];\n" ++
+        "    start [shape=point, width=0.05];\n" ++
         concat (zipWith showState [0 ..] labels) ++
         "    start -> " ++ stateNode 0 ++ ";\n" ++
         concatMap showEdge [1 .. lastState] ++
         "    " ++ stateNode lastState ++ " -> " ++ stateNode loopState ++ " [style=dashed, label=\"loop\"];\n"
         where
         lastState = length states - 1
-    showState i label = dotNode (stateNode i) ("State " ++ show i ++ "\n" ++ label)
+    -- the name of a state is outside its box, and it is also the tooltip of the box
+    showState i label = dotNode (stateNode i) (", xlabel=\"" ++ stateNode i ++ "\"") label
     showEdge i = "    " ++ stateNode (i - 1) ++ " -> " ++ stateNode i ++ ";\n"
-    stateNode i = "s" ++ show (i :: Int)
+    stateNode i = "S" ++ show (i :: Int)
 
--- | A node with left-aligned lines, which keep the indentation of the tree
-dotNode :: String -> String -> String
-dotNode name text = "    " ++ name ++ " [label=\"" ++ concatMap line (filter (not . null) $ lines text) ++ "\"];\n"
+-- | A node with left-aligned lines, which keep the indentation of the tree, and further attributes
+dotNode :: String -> String -> String -> String
+dotNode name attributes text = "    " ++ name ++ " [label=\"" ++ concatMap line (filter (not . null) $ lines text) ++ "\"" ++ attributes ++ "];\n"
     where
     line l = concatMap escape l ++ "\\l"
     escape '"' = "\\\""

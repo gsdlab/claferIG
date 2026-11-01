@@ -157,17 +157,18 @@ case_SolutionGraph = do
                     graph = solutionDot solution
                     lastState = length states - 1
                     has line = (line `isInfixOf` graph) @? ("The graph has " ++ line ++ ": " ++ graph)
-                has "start -> s0;"
-                forM_ [1 .. lastState] $ \i -> has $ "s" ++ show (i - 1) ++ " -> s" ++ show i ++ ";"
-                has $ "s" ++ show lastState ++ " -> s" ++ show loopState ++ " [style=dashed"
-                has "s0 [label=\"State 0\\l"
+                has "start -> S0;"
+                forM_ [1 .. lastState] $ \i -> has $ "S" ++ show (i - 1) ++ " -> S" ++ show i ++ ";"
+                has $ "S" ++ show lastState ++ " -> S" ++ show loopState ++ " [style=dashed"
+                has "xlabel=\"S0\""
+                (not ("State" `isInfixOf` graph)) @? ("The states have no header: " ++ graph)
                 let
                     diffGraph = solutionDiffDot id solution
                     diffHas line = (line `isInfixOf` diffGraph) @? ("The diff graph has " ++ line ++ ": " ++ diffGraph)
-                diffHas "s0 [label=\"State 0\\l+ "
-                diffHas "s1 [label=\"State 1\\l"
-                diffHas $ "s" ++ show lastState ++ " -> s" ++ show loopState ++ " [style=dashed"
-                diffHas "\\l- "
+                diffHas "S0 [label=\"+ "
+                diffHas "S1 [label=\""
+                diffHas $ "S" ++ show lastState ++ " -> S" ++ show loopState ++ " [style=dashed"
+                diffHas "[label=\"- "
             _ -> assertFailure "A trace"
         let
             value = Clafer (Id "c" 0) "c" (Just $ StringValue "\"a\"") []

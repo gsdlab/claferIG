@@ -281,7 +281,7 @@ Two commands explore other traces than the next one:
 
 `config` also works on static models, whose next instances often differ only in a value: it gives an instance whose structure, its clafers without the values of their references, differs from those of the instances given so far. Each `config` gives, e.g., another selection of features of a product line. The next instances then continue from it, without the structures given so far.
 
-The command `dot` saves the most recent solution as a Graphviz graph: a node for each state, with the instance as its label, an edge to the next state, and a dashed edge back to the loop state. In the diff view, the first state is in full and each next state shows its changes, which keeps the graph of a large model readable. With `--dot`, solutions are given as such graphs, and `--all` saves them to `.dot` files. To render one:
+The command `dot` saves the most recent solution as a Graphviz graph: a node for each state, with the instance as its label and the name of the state (`S0`, `S1`, ...) outside it, an edge to the next state, and a dashed edge back to the loop state. In the diff view, the first state is in full and each next state shows its changes, which keeps the graph of a large model readable. With `--dot`, solutions are given as such graphs, and `--all` saves them to `.dot` files. To render one:
 
 ```bash
 dot -Tsvg TrafficLight.cfr.1.dot -o trace.svg
