@@ -1,3 +1,9 @@
+##### ClaferIG Version 0.5.7, unreleased
+
+Minor release with Clafer 0.5.7.
+
+* Dynamic models: the obligations of a constraint last while the parent of its context exists, so a transition nested in its source state, e.g., `[ req=down --> movingDown ]` in the state `movingUp`, takes the machine to its target ([clafer#107](https://github.com/gsdlab/clafer/issues/107)).
+
 ##### ClaferIG Version 0.5.6, Nov 1, 2026
 
 Minor release with Clafer 0.5.6.
