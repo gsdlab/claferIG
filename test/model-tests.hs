@@ -31,6 +31,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Data.List (isInfixOf, isPrefixOf, isSuffixOf)
 import Language.Clafer.IG.Constraints
+import Language.Clafer.ClaferArgs (ScopeStrategy(..))
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.IORef
@@ -216,6 +217,93 @@ case_Assertions = do
     case solution of
         Instance{} -> return ()
         _ -> assertFailure "The next solution stays as it is"
+
+-- | The assertions with whether they hold, and whether the model has a solution, with the scope
+--   strategy, the global scope and the maximum trace length.
+checkLifetimes :: FilePath -> String -> ScopeStrategy -> Integer -> Integer -> IO ([(String, Bool)], Bool)
+checkLifetimes dir model strategy scope traceLength = do
+    writeFile (dir </> "lifetimes.cfr") model
+    result <- runClaferIGT (defaultIGArgs $ dir </> "lifetimes.cfr"){scope_strategy_comp = strategy} $ do
+        -- as the command i does: the clafers have scopes, which the global scope does not change
+        getScopes >>= mapM_ (\s -> (fmap (max scope) . valueOfScope) (fst s) >>= \n -> setScope n s)
+        setGlobalScope scope
+        setMaxTraceLength traceLength
+        solve
+        solution <- next
+        assertions <- getAssertions
+        holds <- forM assertions $ \(name', info') -> ((,) (syntax info') . isNothing) <$> checkAssertion name'
+        return (holds, case solution of
+            Instance{} -> True
+            _ -> False)
+    return $ fromRight result
+
+-- | The obligations of a constraint last while the parent of its context instance exists, also
+--   when they are negated; a scope bounds the instance identities across the trace, and an
+--   instance keeps its parent. Checked with both scope strategies, at scopes 1 to 3 and up to
+--   3 and 10 states.
+case_Lifetimes :: Assertion
+case_Lifetimes = do
+    dir <- (</> "claferIG-test-lifetimes") <$> getTemporaryDirectory
+    createDirectoryIfMissing True dir
+    let
+        machine final' = unlines
+            [ "go ?"
+            , final' ++ "xor sm"
+            , "  initial a"
+            , "    [ go --> b ]"
+            , "  b"
+            , "  c"
+            , "assert [ all m : sm | m.a && go => X (m.b || no (m ** sm)) ]"
+            , "assert [ sm.a && go => X sm.b ]" ]
+        negated constraints' = unlines $
+            [ "machine ?"
+            , "  ctx"
+            , "    error ?" ] ++ map ("    " ++) constraints' ++
+            [ "[ initially machine ]"
+            , "[ initially (X no machine) ]" ]
+        scopeIdentities = "item\n[ initially (all x : item | X no (x ** item)) ]\n"
+        parentAcrossLifetimes = unlines
+            [ "box 2"
+            , "  item ?"
+            , "[ initially (some box.item) ]"
+            , "[ initially (all i : box.item | X (no (i ** box.item) && X some (i ** box.item))) ]"
+            , "assert [ all b : box | all i : b.item | G (some (i ** box.item) => some (i ** b.item)) ]" ]
+        persistent = unlines
+            [ "final machine"
+            , "  ctx"
+            , "    error ?"
+            , "    [ F error ]"
+            , "    [ !(F error) ]" ]
+        holds = map snd
+    forM_ [(s, n, l) | s <- [None, Simple], n <- [1, 2, 3], l <- [3, 10]] $ \(strategy, scope, traceLength) -> do
+        let
+            at = " (" ++ show strategy ++ ", scope " ++ show scope ++ ", " ++ show traceLength ++ " states)"
+            check = checkLifetimes dir
+        -- a transition in its source state leads to b while the machine exists
+        (final', _) <- check (machine "final ") strategy scope traceLength
+        holds final' @?= [True, True]
+        -- a replaced machine starts again, and the transition of the old one lapses
+        (replaced, _) <- check (machine "") strategy scope traceLength
+        holds replaced == [True, scope == 1] @? ("The transition lapses with a replaced machine" ++ at ++ ": " ++ show replaced)
+        -- a negated obligation lapses with the parent too
+        (equivalences, trace) <- check (negated
+            [ "assert [ (G !error) <=> !(F error) ]"
+            , "assert [ !(X error) <=> X !error ]"
+            , "assert [ !(error U !error) <=> (error W (!error && error)) ]" ]) strategy scope traceLength
+        holds equivalences @?= [True, True, True]
+        trace @? ("The machine disappears" ++ at)
+        (_, globally) <- check (negated ["[ G !error ]"]) strategy scope traceLength
+        globally @? ("G !error lets the machine disappear" ++ at)
+        (_, notEventually) <- check (negated ["[ !(F error) ]"]) strategy scope traceLength
+        notEventually @? ("!(F error) lets the machine disappear" ++ at)
+        -- while the parent persists, a formula and its negation contradict each other
+        (_, contradiction) <- check persistent strategy scope traceLength
+        not contradiction @? ("F error and !(F error) contradict each other while the machine exists" ++ at)
+        -- another instance of item in each state needs two identities
+        (_, identities) <- check scopeIdentities strategy scope traceLength
+        identities == (scope > 1) @? ("A scope bounds the identities across the trace" ++ at)
+        (sameParent, _) <- check parentAcrossLifetimes strategy scope traceLength
+        holds sameParent @?= [True]
 
 -- | A scenario that contradicts the model has an unsat core with the scenario and the transition
 --   it contradicts.

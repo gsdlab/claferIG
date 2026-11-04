@@ -3,6 +3,8 @@
 Minor release with Clafer 0.5.7.
 
 * Dynamic models: the obligations of a constraint last while the parent of its context exists, so a transition nested in its source state, e.g., `[ req=down --> movingDown ]` in the state `movingUp`, takes the machine to its target ([clafer#107](https://github.com/gsdlab/clafer/issues/107)).
+* Dynamic models: a negated obligation lapses with the parent too, so `[ !(F error) ]` lets the parent disappear, like `[ G !error ]` ([clafer#110](https://github.com/gsdlab/clafer/issues/110)).
+* The model tests check the lifetimes of obligations, the identities in a scope and the parent of a reappearing instance, with both scope strategies, at the scopes 1 to 3 and up to 3 and 10 states.
 
 ##### ClaferIG Version 0.5.6, Nov 1, 2026
 
