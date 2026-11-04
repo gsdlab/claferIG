@@ -537,6 +537,7 @@ public final class AlloyIG {
 
                 world = CompUtil.parseEverything_fromString(rep, load.getModel());
                 sigs = world.getAllSigs();
+                splitFacts(world.getAllReachableSigs());
                 dynamic = isDynamic(sigs);
                 command = world.getAllCommands().get(0);
                 modelFile = command.pos.filename;

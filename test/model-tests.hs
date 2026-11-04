@@ -426,6 +426,56 @@ case_ImportsUnsatCore = do
                 any ("B.y < 2 (" `isPrefixOf`) shown && any ("unsat.cfr:2:3)" `isSuffixOf`) shown @? ("The core names unsat.cfr: " ++ show shown)
             _ -> assertFailure "The model has no unsatisfiable core"
 
+-- The unsat core has the constraints of abstract clafers and of their children, each at its
+-- position in the model (#46).
+case_AbstractClaferUnsatCore :: Assertion
+case_AbstractClaferUnsatCore = do
+        dir <- (</> "claferIG-test-abstract-core") <$> getTemporaryDirectory
+        createDirectoryIfMissing True dir
+        writeFile (dir </> "engine.cfr") $ unlines
+            [ "abstract Engine"
+            , "    power -> integer"
+            , "gas : Engine"
+            , "    [ power = 2 ]"
+            , "electric : Engine"
+            , "    [ power = 5 ]"
+            , "abstract Car"
+            , "    abstract engine -> Engine"
+            , "        [ power >= 4 ]"
+            , "golf : Car"
+            , "    motor : engine -> gas"
+            ]
+        writeFile (dir </> "car.cfr") $ unlines
+            [ "abstract Car"
+            , "    x -> integer"
+            , "        [ this > 5 ]"
+            , "    [ x < 3 ]"
+            , "golf : Car"
+            ]
+        engine <- runClaferIGT (defaultIGArgs $ dir </> "engine.cfr") $ do
+            solve
+            fastest <- next
+            setUnsatCoreMinimization 0
+            solve
+            best <- next
+            return (fastest, best)
+        case fromRight engine of
+            (UnsatCore{unsatConstraints = fastest}, UnsatCore{unsatConstraints = best}) -> do
+                let core = shownCore fastest
+                any ("power >= 4 (" `isPrefixOf`) core && any ("engine.cfr:9:11)" `isSuffixOf`) core @? ("The core has the constraint of the abstract engine: " ++ show core)
+                any ("power = 2 (" `isPrefixOf`) core @? ("The core has the power of gas: " ++ show core)
+                let minimal = shownCore best
+                length minimal == 2 && not (any ("power = 5" `isPrefixOf`) minimal) @? ("The minimal core leaves out electric: " ++ show minimal)
+            _ -> assertFailure "The model has no unsatisfiable core"
+        car <- getModel $ dir </> "car.cfr"
+        case fromRight car of
+            UnsatCore{unsatConstraints = core'} -> do
+                let core = shownCore core'
+                any ("x < 3 (" `isPrefixOf`) core && any ("this > 5 (" `isPrefixOf`) core @? ("The core has both constraints of the abstract car: " ++ show core)
+            _ -> assertFailure "The model has no unsatisfiable core"
+    where
+    shownCore core = map show [ info | UserConstraint{constraintInfo = info} <- core ]
+
 -- The command c shows the scope of every clafer, also of the first one: the line of each
 -- clafer's declaration names the clafer.
 case_LineNumMapFirstClafer :: Assertion
