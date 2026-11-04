@@ -5,6 +5,8 @@ Minor release with Clafer 0.5.7.
 * Dynamic models: the obligations of a constraint last while the parent of its context exists, so a transition nested in its source state, e.g., `[ req=down --> movingDown ]` in the state `movingUp`, takes the machine to its target ([clafer#107](https://github.com/gsdlab/clafer/issues/107)).
 * Dynamic models: a negated obligation lapses with the parent too, so `[ !(F error) ]` lets the parent disappear, like `[ G !error ]` ([clafer#110](https://github.com/gsdlab/clafer/issues/110)).
 * Unsat cores have the constraints of abstract clafers and of their children, each at its position in the model ([#46](https://github.com/gsdlab/claferIG/issues/46)). Alloy gave the position of the whole signature for a constraint of a signature that is not a `one sig`, which matched no constraint of the model: such constraints were left out of the core, and a model whose constraints were all in abstract clafers gave "No more instances found" without a core.
+* The next trace, `fork` and `config` are solved without logging the translation for an unsat core, as `check` was: they give no core. The log of a large model took gigabytes, e.g., 11 GB in 3 minutes for the next trace of the TLS handshake model, and filled the temporary folder of a session; the first solution, which gives the core of a model with no instances, still logs it.
+* Ending a session no longer prints a `NoSuchFileException` when Alloy removes its own temporary files while claferIG removes the session's folder.
 * The model tests check the lifetimes of obligations, the identities in a scope and the parent of a reappearing instance, with both scope strategies, at the scopes 1 to 3 and up to 3 and 10 states.
 
 ##### ClaferIG Version 0.5.6, Nov 1, 2026

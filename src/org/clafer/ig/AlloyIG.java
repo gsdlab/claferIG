@@ -46,14 +46,17 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Stream;
 import java.util.Map;
 import java.util.Set;
 import kodkod.engine.satlab.SATFactory;
@@ -480,9 +483,46 @@ public final class AlloyIG {
         }
     }
 
+    // The options for a solve whose unsatisfiability is not shown as an unsat core: a check, and the next
+    // trace, fork or configuration. The solver is not the prover, which logs the translation to a file for
+    // an unsat core; that log of a large model can take gigabytes, more than a temporary folder holds.
+    private static A4Options withoutCore(A4Options options) {
+        A4Options without = options.dup();
+        SATFactory minisat = SATFactory.get("minisat");
+        without.solver = minisat.isPresent() ? minisat : SATFactory.get("sat4j");
+        return without;
+    }
+
+    // Alloy removes its own temporary folders when the JVM exits too, so a file may be gone before it is
+    // visited: such a file is skipped.
     private static void deleteRecursively(Path folder) {
-        try (Stream<Path> paths = Files.walk(folder)) {
-            paths.sorted(Collections.reverseOrder()).forEach(path -> path.toFile().delete());
+        try {
+            Files.walkFileTree(folder, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    Files.deleteIfExists(file);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException e) throws IOException {
+                    if (e instanceof NoSuchFileException) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    throw e;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+                    if (e != null && !(e instanceof NoSuchFileException)) {
+                        throw e;
+                    }
+                    Files.deleteIfExists(dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (NoSuchFileException e) {
+            // the folder is gone already
         } catch (IOException e) {
             System.err.println("Could not remove " + folder + ": " + e.getMessage());
         }
@@ -576,7 +616,7 @@ public final class AlloyIG {
                     // the next trace is solved for, without the traces given so far. The reporter of
                     // the model stays as it is, since no more traces is not an unsat core of the model.
                     ans = TranslateAlloyToKodkod.execute_command(new AlloyIGReporter(), world.getAllReachableSigs(),
-                            command.change(command.formula.and(givenTraces)), options);
+                            command.change(command.formula.and(givenTraces)), withoutCore(options));
                     stale = false;
                 }
                 if (ans.satisfiable()) {
@@ -614,7 +654,7 @@ public final class AlloyIG {
                             ? sameStates(shown, fields, ((ForkOperation) operation).getState(), false)
                             : givenConfigurations;
                     other = TranslateAlloyToKodkod.execute_command(new AlloyIGReporter(), world.getAllReachableSigs(),
-                            command.change(command.formula.and(givenTraces).and(formula)), options);
+                            command.change(command.formula.and(givenTraces).and(formula)), withoutCore(options));
                 }
                 if (other != null && other.satisfiable()) {
                     writeMessage("True");
@@ -636,12 +676,9 @@ public final class AlloyIG {
                 }
             } else if (operation instanceof CheckOperation) {
                 // The check of an assertion, at the scopes and the trace length of the model. A
-                // solution is a counterexample. It has no unsat core, so the solver is not the
-                // prover, which logs its translation to a file for an unsat core. The solutions of
-                // the model stay as they are.
-                A4Options checkOptions = options.dup();
-                SATFactory minisat = SATFactory.get("minisat");
-                checkOptions.solver = minisat.isPresent() ? minisat : SATFactory.get("sat4j");
+                // solution is a counterexample. It has no unsat core. The solutions of the model
+                // stay as they are.
+                A4Options checkOptions = withoutCore(options);
                 A4Solution counterexample = null;
                 for (Command assertion : world.getAllCommands()) {
                     if (assertion.check && assertion.label.equals(((CheckOperation) operation).getAssertion())) {
