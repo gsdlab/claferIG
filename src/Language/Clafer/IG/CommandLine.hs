@@ -305,7 +305,8 @@ runCommandLine =
                 newBw <- lift getBitwidth
                 printBitwidthWarning newBw
 
-            oldScopes <- lift getScopes
+            -- the clafers without instances keep their scopes, 0
+            oldScopes <- lift $ filterM (fmap not . hasNoInstances . fst) =<< getScopes
             mapM_ ( \(sigName', val') -> do
                         claferName' <- lift $ claferNameOfSig sigName'
                         setAlloyScopeAndBitwidth bitwidth' (max 1 $ val'+inc') claferName' sigName') oldScopes
@@ -624,6 +625,10 @@ incAlloyScopeAndBitwidth                 bitwidth'  inc'       fqName'   sigName
 
 setAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
 setAlloyScopeAndBitwidth                 bitwidth'  newValue'   fqName'   sigName' = do
+  empty' <- lift $ hasNoInstances sigName'
+  if empty'
+  then outputStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") stays 0: it has no instances, since no concrete clafer inherits from it or from the abstract clafer it is in"
+  else do
     when (newValue' > allowedMaxInt bitwidth') $ do
         lift $ setBitwidth $ requiredBitwidth $ newValue'
         newBw <- lift $ getBitwidth

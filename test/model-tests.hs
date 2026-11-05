@@ -237,6 +237,25 @@ checkLifetimes dir model strategy scope traceLength = do
             _ -> False)
     return $ fromRight result
 
+-- | An abstract clafer that no concrete clafer inherits from, and the clafers in it, have no
+--   instances: their scopes stay 0 when the scopes are raised. An abstract clafer that a concrete
+--   clafer inherits from through another abstract clafer keeps its scope.
+case_EmptyAbstractScopes :: Assertion
+case_EmptyAbstractScopes = do
+    dir <- (</> "claferIG-test-empty-abstracts") <$> getTemporaryDirectory
+    createDirectoryIfMissing True dir
+    writeFile (dir </> "empty.cfr") $ unlines
+        [ "abstract A", "    x ?", "abstract B : A", "abstract E", "    y ?", "C : B" ]
+    result <- runClaferIGT (defaultIGArgs $ dir </> "empty.cfr") $ do
+        initial <- getScopes
+        getScopes >>= mapM_ (increaseScope 2)
+        mapM_ (setAlloyScope 4) ["this/c0_E", "this/c0_y"]
+        raised <- getScopes
+        return (initial, raised)
+    let (initial, raised) = fromRight result
+    [ lookup ("this/" ++ s) initial | s <- ["c0_A", "c0_B", "c0_E", "c0_y"] ] @?= [Just 1, Just 1, Just 0, Just 0]
+    [ lookup ("this/" ++ s) raised | s <- ["c0_A", "c0_B", "c0_C", "c0_E", "c0_y"] ] @?= [Just 3, Just 3, Just 3, Just 0, Just 0]
+
 -- | The obligations of a constraint last while the parent of its context instance exists, also
 --   when they are negated; a scope bounds the instance identities across the trace, and an
 --   instance keeps its parent. Checked with both scope strategies, at scopes 1 to 3 and up to

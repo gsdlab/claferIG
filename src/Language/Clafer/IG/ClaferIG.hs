@@ -51,6 +51,7 @@ module Language.Clafer.IG.ClaferIG (
     increaseScope,
     setScope,
     setAlloyScope,
+    hasNoInstances,
     next,
     getAssertions,
     checkAssertion,
@@ -75,6 +76,7 @@ import Language.Clafer.Import (ModelFile, readModel, modelText, modelPosition)
 import Language.Clafer.QNameUID
 import Language.ClaferT
 import Language.Clafer.Intermediate.Intclafer
+import Language.Clafer.Intermediate.ScopeAnalysis (emptyAbstracts)
 import Language.Clafer.IG.AlloyIGInterface (AlloyIGT)
 import qualified Language.Clafer.IG.AlloyIGInterface as AlloyIG
 import Language.Clafer.IG.ClaferModel
@@ -93,6 +95,7 @@ import Data.Monoid
 import Data.Tuple (swap)
 import Data.Map as Map hiding (map, null)
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import Data.Maybe
 import Data.Data
 import Paths_claferIG (version)
@@ -167,7 +170,9 @@ data ClaferIGEnv = ClaferIGEnv{
     strMap :: Map Int String,
     lineNumMap :: Map Integer String,
     -- | A dynamic model, with temporal operators or modifiers, whose solutions are traces
-    dynamicModel :: Bool
+    dynamicModel :: Bool,
+    -- | The sigs of the abstract clafers that no concrete clafer inherits from: their scopes stay 0
+    emptySigs :: Set.Set String
 }
 
 data Instance =
@@ -230,6 +235,7 @@ load                 igArgs    =
         let irTrace = editMap $ irModuleTrace claferEnv'
 
         return $ ClaferIGEnv claferEnv' igArgs{bitwidth = bitwidth'} constraints claferModel modelFiles' (file claferArgs') qNameMaps uidIClaferMap' sMap irTrace dynamic
+            (Set.map ("this/" ++) $ emptyAbstracts ir)
     where
     editMap :: Map.Map Span [Ir] -> Map.Map Integer String -- Map Line Number to Clafer Name
     editMap =
@@ -337,10 +343,16 @@ increaseScope increment (sigName, value) = setAlloyScope (value + increment) sig
 setScope :: MonadIO m => Integer -> (String, Integer) -> ClaferIGT m (Either String ())
 setScope value (sigName, _) = setAlloyScope value sigName
 
+-- | Whether the clafer of the sig has no instances whatever its scope: an abstract clafer that no
+--   concrete clafer inherits from. Its scope stays 0; Alloy would otherwise give it atoms of its own.
+hasNoInstances :: Monad m => String -> ClaferIGT m Bool
+hasNoInstances sigName = Set.member sigName <$> fetches emptySigs
+
 setAlloyScope :: MonadIO m => Integer -> String -> ClaferIGT m (Either String ())
 setAlloyScope value sigName =
     do
-        subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName value
+        empty' <- hasNoInstances sigName
+        subset <- ClaferIGT $ lift $ AlloyIG.sendSetScopeCommand sigName (if empty' then 0 else value)
         subsetName <- traverse claferNameOfSig subset
         runExceptT $ maybe (return ()) throwError subsetName
 
