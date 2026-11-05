@@ -356,6 +356,26 @@ public final class AlloyIG {
         return fields;
     }
 
+    // The given relations as they are seen in a state: the references of the clafers in it. The
+    // model constrains a reference only while its clafer is alive, so a clafer that is not in the
+    // state has any value, and a trace that differs only in such values is the same trace. A
+    // clafer is alive when it is the child of a clafer, which is alive itself (the parent of
+    // each child is alive in the model).
+    private static List<Expr> visible(List<Sig.Field> fields, List<Sig.Field> all) {
+        Expr alive = null;
+        for (Sig.Field field : all) {
+            if (field.label.startsWith("r_")) {
+                Expr children = Sig.UNIV.join(field);
+                alive = alive == null ? children : alive.plus(children);
+            }
+        }
+        List<Expr> visible = new ArrayList<Expr>();
+        for (Sig.Field field : fields) {
+            visible.add(alive != null && field.label.endsWith("_ref") ? alive.domain(field) : field);
+        }
+        return visible;
+    }
+
     // The expression applied n times.
     private static Expr repeat(Expr e, int n, boolean prime) {
         for (int i = 0; i < n; i++) {
@@ -625,8 +645,8 @@ public final class AlloyIG {
 
                     if (dynamic) {
                         List<Sig.Field> fields = stateFields(world.getAllReachableSigs());
-                        givenTraces = givenTraces.and(sameStates(ans, fields, ans.getTraceLength(), true).not());
-                        givenConfigurations = givenConfigurations.and(sameStates(ans, staticFields(fields), 1, false).not());
+                        givenTraces = givenTraces.and(sameStates(ans, visible(fields, fields), ans.getTraceLength(), true).not());
+                        givenConfigurations = givenConfigurations.and(sameStates(ans, visible(staticFields(fields), fields), 1, false).not());
                         shown = ans;
                         stale = true;
                     } else {
@@ -651,7 +671,7 @@ public final class AlloyIG {
                 if ((dynamic || operation instanceof NextConfigurationOperation) && shown != null) {
                     List<Sig.Field> fields = stateFields(world.getAllReachableSigs());
                     Expr formula = operation instanceof ForkOperation
-                            ? sameStates(shown, fields, ((ForkOperation) operation).getState(), false)
+                            ? sameStates(shown, visible(fields, fields), ((ForkOperation) operation).getState(), false)
                             : givenConfigurations;
                     other = TranslateAlloyToKodkod.execute_command(new AlloyIGReporter(), world.getAllReachableSigs(),
                             command.change(command.formula.and(givenTraces).and(formula)), withoutCore(options));
@@ -662,8 +682,8 @@ public final class AlloyIG {
                     List<Sig.Field> fields = stateFields(world.getAllReachableSigs());
                     shown = other;
                     if (dynamic) {
-                        givenTraces = givenTraces.and(sameStates(other, fields, other.getTraceLength(), true).not());
-                        givenConfigurations = givenConfigurations.and(sameStates(other, staticFields(fields), 1, false).not());
+                        givenTraces = givenTraces.and(sameStates(other, visible(fields, fields), other.getTraceLength(), true).not());
+                        givenConfigurations = givenConfigurations.and(sameStates(other, visible(staticFields(fields), fields), 1, false).not());
                         ans = other;
                         stale = true;
                     } else {

@@ -380,6 +380,19 @@ case_DynamicModelTraces = do
         -- the traces of at most 3 states: one of 2 states and two of 3 states
         length traces == 3 @? ("3 traces of at most 3 states: " ++ show (length traces))
         length traces == length (nubOrd traces) @? "The traces are distinct"
+        -- the reference of a clafer that is not in a state has any value, which is not shown:
+        -- traces that differ only in it are the same trace
+        writeFile (dir </> "absent.cfr") $ unlines
+            [ "enum R = a | b"
+            , "req -> R ?"
+            , "[ never req ]"
+            ]
+        absent <- runClaferIGT (defaultIGArgs $ dir </> "absent.cfr") $ do
+            setMaxTraceLength 1
+            solve
+            replicateM 3 next
+        let absentTraces = [show $ solutionText s | Instance s _ <- fromRight absent]
+        length absentTraces == 1 @? ("1 trace of 1 state without req: " ++ show absentTraces)
     where
     nubOrd = foldr (\x seen -> if x `elem` seen then seen else x : seen) []
 
