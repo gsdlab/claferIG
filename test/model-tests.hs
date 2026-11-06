@@ -346,6 +346,64 @@ case_Lifetimes = do
         (sameParent, _) <- check parentAcrossLifetimes strategy scope traceLength
         holds sameParent @?= [True]
 
+-- | Whether the model has a trace, with the global scope.
+hasTrace :: FilePath -> Integer -> String -> IO Bool
+hasTrace dir scope model = snd <$> checkLifetimes dir model Simple scope 10
+
+-- | s must follow every p between q and r, not only a p at q; s must precede p from the first q,
+--   not from a later q, so at the top level, where a pattern holds in every state, every q starts
+--   the scope (kbak/clafer-semantics#127).
+case_PatternScopes :: Assertion
+case_PatternScopes = do
+    dir <- (</> "claferIG-test-patterns") <$> getTemporaryDirectory
+    createDirectoryIfMissing True dir
+    let
+        model pattern' scenario = unlines ["q ?", "p ?", "s ?", "r ?", "[ " ++ pattern' ++ " ]", "[ initially (" ++ scenario ++ ") ]"]
+        check expected pattern' scenario = do
+            actual <- hasTrace dir 1 $ model pattern' scenario
+            actual == expected @? ("[ " ++ pattern' ++ " ] on " ++ scenario ++ (if expected then " has a trace" else " has no trace"))
+        follow = "s must follow p between q and r"
+        precede = "s must precede p after q"
+    -- q, then p, then r: p needs s before r
+    check False follow "q && !p && !r && !s && X (!q && p && !r && !s && X (!q && !p && !r && !s && X (r && !p && !s)))"
+    check True follow "q && !p && !r && !s && X (!q && p && !r && !s && X (!q && !p && !r && s && X (r && !p)))"
+    -- q, p, q, s: the second q does not hide the p after the first one
+    check False precede "q && !p && !s && X (!q && p && !s && X (q && !p && !s && X (s && !p && !q)))"
+    -- q, s, p, q, p: at the top level, the second q needs an s before its p
+    let qspqp = "q && !p && !s && X (!q && !p && s && X (!q && p && !s && X (q && !p && !s && X (!q && p && !s))))"
+    check False precede qspqp
+    check True ("initially (" ++ precede ++ ")") qspqp
+
+-- | finalref fixes the target of each instance, finaltarget the set of targets of the instances
+--   in their parent, so they may swap targets, but a new instance points to an old target; final
+--   fixes both (kbak/clafer-semantics#127).
+case_FinalTarget :: Assertion
+case_FinalTarget = do
+    dir <- (</> "claferIG-test-finaltarget") <$> getTemporaryDirectory
+    createDirectoryIfMissing True dir
+    let
+        model clafer' scenario = unlines $
+            ["abstract E", "e1 : E", "e2 : E", "abstract Car", "  abstract engine -> E", "final car : Car"]
+            ++ map ("  " ++) clafer' ++ ["[ initially (" ++ scenario ++ ") ]"]
+        swap = "some x : car.h | x.dref = e1 && X (some (x ** car.h) && x.dref = e2)"
+        replace = "car.h.dref = e1 && X (car.h.dref = e2)"
+        check expected clafer' scenario = do
+            actual <- hasTrace dir 2 $ model clafer' scenario
+            actual == expected @? (unwords clafer' ++ ": " ++ scenario ++ (if expected then " has a trace" else " has no trace"))
+    forM_ [("", " -> E"), (" : engine", "")] $ \(super', ref) -> do
+        let h modifier card = [modifier ++ " h" ++ super' ++ ref ++ card]
+        check True (h "finaltarget" " 2") swap
+        check False (h "finalref" " 2") swap
+        check False (h "final" " 2") swap
+        check False (h "finaltarget" "") replace
+        check True (h "finalref" "") replace
+        check True (h "" "") replace
+    -- finaltarget on the abstract clafer fixes the targets of all its instances in the parent
+    let abstract' clafer' scenario = replace' "abstract engine" "abstract finaltarget engine" $ model clafer' scenario
+        replace' old new s = unlines [ if l == "  " ++ old ++ " -> E" then "  " ++ new ++ " -> E" else l | l <- lines s ]
+    hasTrace dir 2 (abstract' ["h : engine 2"] swap) >>= (@? "finaltarget engine: the instances of h swap their targets")
+    hasTrace dir 2 (abstract' ["h : engine"] replace) >>= (@? "finaltarget engine: a new h points to an old target") . not
+
 -- | A scenario that contradicts the model has an unsat core with the scenario and the transition
 --   it contradicts.
 case_DynamicModelUnsatCore :: Assertion
