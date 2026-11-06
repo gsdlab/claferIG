@@ -398,6 +398,10 @@ case_FinalTarget = do
         check False (h "finaltarget" "") replace
         check True (h "finalref" "") replace
         check True (h "" "") replace
+        -- both modifiers, in either order, mean both
+        forM_ ["finalref finaltarget", "finaltarget finalref"] $ \both -> do
+            check False (h both " 2") swap
+            check False (h both "") replace
     -- finaltarget on the abstract clafer fixes the targets of all its instances in the parent
     let abstract' clafer' scenario = replace' "abstract engine" "abstract finaltarget engine" $ model clafer' scenario
         replace' old new s = unlines [ if l == "  " ++ old ++ " -> E" then "  " ++ new ++ " -> E" else l | l <- lines s ]
