@@ -2,6 +2,7 @@
 
 Minor release with Clafer 0.5.7.
 
+* The UIDs of the clafers are their names since Clafer 0.5.7, qualified only where a name is not unique (`x__size`), and the Alloy model renames those that cannot be Alloy names (e.g., `sig_1` for `sig`). claferIG shows the names of the clafers, also with `--useuids` (their UIDs, not their Alloy names), and takes UIDs in its commands and scope files (`i sig 3`, `saveScopes`, `loadScopes`); it translates between the UIDs and the Alloy names. It cut a sig's name after its first `_` when a clafer was not found.
 * Dynamic models: the obligations of a constraint last while the parent of its context exists, so a transition nested in its source state, e.g., `[ req=down --> movingDown ]` in the state `movingUp`, takes the machine to its target ([clafer#107](https://github.com/gsdlab/clafer/issues/107)).
 * Dynamic models: a negated obligation lapses with the parent too, so `[ !(F error) ]` lets the parent disappear, like `[ G !error ]` ([clafer#110](https://github.com/gsdlab/clafer/issues/110)).
 * Unsat cores have the constraints of abstract clafers and of their children, each at its position in the model ([#46](https://github.com/gsdlab/claferIG/issues/46)). Alloy gave the position of the whole signature for a constraint of a signature that is not a `one sig`, which matched no constraint of the model: such constraints were left out of the core, and a model whose constraints were all in abstract clafers gave "No more instances found" without a core.

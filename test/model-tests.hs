@@ -237,6 +237,28 @@ checkLifetimes dir model strategy scope traceLength = do
             _ -> False)
     return $ fromRight result
 
+-- | A clafer whose UID cannot be an Alloy name, e.g., sig, has a sig of its own, this/sig_1, and so
+--   does r_x next to x (r_x is the relation of x); claferIG translates between the UIDs and the
+--   sigs, and shows the clafers by their names.
+case_AlloyNamesOfUIDs :: Assertion
+case_AlloyNamesOfUIDs = do
+    dir <- (</> "claferIG-test-alloy-names") <$> getTemporaryDirectory
+    createDirectoryIfMissing True dir
+    writeFile (dir </> "names.cfr") $ unlines [ "sig", "x", "r_x ?" ]
+    result <- runClaferIGT (defaultIGArgs $ dir </> "names.cfr") $ do
+        sigs <- map fst <$> getScopes
+        sigOfSig <- sigOfUID "sig"
+        sigOfRx <- sigOfUID "r_x"
+        sigOfX <- sigOfUID "x"
+        uid' <- uidOfSig "this/sig_1"
+        name' <- claferNameOfSig "this/sig_1"
+        return (sigs, [sigOfSig, sigOfRx, sigOfX], uid', name')
+    let (sigs, mapped, uid', name') = fromRight result
+    mapped @?= ["this/sig_1", "this/r_x_1", "this/x"]
+    and [ m `elem` sigs | m <- mapped ] @? ("The sigs are not those of the Alloy model: " ++ show sigs)
+    uid' @?= "sig"
+    name' @?= "sig"
+
 -- | An abstract clafer that no concrete clafer inherits from, and the clafers in it, have no
 --   instances: their scopes stay 0 when the scopes are raised. An abstract clafer that a concrete
 --   clafer inherits from through another abstract clafer keeps its scope.
@@ -249,12 +271,12 @@ case_EmptyAbstractScopes = do
     result <- runClaferIGT (defaultIGArgs $ dir </> "empty.cfr") $ do
         initial <- getScopes
         getScopes >>= mapM_ (increaseScope 2)
-        mapM_ (setAlloyScope 4) ["this/c0_E", "this/c0_y"]
+        mapM_ (setAlloyScope 4) ["this/E", "this/y"]
         raised <- getScopes
         return (initial, raised)
     let (initial, raised) = fromRight result
-    [ lookup ("this/" ++ s) initial | s <- ["c0_A", "c0_B", "c0_E", "c0_y"] ] @?= [Just 1, Just 1, Just 0, Just 0]
-    [ lookup ("this/" ++ s) raised | s <- ["c0_A", "c0_B", "c0_C", "c0_E", "c0_y"] ] @?= [Just 3, Just 3, Just 3, Just 0, Just 0]
+    [ lookup ("this/" ++ s) initial | s <- ["A", "B", "E", "y"] ] @?= [Just 1, Just 1, Just 0, Just 0]
+    [ lookup ("this/" ++ s) raised | s <- ["A", "B", "C", "E", "y"] ] @?= [Just 3, Just 3, Just 3, Just 0, Just 0]
 
 -- | The obligations of a constraint last while the parent of its context instance exists, also
 --   when they are negated; a scope bounds the instance identities across the trace, and an
@@ -517,5 +539,5 @@ case_LineNumMapFirstClafer = do
         writeFile (dir </> "lines.cfr") "B\n    y : integer\n    [ y > 2 ]\nC\n"
         result <- runClaferIGT (defaultIGArgs $ dir </> "lines.cfr") getlineNumMap
         case result of
-            Right lineNumMap -> Map.toList lineNumMap @?= [(1, "c0_B"), (2, "c0_y"), (4, "c0_C")]
+            Right lineNumMap -> Map.toList lineNumMap @?= [(1, "B"), (2, "y"), (4, "C")]
             Left errs -> assertFailure $ show errs

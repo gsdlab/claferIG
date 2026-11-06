@@ -50,18 +50,10 @@ poll uidIClaferMap' id (Census sample' counts') =
     ordinal' = findWithDefault (error $ "Did not find " ++ name ++ " in counts.") name counts''
     sample'' = insertWith (error $ "Polled " ++ fullName ++ " twice in the census.") id (ordinal', name) sample'
 
--- | The clafer's name for its UID. UIDs are not always cN_name: an apostrophe in a
--- name is replaced in the UID (name' -> c0_name__prime__).
+-- | The clafer's name for its UID (its Alloy name): its _ident, which the UID need not
+-- contain, e.g., size for x__size, or a' for a_prime.
 claferName :: UIDIClaferMap -> String -> String
-claferName uidIClaferMap' uid = maybe (makeSimpleName uid) _ident $ findIClafer uidIClaferMap' uid
-
--- Transforms c2_name -> name
-makeSimpleName :: String -> String
-makeSimpleName "" = ""
-makeSimpleName "root" = "root"
-makeSimpleName name' = case dropWhile (/='_') name' of
-    "" ->  "" -- error "Unexpected Clafer name: " ++ name'
-    x -> tail x
+claferName uidIClaferMap' uid = maybe uid _ident $ findIClafer uidIClaferMap' uid
 
 -- | Count the number of each clafer
 claferModelCensus :: UIDIClaferMap -> ClaferModel -> Census
@@ -81,20 +73,21 @@ statesCensus uidIClaferMap' states =
 
 
 -- | Rewrite the model into a human-friendlier format
-sugarClaferModel:: Bool -> Bool  -> UIDIClaferMap -> ClaferModel                      -> Map Int String -> ClaferModel
-sugarClaferModel   useUids addTypes uidIClaferMap'   model sMap =
-    sugarWithCensus (claferModelCensus uidIClaferMap' model) useUids addTypes uidIClaferMap' model sMap
+sugarClaferModel:: (String -> String) -> Bool -> Bool  -> UIDIClaferMap -> ClaferModel                      -> Map Int String -> ClaferModel
+sugarClaferModel   toUid useUids addTypes uidIClaferMap'   model sMap =
+    sugarWithCensus (claferModelCensus uidIClaferMap' model) toUid useUids addTypes uidIClaferMap' model sMap
 
 -- | Rewrite the states of a trace into a human-friendlier format: an instance has the same name
 --   in every state
-sugarClaferStates :: Bool -> Bool -> UIDIClaferMap -> [ClaferModel] -> Map Int String -> [ClaferModel]
-sugarClaferStates useUids addTypes uidIClaferMap' states sMap =
-    map (\state -> sugarWithCensus census useUids addTypes uidIClaferMap' state sMap) states
+sugarClaferStates :: (String -> String) -> Bool -> Bool -> UIDIClaferMap -> [ClaferModel] -> Map Int String -> [ClaferModel]
+sugarClaferStates toUid useUids addTypes uidIClaferMap' states sMap =
+    map (\state -> sugarWithCensus census toUid useUids addTypes uidIClaferMap' state sMap) states
     where
     census = statesCensus uidIClaferMap' states
 
-sugarWithCensus :: Census -> Bool -> Bool  -> UIDIClaferMap -> ClaferModel                -> Map Int String -> ClaferModel
-sugarWithCensus    census    useUids addTypes uidIClaferMap'   (ClaferModel topLevelClafers) sMap            =
+-- | The clafers of the model are by their Alloy names; with useUids, they are shown by their UIDs (toUid).
+sugarWithCensus :: Census -> (String -> String) -> Bool -> Bool  -> UIDIClaferMap -> ClaferModel                -> Map Int String -> ClaferModel
+sugarWithCensus    census    toUid useUids addTypes uidIClaferMap'   (ClaferModel topLevelClafers) sMap            =
     ClaferModel $ map sugarClafer topLevelClafers
     where
     sugarClafer clafer@(Clafer id uid' _ children) =
@@ -133,15 +126,15 @@ sugarWithCensus    census    useUids addTypes uidIClaferMap'   (ClaferModel topL
                          else ""
 
         refDecl :: Bool -> Bool ->  UIDIClaferMap -> String
-        refDecl    True    True    uidIClaferMap'' = retrieveSuper useUids' uidIClaferMap'' $ i_name id
+        refDecl    True    True    uidIClaferMap'' = retrieveSuper toUid useUids' uidIClaferMap'' $ i_name id
         refDecl    _       _       _               = ""
 
         (ordinal, simpleName) = findWithDefault (error $ "Sample lookup " ++ show id ++ " failed.") id sample'
         count = findWithDefault (error $ "Count lookup " ++ simpleName ++ " failed.") simpleName counts'
-        finalName = if useUids' then fullName else simpleName
+        finalName = if useUids' then toUid fullName else simpleName
 
-retrieveSuper :: Bool -> UIDIClaferMap -> String -> String
-retrieveSuper useUids' uidIClaferMap'      uid =
+retrieveSuper :: (String -> String) -> Bool -> UIDIClaferMap -> String -> String
+retrieveSuper toUid useUids' uidIClaferMap'      uid =
     sugarSuper (getSuper iclafer)
     -- ++
     -- sugarReference  (getReference iclafer)
@@ -149,7 +142,7 @@ retrieveSuper useUids' uidIClaferMap'      uid =
         iclafer = fromMaybe (error $ "IClafer not found: " ++ uid) $ findIClafer uidIClaferMap' uid
 
         sugarSuper :: [String] -> String
-        sugarSuper [s] = " : " ++ if useUids' then s else claferName uidIClaferMap' s
+        sugarSuper [s] = " : " ++ if useUids' then toUid s else claferName uidIClaferMap' s
         sugarSuper _   = ""
         -- sugarReference :: [String] -> String
         -- sugarReference [s] = " -> " ++ s

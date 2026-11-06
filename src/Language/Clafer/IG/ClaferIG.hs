@@ -68,10 +68,14 @@ module Language.Clafer.IG.ClaferIG (
     getlineNumMap,
     strictReadFile,
     sigToClaferName,
-    claferNameOfSig) where
+    claferNameOfSig,
+    sigOfUID,
+    uidOfSig,
+    getToUid) where
 
 import Language.Clafer
 import Language.Clafer.Common
+import Language.Clafer.Generator.AlloyNames (alloyNames, toAlloyNames, fromAlloyName)
 import Language.Clafer.Import (ModelFile, readModel, modelText, modelPosition)
 import Language.Clafer.QNameUID
 import Language.ClaferT
@@ -172,7 +176,11 @@ data ClaferIGEnv = ClaferIGEnv{
     -- | A dynamic model, with temporal operators or modifiers, whose solutions are traces
     dynamicModel :: Bool,
     -- | The sigs of the abstract clafers that no concrete clafer inherits from: their scopes stay 0
-    emptySigs :: Set.Set String
+    emptySigs :: Set.Set String,
+    -- | The Alloy names of the clafers whose UIDs cannot be Alloy names, e.g., sig_1 for sig, by
+    --   UID. claferIG works with the clafers by their Alloy names (the IR with them, its map,
+    --   the sigs); the UIDs are used for the names that the user gives and the scope files.
+    alloyNameMap :: Map UID String
 }
 
 data Instance =
@@ -223,19 +231,22 @@ load                 igArgs    =
         (claferEnv', alloyModel, mapping, sMap, dynamic) <- ExceptT $ return $ mapLeft (inFiles modelFiles') $ callClaferTranslator claferArgs' claferModel
 
         let
-            (ir, genv', _) = fromJust $ cIr claferEnv'
+            (ir0, genv', _) = fromJust $ cIr claferEnv'
+            -- the clafers by their Alloy names, as in the Alloy model
+            names = alloyNames ir0
+            ir = toAlloyNames names ir0
         let constraints = parseConstraints modelFiles' ir mapping
 
         lift $ AlloyIG.sendLoadCommand alloyModel
         lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
 
-        let qNameMaps = deriveQNameMaps ir
+        let qNameMaps = deriveQNameMaps ir0
 
-        let uidIClaferMap' = uidClaferMap genv'
-        let irTrace = editMap $ irModuleTrace claferEnv'
+        let uidIClaferMap' = if null names then uidClaferMap genv' else createUidIClaferMap ir
+        let irTrace = fmap (\uid' -> findWithDefault uid' uid' names) $ editMap $ irModuleTrace claferEnv'
 
         return $ ClaferIGEnv claferEnv' igArgs{bitwidth = bitwidth'} constraints claferModel modelFiles' (file claferArgs') qNameMaps uidIClaferMap' sMap irTrace dynamic
-            (Set.map ("this/" ++) $ emptyAbstracts ir)
+            (Set.map ("this/" ++) $ emptyAbstracts ir) names
     where
     editMap :: Map.Map Span [Ir] -> Map.Map Integer String -- Map Line Number to Clafer Name
     editMap =
@@ -369,16 +380,18 @@ checkAssertion :: MonadIO m => String -> ClaferIGT m (Maybe (ClaferSolution, Str
 checkAssertion assertion = do
     claferIGArgs' <- getClaferIGArgs
     uidIClaferMap' <- getUIDIClaferMap
+    toUid <- getToUid
     dynamic <- isDynamicModel
     sMap <- getStrMap
     xmlSolution <- ClaferIGT $ lift $ AlloyIG.sendCheckCommand assertion
-    return $ fmap (\xml -> (xmlToSolution dynamic (useUids claferIGArgs') (addTypes claferIGArgs') uidIClaferMap' xml sMap, xml)) xmlSolution
+    return $ fmap (\xml -> (xmlToSolution toUid dynamic (useUids claferIGArgs') (addTypes claferIGArgs') uidIClaferMap' xml sMap, xml)) xmlSolution
 
 next :: MonadIO m => ClaferIGT m Instance
 next = do
     env <- getClaferEnv
     claferIGArgs' <- getClaferIGArgs
     uidIClaferMap' <- getUIDIClaferMap
+    toUid <- getToUid
     let
         useUids' = useUids claferIGArgs'
         addTypes' = addTypes claferIGArgs'
@@ -387,13 +400,13 @@ next = do
     xmlSolution <- ClaferIGT $ lift AlloyIG.sendNextCommand
     sMap <- getStrMap
     case xmlSolution of
-        Just xml -> return $ Instance (xmlToSolution dynamic useUids' addTypes' uidIClaferMap' xml sMap) xml
+        Just xml -> return $ Instance (xmlToSolution toUid dynamic useUids' addTypes' uidIClaferMap' xml sMap) xml
         Nothing  -> do
             ClaferIGT $ lift AlloyIG.sendSaveStateCommand
             -- Generating counterexample modifies the state. If we ever want to
             -- rerun the original model, we need to restore the state.
             AlloyIG.UnsatCore core <- ClaferIGT $ lift AlloyIG.sendUnsatCoreCommand
-            c <- counterexample (xmlToSolution dynamic) env core useUids' addTypes' uidIClaferMap' constraints' sMap
+            c <- counterexample (xmlToSolution toUid dynamic) env core useUids' addTypes' uidIClaferMap' constraints' sMap
             ClaferIGT $ lift AlloyIG.sendRestoreStateCommand
             return c
     where
@@ -415,10 +428,11 @@ next = do
                 Nothing -> -- It is possible that none of the constraints are removable
                     return NoInstance
 
--- | The instance of a static model, or the trace of a dynamic model
-xmlToSolution :: Bool -> Bool -> Bool -> UIDIClaferMap -> String -> Map Int String -> ClaferSolution
-xmlToSolution False useUids' addTypes' uidIClaferMap' xml sMap = ClaferInstance $ (sugarClaferModel useUids' addTypes' uidIClaferMap' $ buildClaferModel $ parseSolution xml) sMap
-xmlToSolution True  useUids' addTypes' uidIClaferMap' xml sMap = ClaferTrace (sugarClaferStates useUids' addTypes' uidIClaferMap' (map buildStateModel states) sMap) loopState
+-- | The instance of a static model, or the trace of a dynamic model, given the UIDs of the
+--   clafers by their Alloy names (for --useuids)
+xmlToSolution :: (String -> String) -> Bool -> Bool -> Bool -> UIDIClaferMap -> String -> Map Int String -> ClaferSolution
+xmlToSolution toUid False useUids' addTypes' uidIClaferMap' xml sMap = ClaferInstance $ (sugarClaferModel toUid useUids' addTypes' uidIClaferMap' $ buildClaferModel $ parseSolution xml) sMap
+xmlToSolution toUid True  useUids' addTypes' uidIClaferMap' xml sMap = ClaferTrace (sugarClaferStates toUid useUids' addTypes' uidIClaferMap' (map buildStateModel states) sMap) loopState
     where
     (states, loopState) = parseTrace xml
 
@@ -437,11 +451,12 @@ otherTrace :: MonadIO m => AlloyIGT m (Maybe String) -> ClaferIGT m Instance
 otherTrace command = do
     claferIGArgs' <- getClaferIGArgs
     uidIClaferMap' <- getUIDIClaferMap
+    toUid <- getToUid
     sMap <- getStrMap
     dynamic <- isDynamicModel
     xmlSolution <- ClaferIGT $ lift command
     return $ case xmlSolution of
-        Just xml -> Instance (xmlToSolution dynamic (useUids claferIGArgs') (addTypes claferIGArgs') uidIClaferMap' xml sMap) xml
+        Just xml -> Instance (xmlToSolution toUid dynamic (useUids claferIGArgs') (addTypes claferIGArgs') uidIClaferMap' xml sMap) xml
         Nothing  -> NoInstance
 
 -- | Whether the model is dynamic, with traces as its solutions
@@ -478,19 +493,33 @@ quit :: MonadIO m => ClaferIGT m ()
 quit = ClaferIGT $ lift AlloyIG.sendQuitCommand
 
 
--- | The clafer's name for an Alloy signature (this/c0_name). UIDs are not always
--- cN_name: an apostrophe in a name is replaced in the UID (name' -> c0_name__prime__).
+-- | The clafer's name for an Alloy signature (this/name): its _ident, which its UID or Alloy
+-- name need not contain, e.g., size for x__size, or a' for a_prime.
 claferNameOfSig :: MonadIO m => String -> ClaferIGT m String
 claferNameOfSig sig = do
     uidIClaferMap' <- getUIDIClaferMap
-    let uid = fromMaybe sig $ stripPrefix "this/" sig
-    return $ maybe (sigToClaferName sig) _ident $ findIClafer uidIClaferMap' uid
+    let name = sigToClaferName sig
+    return $ maybe name _ident $ findIClafer uidIClaferMap' name
 
+-- | The Alloy name of a signature, without this/.
 sigToClaferName :: String -> String
-sigToClaferName n =
-    case snd $ break ('_' ==) n of
-        [] ->  n
-        x -> tail x
+sigToClaferName sig = fromMaybe sig $ stripPrefix "this/" sig
+
+-- | The UIDs of the clafers by their Alloy names.
+getToUid :: Monad m => ClaferIGT m (String -> String)
+getToUid = fromAlloyName <$> fetches alloyNameMap
+
+-- | The signature of a clafer given its UID: this/ and its Alloy name.
+sigOfUID :: Monad m => UID -> ClaferIGT m String
+sigOfUID uid' = do
+    names <- fetches alloyNameMap
+    return $ "this/" ++ findWithDefault uid' uid' names
+
+-- | The UID of a clafer given its signature.
+uidOfSig :: Monad m => String -> ClaferIGT m UID
+uidOfSig sig = do
+    names <- fetches alloyNameMap
+    return $ fromAlloyName names $ sigToClaferName sig
 
 findRemovable :: ClaferEnv -> [Span] -> [Constraint] -> [Maybe Constraint]
 findRemovable env core constraints' =
