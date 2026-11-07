@@ -3,6 +3,7 @@ package org.clafer.ig;
 import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.alloy4.SafeList;
 import edu.mit.csail.sdg.ast.Command;
+import edu.mit.csail.sdg.ast.Decl;
 import edu.mit.csail.sdg.ast.Expr;
 import edu.mit.csail.sdg.ast.ExprLet;
 import edu.mit.csail.sdg.ast.ExprList;
@@ -30,6 +31,8 @@ public class Util {
     private static final Field isLone;
     private static final Field isSome;
     private static final Field facts;
+    private static final Field declSpan;
+    private static final Field safeListList;
 
     static {
         try {
@@ -37,11 +40,15 @@ public class Util {
             isLone = Sig.class.getDeclaredField("isLone");
             isSome = Sig.class.getDeclaredField("isSome");
             facts = Sig.class.getDeclaredField("facts");
+            declSpan = Decl.class.getDeclaredField("span");
+            safeListList = SafeList.class.getDeclaredField("list");
 
             isOne.setAccessible(true);
             isLone.setAccessible(true);
             isSome.setAccessible(true);
             facts.setAccessible(true);
+            declSpan.setAccessible(true);
+            safeListList.setAccessible(true);
         } catch (NoSuchFieldException e) {
             throw new AlloyIGException(e);
         }
@@ -165,6 +172,50 @@ public class Util {
             list.add(item);
         }
         return list;
+    }
+
+    /**
+     * Makes each constraint of a sig fact a fact of its own, at its own position in the unsat
+     * core. Alloy quantifies a fact of a sig that is not a one sig over its atoms, all this: S |
+     * a && b, as one formula, which spans the declaration of the sig: the core had the span of
+     * the whole sig instead of the constraints that contradict, e.g., of the clafers in
+     * abstract clafers (gsdlab/claferIG#46). The span of the sig's declaration of this is
+     * unknown, so a quantified constraint spans the constraint.
+     */
+    public static void splitFacts(Iterable<Sig> sigs) {
+        for (Sig sig : sigs) {
+            try {
+                declSpan.set(sig.decl, Pos.UNKNOWN);
+            } catch (IllegalAccessException e) {
+                throw new AlloyIGException(e);
+            }
+            List<Expr> newFacts = new ArrayList<Expr>();
+            for (Expr fact : sig.getFacts()) {
+                addConjuncts(fact, newFacts);
+            }
+            // The facts are replaced in the list of the sig, not by another list: Java warns
+            // about mutated final fields. No copies of the list are saved yet when the model
+            // is loaded.
+            try {
+                List<Expr> list = (List<Expr>) safeListList.get(facts.get(sig));
+                list.clear();
+                list.addAll(newFacts);
+            } catch (IllegalAccessException e) {
+                throw new AlloyIGException(e);
+            }
+        }
+    }
+
+    private static void addConjuncts(Expr expr, List<Expr> conjuncts) {
+        if (expr instanceof ExprUnary && ((ExprUnary) expr).op == ExprUnary.Op.NOOP) {
+            addConjuncts(((ExprUnary) expr).sub, conjuncts);
+        } else if (expr instanceof ExprList && ((ExprList) expr).op == ExprList.Op.AND) {
+            for (Expr arg : ((ExprList) expr).args) {
+                addConjuncts(arg, conjuncts);
+            }
+        } else {
+            conjuncts.add(expr);
+        }
     }
 
     public static boolean removeLocalConstraint(Pos pos, Iterable<Sig> sigs) {

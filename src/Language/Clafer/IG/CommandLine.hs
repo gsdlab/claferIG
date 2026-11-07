@@ -305,7 +305,8 @@ runCommandLine =
                 newBw <- lift getBitwidth
                 printBitwidthWarning newBw
 
-            oldScopes <- lift getScopes
+            -- the clafers without instances keep their scopes, 0
+            oldScopes <- lift $ filterM (fmap not . hasNoInstances . fst) =<< getScopes
             mapM_ ( \(sigName', val') -> do
                         claferName' <- lift $ claferNameOfSig sigName'
                         setAlloyScopeAndBitwidth bitwidth' (max 1 $ val'+inc') claferName' sigName') oldScopes
@@ -331,7 +332,7 @@ runCommandLine =
             try $ do
                 qNameMaps' <- lift $ lift $ getQNameMaps
                 let uids = getUIDs qNameMaps' fqName
-                let sigs = map ("this/" ++) uids
+                sigs <- lift $ lift $ mapM sigOfUID uids
                 bitwidth' <- lift $ lift getBitwidth
 
                 lift $ mapM_ (incAlloyScopeAndBitwidth bitwidth' inc' fqName) sigs
@@ -344,7 +345,7 @@ runCommandLine =
             try $ do
                 qNameMaps' <- lift $ lift $ getQNameMaps
                 let uids = getUIDs qNameMaps' qName
-                let sigs = map ((++) "this/") uids
+                sigs <- lift $ lift $ mapM sigOfUID uids
                 bitwidth' <- lift $ lift getBitwidth
 
                 lift $ mapM_ (setAlloyScopeAndBitwidth bitwidth' val' qName) sigs
@@ -405,13 +406,13 @@ runCommandLine =
             globalScope <- lift getGlobalScope
             outputStrLn $ "Global scope = " ++ show globalScope
             originalScopes <- lift getScopes
-            -- remove the "this/" prefix
-            mapM_ printScope originalScopes
+            -- by UID
+            mapM_ (\(sigName, value) -> lift (uidOfSig sigName) >>= \uid' -> printScope (uid', value)) originalScopes
             nextLoop context
 
             where
-            printScope (sigName, value)  =
-                outputStrLn $ "  " ++ (drop 5 sigName) ++ " scope = " ++ show value
+            printScope (uid', value)  =
+                outputStrLn $ "  " ++ uid' ++ " scope = " ++ show value
 
     loop SaveScopes context =
         do
@@ -419,10 +420,11 @@ runCommandLine =
             originalScopes <- lift getScopes
             modelFileName <- lift getModelFileName
             qNameMaps' <- lift getQNameMaps
+            -- by UID
+            sigUids <- lift $ mapM (uidOfSig . fst) originalScopes
             let
                 globalScopeTuple = ("", globalScope)
-                -- remove the "this/" prefix
-                uidScopes = globalScopeTuple : (map (\(sigName, value) -> (drop 5 sigName, value)) originalScopes)
+                uidScopes = globalScopeTuple : zip sigUids (map snd originalScopes)
             liftIO $ writeCfrScopeFile uidScopes qNameMaps' modelFileName
             outputStrLn "Scopes saved to the `.cfr-scope` file."
             nextLoop context
@@ -441,8 +443,9 @@ runCommandLine =
                         (globalScopes, normalScopes) = partition (\(uid', _) -> null uid') uidScopes
                         -- from the globalScopes, take the maximum
                         globalScopeVals = map snd globalScopes
-                        -- add the "this/" prefix
-                        normalScopesAlloy = map (\(uid', scope) -> ("this/"++uid', scope)) normalScopes
+                    -- the sigs of the clafers
+                    normalSigs <- lift $ mapM (sigOfUID . fst) normalScopes
+                    let normalScopesAlloy = zip normalSigs (map snd normalScopes)
                     -- a file may list only some clafers, without the global scope; then it stays
                     unless (null globalScopeVals) $ lift $ setGlobalScope $ maximum globalScopeVals
                     lift $ mapM_ (\(uid', val) -> setAlloyScope val uid') normalScopesAlloy
@@ -624,6 +627,10 @@ incAlloyScopeAndBitwidth                 bitwidth'  inc'       fqName'   sigName
 
 setAlloyScopeAndBitwidth :: MonadIO m => Integer -> Integer -> String -> UID -> InputT (ClaferIGT m) ()
 setAlloyScopeAndBitwidth                 bitwidth'  newValue'   fqName'   sigName' = do
+  empty' <- lift $ hasNoInstances sigName'
+  if empty'
+  then outputStrLn $ "Scope of " ++ fqName' ++ " (" ++ (drop 5 sigName') ++ ") stays 0: it has no instances, since no concrete clafer inherits from it or from the abstract clafer it is in"
+  else do
     when (newValue' > allowedMaxInt bitwidth') $ do
         lift $ setBitwidth $ requiredBitwidth $ newValue'
         newBw <- lift $ getBitwidth

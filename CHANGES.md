@@ -1,3 +1,19 @@
+##### ClaferIG Version 0.5.7, unreleased
+
+Minor release with Clafer 0.5.7.
+
+* The UIDs of the clafers are their names since Clafer 0.5.7, qualified only where a name is not unique (`x__size`), and the Alloy model renames those that cannot be Alloy names (e.g., `sig_1` for `sig`). claferIG shows the names of the clafers, also with `--useuids` (their UIDs, not their Alloy names), and takes UIDs in its commands and scope files (`i sig 3`, `saveScopes`, `loadScopes`); it translates between the UIDs and the Alloy names. It cut a sig's name after its first `_` when a clafer was not found.
+* Dynamic models: the obligations of a constraint last while the parent of its context exists, so a transition nested in its source state, e.g., `[ req=down --> movingDown ]` in the state `movingUp`, takes the machine to its target ([clafer#107](https://github.com/gsdlab/clafer/issues/107)).
+* Dynamic models: a negated obligation lapses with the parent too, so `[ !(F error) ]` lets the parent disappear, like `[ G !error ]` ([clafer#110](https://github.com/gsdlab/clafer/issues/110)).
+* Unsat cores have the constraints of abstract clafers and of their children, each at its position in the model ([#46](https://github.com/gsdlab/claferIG/issues/46)). Alloy gave the position of the whole signature for a constraint of a signature that is not a `one sig`, which matched no constraint of the model: such constraints were left out of the core, and a model whose constraints were all in abstract clafers gave "No more instances found" without a core.
+* The next trace, `fork` and `config` are solved without logging the translation for an unsat core, as `check` was: they give no core. The log of a large model took gigabytes, e.g., 11 GB in 3 minutes for the next trace of the TLS handshake model, and filled the temporary folder of a session; the first solution, which gives the core of a model with no instances, still logs it.
+* The next trace, `fork` and `config` differ from the traces given so far in what the traces show. The reference of a clafer that is not in a state has any value there, and a trace that differed from the last one only in such a value was given as a new trace that looked the same, e.g., the same trace of the WebSocket model again and again.
+* An abstract clafer that no concrete clafer inherits from, and the clafers in it, have no instances: their scopes stay 0 when the scopes are raised, with `i`, `i <clafer>`, `s <clafer> <number>`, a `.cfr-scope` file or a reload, and `i <clafer>` and `s <clafer> <number>` say so. Raising them gave Alloy atoms of such clafers, which made a model, e.g., the power window with abstract variants of its controller, take minutes instead of seconds.
+* Ending a session no longer prints a `NoSuchFileException` when Alloy removes its own temporary files while claferIG removes the session's folder.
+* The model tests check the scopes of the patterns `must follow ... between` and `must precede ... after`, and that `finaltarget` lets the instances of a clafer swap their targets, while `finalref` and `final` do not ([kbak/clafer-semantics#127](https://github.com/kbak/clafer-semantics/issues/127)).
+* The model tests run in parallel, on all cores, each in a folder of its own (two tests wrote different `lib.cfr` files into one folder); the lifetimes, pattern scope and `finaltarget` tests are split into one test for each case. `make test` takes about 30 seconds instead of 2 minutes.
+* The model tests check the lifetimes of obligations, the identities in a scope and the parent of a reappearing instance, with both scope strategies, at the scopes 1 to 3 and up to 3 and 10 states, and that the scopes of abstract clafers without instances stay 0.
+
 ##### ClaferIG Version 0.5.6, Nov 1, 2026
 
 Minor release with Clafer 0.5.6.

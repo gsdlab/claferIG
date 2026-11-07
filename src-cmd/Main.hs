@@ -33,7 +33,6 @@ import Language.Clafer.IG.Sugarer
 import Language.Clafer.ClaferArgs
 import Language.Clafer.JSONMetaData
 import Language.ClaferT
-import Language.Clafer.Common
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Either
@@ -171,17 +170,17 @@ runAlloySolution args' =
         alloyInstance <- liftIO $ strictReadFile $ alloySolution args' -- It's an Alloy XML file in this case
         when (null alloyInstance) $ error $ "Provide an Alloy solution Alloy file name.\n"
                                          ++ "Usage: claferIG [OPTIONS] <model.cfr> --alloy-solution=<instance.xml>\n"
-        env <- getClaferEnv
         dynamic <- isDynamicModel
-        let (_, genv', _) = fromJust $ cIr env
+        -- the clafers by their Alloy names, as in the Alloy solution
+        uidIClaferMap' <- getUIDIClaferMap
+        toUid <- getToUid
         let
             sMap = Map.empty
-            uidIClaferMap' = uidClaferMap genv'
             -- the trace of a dynamic model
             (states, loopState) = parseTrace alloyInstance
         liftIO $ putStrLn $ if dynamic
-            then solutionText $ ClaferTrace (sugarClaferStates (useUids args') (addTypes args') uidIClaferMap' (map buildStateModel states) sMap) loopState
-            else show $ (sugarClaferModel (useUids args') (addTypes args') uidIClaferMap' $ buildClaferModel $ parseSolution alloyInstance) $ sMap
+            then solutionText $ ClaferTrace (sugarClaferStates toUid (useUids args') (addTypes args') uidIClaferMap' (map buildStateModel states) sMap) loopState
+            else show $ (sugarClaferModel toUid (useUids args') (addTypes args') uidIClaferMap' $ buildClaferModel $ parseSolution alloyInstance) $ sMap
 
 savePath :: String -> FilePath -> IORef Int -> IO FilePath
 savePath extension file' counterRef =
