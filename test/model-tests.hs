@@ -46,8 +46,17 @@ import Test.Tasty.TH
 tg_modeltests :: TestTree
 tg_modeltests = $(testGroupGenerator)
 
+-- | The tests run in parallel, on all cores (the executable runs with +RTS -N): each test has a
+--   folder of its own, and the long ones are split into parts.
 main :: IO ()
-main = defaultMain $ testGroup "Model tests" [ tg_modeltests ]
+main = defaultMain $ testGroup "Model tests" [ tg_modeltests, lifetimes, patternScopes, finalTarget ]
+
+-- | A new folder for the models of a test, under the temporary directory.
+testDir :: String -> IO FilePath
+testDir name = do
+    dir <- (</> ("claferIG-test-" ++ name)) <$> getTemporaryDirectory
+    createDirectoryIfMissing True dir
+    return dir
 
 claferIGArgsDef :: IGArgs
 claferIGArgsDef = IGArgs {
@@ -131,8 +140,7 @@ trafficLight = unlines
 --   the diff view shows the changes from one state to the next.
 case_DynamicModelTrace :: Assertion
 case_DynamicModelTrace = do
-        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
-        createDirectoryIfMissing True dir
+        dir <- testDir "DynamicModelTrace"
         writeFile (dir </> "scenario.cfr") $ trafficLight ++ "    [ initially (green --> yellow --> red --> green --> yellow_on --> yellow_off --> off) ]\n"
         result <- getModel $ dir </> "scenario.cfr"
         case modelSolution $ fromRight result of
@@ -148,8 +156,7 @@ case_DynamicModelTrace = do
 -- | The graph of a trace has its states, their transitions and the loop; of an instance, a node.
 case_SolutionGraph :: Assertion
 case_SolutionGraph = do
-        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
-        createDirectoryIfMissing True dir
+        dir <- testDir "SolutionGraph"
         writeFile (dir </> "graph.cfr") trafficLight
         result <- runClaferIGT (defaultIGArgs $ dir </> "graph.cfr") $ solve >> next
         case fromRight result of
@@ -180,8 +187,7 @@ case_SolutionGraph = do
 --   a failed one has a counterexample, which leaves the next solution as it is.
 case_Assertions :: Assertion
 case_Assertions = do
-    dir <- (</> "claferIG-test-assertions") <$> getTemporaryDirectory
-    createDirectoryIfMissing True dir
+    dir <- testDir "Assertions"
     writeFile (dir </> "dynamic.cfr") $ unlines
         [ "xor s"
         , "    initial a --> b"
@@ -242,8 +248,7 @@ checkLifetimes dir model strategy scope traceLength = do
 --   sigs, and shows the clafers by their names.
 case_AlloyNamesOfUIDs :: Assertion
 case_AlloyNamesOfUIDs = do
-    dir <- (</> "claferIG-test-alloy-names") <$> getTemporaryDirectory
-    createDirectoryIfMissing True dir
+    dir <- testDir "AlloyNamesOfUIDs"
     writeFile (dir </> "names.cfr") $ unlines [ "sig", "x", "r_x ?" ]
     result <- runClaferIGT (defaultIGArgs $ dir </> "names.cfr") $ do
         sigs <- map fst <$> getScopes
@@ -264,8 +269,7 @@ case_AlloyNamesOfUIDs = do
 --   clafer inherits from through another abstract clafer keeps its scope.
 case_EmptyAbstractScopes :: Assertion
 case_EmptyAbstractScopes = do
-    dir <- (</> "claferIG-test-empty-abstracts") <$> getTemporaryDirectory
-    createDirectoryIfMissing True dir
+    dir <- testDir "EmptyAbstractScopes"
     writeFile (dir </> "empty.cfr") $ unlines
         [ "abstract A", "    x ?", "abstract B : A", "abstract E", "    y ?", "C : B" ]
     result <- runClaferIGT (defaultIGArgs $ dir </> "empty.cfr") $ do
@@ -282,10 +286,14 @@ case_EmptyAbstractScopes = do
 --   when they are negated; a scope bounds the instance identities across the trace, and an
 --   instance keeps its parent. Checked with both scope strategies, at scopes 1 to 3 and up to
 --   3 and 10 states.
-case_Lifetimes :: Assertion
-case_Lifetimes = do
-    dir <- (</> "claferIG-test-lifetimes") <$> getTemporaryDirectory
-    createDirectoryIfMissing True dir
+lifetimes :: TestTree
+lifetimes = testGroup "Lifetimes"
+    [ testCase (show s ++ ", scope " ++ show n ++ ", " ++ show l ++ " states") $ lifetimesAt s n l
+    | s <- [None, Simple], n <- [1, 2, 3], l <- [3, 10] ]
+
+lifetimesAt :: ScopeStrategy -> Integer -> Integer -> Assertion
+lifetimesAt strategy scope traceLength = do
+    dir <- testDir $ "Lifetimes-" ++ show strategy ++ "-" ++ show scope ++ "-" ++ show traceLength
     let
         machine final' = unlines
             [ "go ?"
@@ -316,10 +324,9 @@ case_Lifetimes = do
             , "    [ F error ]"
             , "    [ !(F error) ]" ]
         holds = map snd
-    forM_ [(s, n, l) | s <- [None, Simple], n <- [1, 2, 3], l <- [3, 10]] $ \(strategy, scope, traceLength) -> do
-        let
-            at = " (" ++ show strategy ++ ", scope " ++ show scope ++ ", " ++ show traceLength ++ " states)"
-            check = checkLifetimes dir
+        at = " (" ++ show strategy ++ ", scope " ++ show scope ++ ", " ++ show traceLength ++ " states)"
+        check = checkLifetimes dir
+    do
         -- a transition in its source state leads to b while the machine exists
         (final', _) <- check (machine "final ") strategy scope traceLength
         holds final' @?= [True, True]
@@ -353,45 +360,55 @@ hasTrace dir scope model = snd <$> checkLifetimes dir model Simple scope 10
 -- | s must follow every p between q and r, not only a p at q; s must precede p from the first q,
 --   not from a later q, so at the top level, where a pattern holds in every state, every q starts
 --   the scope (kbak/clafer-semantics#127).
-case_PatternScopes :: Assertion
-case_PatternScopes = do
-    dir <- (</> "claferIG-test-patterns") <$> getTemporaryDirectory
-    createDirectoryIfMissing True dir
-    let
-        model pattern' scenario = unlines ["q ?", "p ?", "s ?", "r ?", "[ " ++ pattern' ++ " ]", "[ initially (" ++ scenario ++ ") ]"]
-        check expected pattern' scenario = do
-            actual <- hasTrace dir 1 $ model pattern' scenario
-            actual == expected @? ("[ " ++ pattern' ++ " ] on " ++ scenario ++ (if expected then " has a trace" else " has no trace"))
-        follow = "s must follow p between q and r"
-        precede = "s must precede p after q"
+patternScopes :: TestTree
+patternScopes = testGroup "PatternScopes" $ zipWith test [1 :: Int ..]
     -- q, then p, then r: p needs s before r
-    check False follow "q && !p && !r && !s && X (!q && p && !r && !s && X (!q && !p && !r && !s && X (r && !p && !s)))"
-    check True follow "q && !p && !r && !s && X (!q && p && !r && !s && X (!q && !p && !r && s && X (r && !p)))"
+    [ (False, follow, "q && !p && !r && !s && X (!q && p && !r && !s && X (!q && !p && !r && !s && X (r && !p && !s)))")
+    , (True, follow, "q && !p && !r && !s && X (!q && p && !r && !s && X (!q && !p && !r && s && X (r && !p)))")
     -- q, p, q, s: the second q does not hide the p after the first one
-    check False precede "q && !p && !s && X (!q && p && !s && X (q && !p && !s && X (s && !p && !q)))"
+    , (False, precede, "q && !p && !s && X (!q && p && !s && X (q && !p && !s && X (s && !p && !q)))")
     -- q, s, p, q, p: at the top level, the second q needs an s before its p
-    let qspqp = "q && !p && !s && X (!q && !p && s && X (!q && p && !s && X (q && !p && !s && X (!q && p && !s))))"
-    check False precede qspqp
-    check True ("initially (" ++ precede ++ ")") qspqp
+    , (False, precede, qspqp)
+    , (True, "initially (" ++ precede ++ ")", qspqp) ]
+  where
+    model pattern' scenario = unlines ["q ?", "p ?", "s ?", "r ?", "[ " ++ pattern' ++ " ]", "[ initially (" ++ scenario ++ ") ]"]
+    test i (expected, pattern', scenario) = testCase ("[ " ++ pattern' ++ " ] " ++ show i) $ do
+        dir <- testDir $ "PatternScopes-" ++ show i
+        actual <- hasTrace dir 1 $ model pattern' scenario
+        actual == expected @? ("[ " ++ pattern' ++ " ] on " ++ scenario ++ (if expected then " has a trace" else " has no trace"))
+    follow = "s must follow p between q and r"
+    precede = "s must precede p after q"
+    qspqp = "q && !p && !s && X (!q && !p && s && X (!q && p && !s && X (q && !p && !s && X (!q && p && !s))))"
 
 -- | finalref fixes the target of each instance, finaltarget the set of targets of the instances
 --   in their parent, so they may swap targets, but a new instance points to an old target; final
 --   fixes both (kbak/clafer-semantics#127).
-case_FinalTarget :: Assertion
-case_FinalTarget = do
-    dir <- (</> "claferIG-test-finaltarget") <$> getTemporaryDirectory
-    createDirectoryIfMissing True dir
+finalTarget :: TestTree
+finalTarget = testGroup "FinalTarget"
+    [ testCase "its own reference" $ finalTargetOf "own" ("", " -> E")
+    , testCase "an inherited reference" $ finalTargetOf "inherited" (" : engine", "")
+    , testCase "finaltarget on the abstract clafer" finalTargetAbstract ]
+
+finalTargetModel :: [String] -> String -> String
+finalTargetModel clafer' scenario = unlines $
+    ["abstract E", "e1 : E", "e2 : E", "abstract Car", "  abstract engine -> E", "final car : Car"]
+    ++ map ("  " ++) clafer' ++ ["[ initially (" ++ scenario ++ ") ]"]
+
+finalTargetSwap, finalTargetReplace :: String
+finalTargetSwap = "some x : car.h | x.dref = e1 && X (some (x ** car.h) && x.dref = e2)"
+finalTargetReplace = "car.h.dref = e1 && X (car.h.dref = e2)"
+
+finalTargetOf :: String -> (String, String) -> Assertion
+finalTargetOf name (super', ref) = do
+    dir <- testDir $ "FinalTarget-" ++ name
     let
-        model clafer' scenario = unlines $
-            ["abstract E", "e1 : E", "e2 : E", "abstract Car", "  abstract engine -> E", "final car : Car"]
-            ++ map ("  " ++) clafer' ++ ["[ initially (" ++ scenario ++ ") ]"]
-        swap = "some x : car.h | x.dref = e1 && X (some (x ** car.h) && x.dref = e2)"
-        replace = "car.h.dref = e1 && X (car.h.dref = e2)"
+        swap = finalTargetSwap
+        replace = finalTargetReplace
         check expected clafer' scenario = do
-            actual <- hasTrace dir 2 $ model clafer' scenario
+            actual <- hasTrace dir 2 $ finalTargetModel clafer' scenario
             actual == expected @? (unwords clafer' ++ ": " ++ scenario ++ (if expected then " has a trace" else " has no trace"))
-    forM_ [("", " -> E"), (" : engine", "")] $ \(super', ref) -> do
-        let h modifier card = [modifier ++ " h" ++ super' ++ ref ++ card]
+        h modifier card = [modifier ++ " h" ++ super' ++ ref ++ card]
+    do
         check True (h "finaltarget" " 2") swap
         check False (h "finalref" " 2") swap
         check False (h "final" " 2") swap
@@ -402,18 +419,21 @@ case_FinalTarget = do
         forM_ ["finalref finaltarget", "finaltarget finalref"] $ \both -> do
             check False (h both " 2") swap
             check False (h both "") replace
-    -- finaltarget on the abstract clafer fixes the targets of all its instances in the parent
-    let abstract' clafer' scenario = replace' "abstract engine" "abstract finaltarget engine" $ model clafer' scenario
+
+-- | finaltarget on the abstract clafer fixes the targets of all its instances in the parent.
+finalTargetAbstract :: Assertion
+finalTargetAbstract = do
+    dir <- testDir "FinalTarget-abstract"
+    let abstract' clafer' scenario = replace' "abstract engine" "abstract finaltarget engine" $ finalTargetModel clafer' scenario
         replace' old new s = unlines [ if l == "  " ++ old ++ " -> E" then "  " ++ new ++ " -> E" else l | l <- lines s ]
-    hasTrace dir 2 (abstract' ["h : engine 2"] swap) >>= (@? "finaltarget engine: the instances of h swap their targets")
-    hasTrace dir 2 (abstract' ["h : engine"] replace) >>= (@? "finaltarget engine: a new h points to an old target") . not
+    hasTrace dir 2 (abstract' ["h : engine 2"] finalTargetSwap) >>= (@? "finaltarget engine: the instances of h swap their targets")
+    hasTrace dir 2 (abstract' ["h : engine"] finalTargetReplace) >>= (@? "finaltarget engine: a new h points to an old target") . not
 
 -- | A scenario that contradicts the model has an unsat core with the scenario and the transition
 --   it contradicts.
 case_DynamicModelUnsatCore :: Assertion
 case_DynamicModelUnsatCore = do
-        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
-        createDirectoryIfMissing True dir
+        dir <- testDir "DynamicModelUnsatCore"
         writeFile (dir </> "contradiction.cfr") $ trafficLight ++ "    [ initially (green --> red) ]\n"
         result <- getModel $ dir </> "contradiction.cfr"
         case fromRight result of
@@ -427,8 +447,7 @@ case_DynamicModelUnsatCore = do
 --   in the clafers that do not change over time.
 case_DynamicModelForkAndConfiguration :: Assertion
 case_DynamicModelForkAndConfiguration = do
-        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
-        createDirectoryIfMissing True dir
+        dir <- testDir "DynamicModelForkAndConfiguration"
         writeFile (dir </> "fork.cfr") trafficLight
         forked <- runClaferIGT (defaultIGArgs $ dir </> "fork.cfr") $ do
             solve
@@ -455,8 +474,7 @@ case_DynamicModelForkAndConfiguration = do
 -- | A static model gives an instance with another structure, regardless of the values.
 case_StaticModelConfiguration :: Assertion
 case_StaticModelConfiguration = do
-        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
-        createDirectoryIfMissing True dir
+        dir <- testDir "StaticModelConfiguration"
         writeFile (dir </> "static.cfr") $ unlines
             [ "EU ?"
             , "age -> integer"
@@ -472,8 +490,7 @@ case_StaticModelConfiguration = do
 -- | The traces given by next are distinct, and limited by the maximum trace length.
 case_DynamicModelTraces :: Assertion
 case_DynamicModelTraces = do
-        dir <- (</> "claferIG-test-dynamic") <$> getTemporaryDirectory
-        createDirectoryIfMissing True dir
+        dir <- testDir "DynamicModelTraces"
         writeFile (dir </> "light.cfr") trafficLight
         result <- runClaferIGT (defaultIGArgs $ dir </> "light.cfr") $ do
             setMaxTraceLength 3
@@ -515,8 +532,7 @@ case_strMapCheck = do
 -- imported file names it.
 case_Imports :: Assertion
 case_Imports = do
-        dir <- (</> "claferIG-test-imports") <$> getTemporaryDirectory
-        createDirectoryIfMissing True dir
+        dir <- testDir "Imports"
         writeFile (dir </> "lib.cfr") "abstract Lib\n    x : integer\n    [ x = 3 ]\n"
         writeFile (dir </> "model.cfr") "//# OPTIONS --import=lib.cfr\nA : Lib\n"
         instance' <- getModel $ dir </> "model.cfr"
@@ -530,8 +546,7 @@ case_Imports = do
 -- The constraints of an unsatisfiable core name the files that they are in.
 case_ImportsUnsatCore :: Assertion
 case_ImportsUnsatCore = do
-        dir <- (</> "claferIG-test-imports") <$> getTemporaryDirectory
-        createDirectoryIfMissing True dir
+        dir <- testDir "ImportsUnsatCore"
         writeFile (dir </> "lib2.cfr") "B\n    y : integer\n    [ y > 2 ]\n"
         writeFile (dir </> "unsat.cfr") "//# OPTIONS --import=lib2.cfr\n[ B.y < 2 ]\n"
         result <- getModel $ dir </> "unsat.cfr"
@@ -546,8 +561,7 @@ case_ImportsUnsatCore = do
 -- position in the model (#46).
 case_AbstractClaferUnsatCore :: Assertion
 case_AbstractClaferUnsatCore = do
-        dir <- (</> "claferIG-test-abstract-core") <$> getTemporaryDirectory
-        createDirectoryIfMissing True dir
+        dir <- testDir "AbstractClaferUnsatCore"
         writeFile (dir </> "engine.cfr") $ unlines
             [ "abstract Engine"
             , "    power -> integer"
@@ -596,8 +610,7 @@ case_AbstractClaferUnsatCore = do
 -- clafer's declaration names the clafer.
 case_LineNumMapFirstClafer :: Assertion
 case_LineNumMapFirstClafer = do
-        dir <- (</> "claferIG-test-imports") <$> getTemporaryDirectory
-        createDirectoryIfMissing True dir
+        dir <- testDir "LineNumMapFirstClafer"
         writeFile (dir </> "lines.cfr") "B\n    y : integer\n    [ y > 2 ]\nC\n"
         result <- runClaferIGT (defaultIGArgs $ dir </> "lines.cfr") getlineNumMap
         case result of

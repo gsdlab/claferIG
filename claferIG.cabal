@@ -127,4 +127,5 @@ Test-Suite model-tests
                       , tasty-th >= 0.1.3
                       , clafer == 0.5.7
                       , claferIG == 0.5.7
-    ghc-options:        -Wall -fno-warn-orphans
+    -- the tests run in parallel, on all cores
+    ghc-options:        -Wall -fno-warn-orphans -threaded -rtsopts "-with-rtsopts=-N"

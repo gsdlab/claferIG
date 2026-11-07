@@ -11,6 +11,7 @@ Minor release with Clafer 0.5.7.
 * An abstract clafer that no concrete clafer inherits from, and the clafers in it, have no instances: their scopes stay 0 when the scopes are raised, with `i`, `i <clafer>`, `s <clafer> <number>`, a `.cfr-scope` file or a reload, and `i <clafer>` and `s <clafer> <number>` say so. Raising them gave Alloy atoms of such clafers, which made a model, e.g., the power window with abstract variants of its controller, take minutes instead of seconds.
 * Ending a session no longer prints a `NoSuchFileException` when Alloy removes its own temporary files while claferIG removes the session's folder.
 * The model tests check the scopes of the patterns `must follow ... between` and `must precede ... after`, and that `finaltarget` lets the instances of a clafer swap their targets, while `finalref` and `final` do not ([kbak/clafer-semantics#127](https://github.com/kbak/clafer-semantics/issues/127)).
+* The model tests run in parallel, on all cores, each in a folder of its own (two tests wrote different `lib.cfr` files into one folder); the lifetimes, pattern scope and `finaltarget` tests are split into one test for each case. `make test` takes about 30 seconds instead of 2 minutes.
 * The model tests check the lifetimes of obligations, the identities in a scope and the parent of a reappearing instance, with both scope strategies, at the scopes 1 to 3 and up to 3 and 10 states, and that the scopes of abstract clafers without instances stay 0.
 
 ##### ClaferIG Version 0.5.6, Nov 1, 2026
