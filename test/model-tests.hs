@@ -27,6 +27,7 @@ import Language.Clafer.IG.ClaferIG
 import Language.Clafer.IG.ClaferModel
 import Language.Clafer.IG.CommandLine
 import Language.Clafer.IG.SolutionView
+import Control.Concurrent (threadDelay)
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.List (isInfixOf, isPrefixOf, isSuffixOf)
@@ -470,6 +471,46 @@ case_DynamicModelForkAndConfiguration = do
             [Instance (ClaferTrace (state : _) _) _, Instance (ClaferTrace (state' : _) _) _, NoInstance] ->
                 (("EU" `isInfixOf` show state) /= ("EU" `isInfixOf` show state')) @? "The configurations differ in EU"
             _ -> assertFailure "Two configurations"
+
+-- | Only the first solve logs the translation of the model, to a file kodkod<n>.log in the session's
+--   folder, which Kodkod's prover needs for the unsat core of a model without instances. The next
+--   trace, a fork and another configuration give no core, so they log nothing. Each of them logged
+--   the translation too, which for a large model took gigabytes of the folder, e.g., 11 GB in 3
+--   minutes for the next traces of the TLS handshake model.
+--   When the session ends, its folder is removed. Alloy removes its own files in it at the same
+--   time, and the removal stopped at the first file that was gone, with a NoSuchFileException; the
+--   test cannot make that happen, it only checks that the folder is gone.
+case_SessionTmpdir :: Assertion
+case_SessionTmpdir = do
+        dir <- testDir "SessionTmpdir"
+        writeFile (dir </> "light.cfr") trafficLight
+        result <- runClaferIGT (defaultIGArgs $ dir </> "light.cfr") $ do
+            tmpdir <- getSessionTmpdir
+            setMaxTraceLength 3
+            -- the first trace, of the first solve, which solve only starts
+            solve
+            _ <- next
+            first <- liftIO $ translationLogs tmpdir
+            others <- sequence [next, fork 1, nextConfiguration]
+            after <- liftIO $ translationLogs tmpdir
+            quit
+            return (tmpdir, first, others, after)
+        let (tmpdir, first, others, after) = fromRight result
+        not (null first) @? "The first solve logs the translation"
+        [ isInstance o | o <- others ] == [True, True, False] @? ("A next trace and a fork; the traffic light has one configuration: " ++ show [ isInstance o | o <- others ])
+        null (filter (`notElem` first) after) @? ("The next trace, the fork and the configuration log no translation: " ++ show (filter (`notElem` first) after))
+        removed <- gone tmpdir (100 :: Int)
+        removed @? ("The session's folder is removed when the session ends: " ++ tmpdir)
+    where
+    isInstance Instance{} = True
+    isInstance _ = False
+    translationLogs tmpdir = filter (\f -> "kodkod" `isPrefixOf` f && ".log" `isSuffixOf` f) <$> listDirectory tmpdir
+    -- alloyIG removes the folder when its JVM exits, after the quit command
+    gone tmpdir tries = do
+        exists <- doesDirectoryExist tmpdir
+        if not exists then return True
+        else if tries <= 0 then return False
+        else threadDelay 100000 >> gone tmpdir (tries - 1)
 
 -- | A static model gives an instance with another structure, regardless of the values.
 case_StaticModelConfiguration :: Assertion

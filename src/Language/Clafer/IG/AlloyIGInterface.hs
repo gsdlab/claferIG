@@ -42,7 +42,8 @@ import System.Info (os)
 
 -- | An interface to the Alloy Analyzer
 
-newtype AlloyIGT m a = AlloyIGT (StateT (Maybe AlloyIGEnv) (ReaderT Process m) a) deriving (Applicative, Functor, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
+-- | The process of alloyIG and the folder of its temporary files
+newtype AlloyIGT m a = AlloyIGT (StateT (Maybe AlloyIGEnv) (ReaderT (Process, FilePath) m) a) deriving (Applicative, Functor, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
 
 instance MonadTrans AlloyIGT where
     lift = AlloyIGT . lift . lift
@@ -57,7 +58,11 @@ set :: Monad m => AlloyIGEnv -> AlloyIGT m ()
 set = AlloyIGT . put . Just
 
 proc :: Monad m => AlloyIGT m Process
-proc = AlloyIGT ask
+proc = AlloyIGT $ asks fst
+
+-- | The folder of the temporary files of the session, which alloyIG removes when it exits
+sessionTmpdir :: Monad m => AlloyIGT m FilePath
+sessionTmpdir = AlloyIGT $ asks snd
 
 -- | Instance generator's environment
 data AlloyIGEnv = AlloyIGEnv {alloyModel::String, sigMap::Map String Sig, scopes::Map String Integer, globalScope::Integer}
@@ -95,7 +100,7 @@ runAlloyIGT run =
         proce     <- liftIO $ pipeProcess "java" (["--enable-native-access=ALL-UNNAMED"] ++ proverArg ++ tmpdirArgs ++ ["-jar", execPath ++ "alloyIG.jar"])
                         (("TMPDIR", tmpdir) : Prelude.filter ((/= "TMPDIR") . fst) environment)
 
-        runReaderT (evalStateT (unwrap run) Nothing) proce
+        runReaderT (evalStateT (unwrap run) Nothing) (proce, tmpdir)
     where
     unwrap (AlloyIGT a) = a
 

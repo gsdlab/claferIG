@@ -13,6 +13,7 @@ Minor release with Clafer 0.5.7.
 * The model tests check the scopes of the patterns `must follow ... between` and `must precede ... after`, and that `finaltarget` lets the instances of a clafer swap their targets, while `finalref` and `final` do not ([kbak/clafer-semantics#127](https://github.com/kbak/clafer-semantics/issues/127)).
 * The model tests run in parallel, on all cores, each in a folder of its own (two tests wrote different `lib.cfr` files into one folder); the lifetimes, pattern scope and `finaltarget` tests are split into one test for each case. `make test` takes about 30 seconds instead of 2 minutes.
 * The model tests check the lifetimes of obligations, the identities in a scope and the parent of a reappearing instance, with both scope strategies, at the scopes 1 to 3 and up to 3 and 10 states, and that the scopes of abstract clafers without instances stay 0.
+* The model test `SessionTmpdir` checks that only the first solve logs the translation of the model, not the next trace, a fork or another configuration, and that the session's folder is removed when the session ends.
 
 ##### ClaferIG Version 0.5.6, Nov 1, 2026
 

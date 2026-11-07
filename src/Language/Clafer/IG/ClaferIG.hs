@@ -39,6 +39,7 @@ module Language.Clafer.IG.ClaferIG (
     Counterexample(..),
     runClaferIGT,
     getAlloyModel,
+    getSessionTmpdir,
     solve,
     getClafers,
     getGlobalScope,
@@ -307,6 +308,10 @@ strictReadFile filePath =
 
 getAlloyModel :: MonadIO m => ClaferIGT m String
 getAlloyModel = ClaferIGT $ lift AlloyIG.getAlloyModel
+
+-- | The folder of the temporary files of Alloy in this session, which alloyIG removes when it exits
+getSessionTmpdir :: MonadIO m => ClaferIGT m FilePath
+getSessionTmpdir = ClaferIGT $ lift AlloyIG.sessionTmpdir
 
 
 solve :: MonadIO m => ClaferIGT m ()
