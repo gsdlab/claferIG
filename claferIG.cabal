@@ -58,7 +58,6 @@ library
     build-depends:      array >= 0.5.0.0
                       , process >= 1.2.0.0
                       , parsec >= 3.1.5
-                      , data-stringmap >= 1.0.1.1
                       , exceptions >= 0.10
                       , json-builder >= 0.3
                       , string-conversions >= 0.3.0.3
