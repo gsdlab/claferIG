@@ -5,6 +5,7 @@ Minor release with Clafer 0.5.8.
 * Builds with GHC 9.12.4 (Stackage nightly-2026-11-11) and still with GHC 9.6.7.
 * The model tests run on 8 cores (`+RTS -N8`): with GHC 9.12, the test suite hung on 16 or more cores, in the parallel garbage collector. They take about 30 seconds, as on all cores before.
 * No longer depends on `data-stringmap`: the scopes are a `Data.Map` map.
+* No longer depends on `json-builder`, which is not maintained and does not build from Hackage with GHC 8.4 or later: the JSON instances (`--json`) are written with `aeson`'s encoding, field by field in the same order. The instances of the positive test models are the same.
 
 ##### ClaferIG Version 0.5.7, Nov 8, 2026
 
