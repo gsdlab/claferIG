@@ -55,7 +55,7 @@ Stack is the only requirement: no other Haskell tooling needs to be installed be
 
 Dependencies
 
-* [GHC](https://www.haskell.org/downloads) >= 9.6.7 is required,
+* [GHC](https://www.haskell.org/downloads) 9.6.7 or 9.12.4 is required,
 * `cabal-install` >= 3.10.3, should be installed together with a GHC distribution,
 
 1. Install GHC
