@@ -16,7 +16,7 @@ For more information, see [technical report](http://gsd.uwaterloo.ca/node/462).
 
 ## Getting the Clafer Instance Generator
 
-Clafer can be installed from a binary distribution (preferred), from Hackage, and from the source code.
+ClaferIG can be installed from a binary distribution (preferred), from Hackage, and from the source code.
 
 ### Dependencies for running
 
@@ -76,9 +76,9 @@ This release is tested with the snapshot `nightly-2026-11-11`:
 Dependencies
 
 * [`stack`](https://haskellstack.org)
-* [Clafer compiler](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`)).
-* On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
-  * on Ubuntu, execute `sudo apt-get install zlib1g-dev libncurses5-dev`
+* the source code of the [Clafer compiler](https://github.com/gsdlab/clafer) in a sibling directory `clafer` (`stack.yaml` builds it from `../clafer`)
+* On Linux, the development files of `gmp`, `ncurses` and `zlib`, needed to build ClaferIG and its dependencies
+  * on Ubuntu, execute `sudo apt install libgmp-dev libncurses-dev zlib1g-dev`
 
 On Windows
 
@@ -99,8 +99,8 @@ Development versions from branches `develop` should work well together but this 
 
 ### Building
 
-1. install the [Clafer compiler](https://github.com/gsdlab/clafer)
-2. in some `<source directory>`, execute `git clone https://github.com/gsdlab/claferIG.git`
+1. in some `<source directory>`, execute `git clone https://github.com/gsdlab/clafer.git` (check out the same branch as ClaferIG)
+2. in the same `<source directory>`, execute `git clone https://github.com/gsdlab/claferIG.git`
 3. in `<source directory>/claferIG`, execute `stack setup`. This will install all dependencies, build tools, and MSYS2 (on Windows).
 4. `cd <source directory>/claferIG`
   * `make`
