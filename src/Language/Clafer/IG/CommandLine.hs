@@ -47,7 +47,6 @@ import Data.IORef
 import Data.List
 import Data.Monoid
 import Data.Foldable hiding (mapM_, maximum, find, elem, notElem, foldr, any, concat)
-import qualified Data.StringMap as SMap
 import qualified Data.Map as Map
 import Data.Maybe
 import System.Console.Haskeline
@@ -648,8 +647,8 @@ mergeScopes oldScopes newScopes = do
 pickLargerScope :: [(String, Integer)] -> (String, Integer) -> (String, Integer)
 pickLargerScope    oldScopes              (uid', val)        =
     let
-        oldScopesMap = SMap.fromList oldScopes
-        oldVal = SMap.findWithDefault val uid' oldScopesMap
+        oldScopesMap = Map.fromList oldScopes
+        oldVal = Map.findWithDefault val uid' oldScopesMap
     in (uid', max val oldVal)
 
 -- | bitwidth required to store the given integer

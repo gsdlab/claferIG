@@ -1,6 +1,6 @@
 # Clafer Instance Generator
 
-##### v0.5.7
+##### v0.5.8
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model.
 
@@ -16,66 +16,69 @@ For more information, see [technical report](http://gsd.uwaterloo.ca/node/462).
 
 ## Getting the Clafer Instance Generator
 
-Clafer can be installed from a binary distribution (preferred), from Hackage, and from the source code.
+ClaferIG can be installed from a binary distribution (preferred), from Hackage, and from the source code.
 
 ### Dependencies for running
 
 Regardless of the installation method, the following are required:
 
-* [Clafer](https://github.com/gsdlab/clafer) v0.5.7
-* [Java Platform (JDK)](https://adoptium.net) v17+, 64bit
-* [Alloy 6.2.0](https://github.com/AlloyTools/org.alloytools.alloy/releases/tag/v6.2.0) (`alloy6.2.0.jar`)
-  * it includes the MiniSat solver with UnSAT cores for Linux and macOS; on Windows, ClaferIG generates instances but cannot compute UnSAT cores and near-miss instances
-  * the MiniSat build in Alloy 6.2.0 is several times slower than the one in Alloy 4.2 because it is compiled without optimization ([AlloyTools/org.alloytools.alloy#352](https://github.com/AlloyTools/org.alloytools.alloy/issues/352)); ClaferIG uses `lib/libminisatprover.so` (`.dylib` on macOS) next to its executable instead, if present. `make` builds it from source.
+* [Java](https://adoptium.net) 17 or newer, 64-bit (a runtime is enough)
+* `alloyIG.jar` (in this repository) and [Alloy 6.2.0](https://github.com/AlloyTools/org.alloytools.alloy/releases/tag/v6.2.0) (`alloy6.2.0.jar`), in the directory of the `claferIG` executable
+  * Alloy includes the MiniSat solver with UnSAT cores for Linux and macOS; on Windows, ClaferIG generates instances but cannot compute UnSAT cores and near-miss instances
+  * the MiniSat build in Alloy 6.2.0 is several times slower than the one in Alloy 4.2 because it is compiled without optimization ([AlloyTools/org.alloytools.alloy#352](https://github.com/AlloyTools/org.alloytools.alloy/issues/352)); ClaferIG uses `lib/libminisatprover.so` (`.dylib` on macOS) in the directory of its executable instead, if present. `make` builds it from source.
+
+The Clafer compiler is part of `claferIG`: the executable `clafer` is not needed.
+
+ClaferIG looks for the jars and `lib/` in the directory of its executable, after following symbolic links: put them next to the file itself, not next to a link to it.
 
 ### Installation from binaries
 
-Binary distributions of the release 0.5.4 of Clafer Tools for Windows, Mac, and Linux,
-can be downloaded from [Clafer Tools - Binary Distributions](http://wiselab.uwaterloo.ca/clafer-tools-binary-distributions).
+Binary distributions of Clafer Tools (`clafer`, `claferIG`, and `chocosolver` with the jars they need; Linux x86-64 for the recent releases)
+can be downloaded from [Clafer Tools - Binary Distributions](https://wiselab.uwaterloo.ca/clafer-tools-binary-distributions/).
+They include `alloyIG.jar`, `alloy6.2.0.jar`, and the optimized `lib/libminisatprover.so`.
 
-1. download the binaries and unpack `<target directory>` of your choice,
-2. add the `<target directory>` to your system path so that the executables can be found.
+1. Download the binaries and unpack them into a `<target directory>` of your choice.
+2. Add the `<target directory>` to your system path so that the executables can be found.
 
-### Installation From Hackage
+### Installation from Hackage
 
-Clafer is now available on [Hackage](http://hackage.haskell.org/package/claferIG-0.5.4/) and it can be installed using either [`stack`](https://github.com/commercialhaskell/stack) or [`cabal-install`](https://hackage.haskell.org/package/cabal-install).
-
-#### Installation using `stack`
-
-Stack is the only requirement: no other Haskell tooling needs to be installed because stack will automatically install the needed Haskell build tools.
-
-1. [install `stack`](https://github.com/commercialhaskell/stack#how-to-install)
-2. Execute
-  * `stack install claferIG`
-  * ``` cd `stack --local-bin-path` ```
-  * `curl -fsSL -o alloy6.2.0.jar https://github.com/AlloyTools/org.alloytools.alloy/releases/download/v6.2.0/org.alloytools.alloy.dist.jar`
-  * `curl -fsSL -O https://github.com/gsdlab/claferIG/raw/master/alloyIG.jar`
+ClaferIG is available on [Hackage](https://hackage.haskell.org/package/claferIG) and it can be installed using either [`cabal-install`](https://hackage.haskell.org/package/cabal-install) or [`stack`](https://haskellstack.org).
+Either way, the jars are installed separately, into the directory of the executable.
 
 #### Installation using `cabal-install`
 
 Dependencies
 
-* [GHC](https://www.haskell.org/downloads) >= 9.6.7 is required,
-* `cabal-install` >= 3.10.3, should be installed together with a GHC distribution,
+* `ghc-9.6.7` or `ghc-9.12.4`
+* `cabal-install-3.10.3` or newer
 
-1. Install GHC
+1. Use [`ghcup`](https://www.haskell.org/ghcup/) to install `ghc` and `cabal`
 2. `cabal update`
-3. `cabal install claferIG`
-4. `cd <cabal's lib or share folder>`  (`C:\Users\<user>\AppData\Roaming\cabal\x86_64-windows-ghc-9.6.7\claferIG-0.5.4` on Windows or `.cabal/share/x86_64-linux-ghc-9.6.7/claferIG-0.5.4/` on Linux)
-5. to automatically download alloy6.2.0.jar
-  * execute `make alloy6.2.0.jar`
-6. copy the following into the Cabal's `bin` folder
-  * the file `alloyIG.jar`
-  * the file `alloy6.2.0.jar`
+3. `cabal install claferIG --install-method=copy --installdir=<target directory>`
+4. In the `<target directory>`, execute
+   * `curl -fsSL -o alloy6.2.0.jar https://github.com/AlloyTools/org.alloytools.alloy/releases/download/v6.2.0/org.alloytools.alloy.dist.jar`
+   * `curl -fsSL -O https://github.com/gsdlab/claferIG/raw/master/alloyIG.jar`
+5. Add the `<target directory>` to your system path.
+
+`--install-method=copy` is needed: by default, `cabal install` puts a symbolic link into its `bin` directory, and ClaferIG would look for the jars in cabal's package store, where the link points.
+
+#### Installation using `stack`
+
+ClaferIG is not part of Stackage snapshots, so give the versions of both packages; their dependencies come from the snapshot.
+This release is tested with the snapshot `nightly-2026-11-11`:
+
+1. [Install `stack`](https://docs.haskellstack.org/en/stable/install_and_upgrade/)
+2. `stack install claferIG-0.5.8 clafer-0.5.8 --resolver nightly-2026-11-11`
+3. In `~/.local/bin` (``stack path --local-bin``), where the executable is copied, download the jars as in step 4 above.
 
 ### Installation from the source code
 
 Dependencies
 
-* [GHC](https://www.haskell.org/downloads) >= v8.4.4
-* [Clafer compiler](https://github.com/gsdlab/clafer) (to produce Alloy models (`.als`)).
-* On Linux, might need to manually install `zlib1g-dev` and `libncurses5-dev` to build one of Haskell packages on which ClaferIG depends
-  * on Ubuntu, execute `sudo apt-get install zlib1g-dev libncurses5-dev`
+* [`stack`](https://haskellstack.org)
+* the source code of the [Clafer compiler](https://github.com/gsdlab/clafer) in a sibling directory `clafer` (`stack.yaml` builds it from `../clafer`)
+* On Linux, the development files of `gmp`, `ncurses` and `zlib`, needed to build ClaferIG and its dependencies
+  * on Ubuntu, execute `sudo apt install libgmp-dev libncurses-dev zlib1g-dev`
 
 On Windows
 
@@ -96,8 +99,8 @@ Development versions from branches `develop` should work well together but this 
 
 ### Building
 
-1. install the [Clafer compiler](https://github.com/gsdlab/clafer)
-2. in some `<source directory>`, execute `git clone git://github.com/gsdlab/claferIG.git`
+1. in some `<source directory>`, execute `git clone https://github.com/gsdlab/clafer.git` (check out the same branch as ClaferIG)
+2. in the same `<source directory>`, execute `git clone https://github.com/gsdlab/claferIG.git`
 3. in `<source directory>/claferIG`, execute `stack setup`. This will install all dependencies, build tools, and MSYS2 (on Windows).
 4. `cd <source directory>/claferIG`
   * `make`
@@ -126,7 +129,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG 0.5.7
+ClaferIG 0.5.8
 
 claferig [OPTIONS] FILE
 
@@ -333,7 +336,7 @@ In a static model, the diff view shows the first instance with `+` on each line,
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
 ```
-ClaferIG v0.5.7
+ClaferIG v0.5.8
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands
