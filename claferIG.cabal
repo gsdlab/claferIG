@@ -19,7 +19,7 @@ data-files:             README.md
 extra-doc-files:        CHANGES.md
 source-repository head
     type:               git
-    location:           git://github.com/gsdlab/claferIG.git
+    location:           https://github.com/gsdlab/claferIG.git
 
 flag model-tests
     description:        Build the model-tests test suite, which generates instances of the models in
