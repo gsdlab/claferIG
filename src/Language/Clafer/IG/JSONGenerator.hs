@@ -19,6 +19,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE.
 -}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.Clafer.IG.JSONGenerator (generateJSON) where
 
@@ -26,14 +27,18 @@ import Language.Clafer.Common
 import Language.Clafer.Intermediate.Intclafer
 import qualified Language.Clafer.IG.ClaferModel as M
 import Data.Maybe (fromJust)
-import Data.Json.Builder
+import Data.Aeson ((.=))
+import Data.Aeson.Encoding (Series, encodingToLazyByteString, list, pair, pairs)
 import Data.String.Conversions
 import Prelude hiding (id)
+
+-- | A JSON object, whose fields keep their order
+type Object = Series
 
 -- | Generate a representation of the instance in JSON format
 generateJSON :: UIDIClaferMap -> M.ClaferModel                  -> String
 generateJSON    uidIClaferMap'   (M.ClaferModel topLevelClafers) =
-    convertString $ toJsonBS $ constructElements $ map (printClafer uidIClaferMap') topLevelClafers
+    convertString $ encodingToLazyByteString $ pairs $ constructElements $ map (printClafer uidIClaferMap') topLevelClafers
 
 printClafer :: UIDIClaferMap -> M.Clafer                           -> Object
 printClafer    uidIClaferMap'      (M.Clafer id _ value children) =
@@ -45,8 +50,9 @@ printClafer    uidIClaferMap'      (M.Clafer id _ value children) =
 
         super' = getSuper iclafer
         reference' = getReference iclafer
-        (Just (cardMin, _)) = _card iclafer
-        (Just (_, cardMax)) = _card iclafer
+        (cardMin, cardMax) = case _card iclafer of
+            Just card' -> card'
+            Nothing    -> error $ "Function printClafer from JSONGenerator expects the cardinality of " ++ uid' -- Should never happen, the compiler sets every cardinality
         basicClaferObject = makeBasicClaferObject ident' uid' super' reference' cardMin cardMax
 
         addValue :: Maybe M.Value         -> Object -> Object
@@ -62,27 +68,27 @@ printClafer    uidIClaferMap'      (M.Clafer id _ value children) =
 
 makeBasicClaferObject :: String -> String -> [String] -> [String] -> Integer -> Integer -> Object
 makeBasicClaferObject    ident'    uid'      super'      reference'   cardMin    cardMax  =
-    mconcat [ row "ident" ident',
-              row "uid" uid',
+    mconcat [ "ident" .= ident',
+              "uid" .= uid',
               superRow,
               refRow,
-              row "cardMin" cardMin,
-              row "cardMax" cardMax ]
+              "cardMin" .= cardMin,
+              "cardMax" .= cardMax ]
     where
         superRow = case super' of
-            [s] -> row "super" s
+            [s] -> "super" .= s
             _   -> mempty
         refRow = case reference' of
-            [r] -> row "reference" r
+            [r] -> "reference" .= r
             _   -> mempty
 
 addIntValue :: Int -> Object      -> Object
 addIntValue    value  claferObject =
-    claferObject `mappend` row "value" value
+    claferObject `mappend` ("value" .= value)
 
 addStringValue :: String -> Object      -> Object
 addStringValue    value     claferObject =
-    claferObject `mappend` row "value" value
+    claferObject `mappend` ("value" .= value)
 
 addElements :: [ Object ] -> Object      -> Object
 addElements    elements'      claferObject =
@@ -90,4 +96,4 @@ addElements    elements'      claferObject =
 
 constructElements :: [ Object ] -> Object
 constructElements    elements'    =
-    row "elements" $ mconcat $ map element elements'
+    pair "elements" $ list pairs elements'

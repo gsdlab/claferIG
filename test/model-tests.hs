@@ -47,7 +47,7 @@ import Test.Tasty.TH
 tg_modeltests :: TestTree
 tg_modeltests = $(testGroupGenerator)
 
--- | The tests run in parallel, on all cores (the executable runs with +RTS -N): each test has a
+-- | The tests run in parallel, on 8 cores (the executable runs with +RTS -N8): each test has a
 --   folder of its own, and the long ones are split into parts.
 main :: IO ()
 main = defaultMain $ testGroup "Model tests" [ tg_modeltests, lifetimes, patternScopes, finalTarget ]
