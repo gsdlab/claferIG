@@ -134,7 +134,7 @@ data IGArgs = IGArgs {
     skip_resolver_comp :: Bool,
     scope_strategy_comp :: ScopeStrategy
 
-} deriving (Show, Data, Typeable)
+} deriving (Show, Data)
 
 newtype ClaferIGT m a = ClaferIGT (StateT ClaferIGEnv (AlloyIGT m) a)
     deriving (Applicative, Functor, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
@@ -532,7 +532,7 @@ findRemovable env core constraints' =
     in  Data.List.filter (removeAbsZero absIDs ) $ map (\c -> find ((== c) . range) constraints') core
     where
         removeAbsZero :: Seq.Seq String -> Maybe Constraint -> Bool
-        removeAbsZero absIDs (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) = ((Seq.elemIndexL uID absIDs)==Nothing)
+        removeAbsZero absIDs (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) = isNothing (Seq.elemIndexL uID absIDs)
         removeAbsZero _ _ = True
         getId :: Ir -> Seq.Seq String
         getId (IRClafer (IClafer _ IClaferModifiers{_abstract=True} _ uID _ _ _ _ _ _ _)) = Seq.singleton uID

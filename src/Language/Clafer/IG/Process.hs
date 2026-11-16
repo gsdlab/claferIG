@@ -67,7 +67,7 @@ getMessage :: MonadIO m => Process -> m String
 getMessage proce =
     liftIO $ do
         len <- read `liftM` hGetLine (stdOut proce)
-        mapM hGetChar $ replicate len (stdOut proce)
+        replicateM len $ hGetChar (stdOut proce)
 
 readMessage :: (Read r, MonadIO m) => Process -> m r
 readMessage proce = read `liftM` getMessage proce
@@ -76,7 +76,7 @@ readMessage proce = read `liftM` getMessage proce
 putMessage :: MonadIO m => Process -> String -> m ()
 putMessage proce message =
     liftIO $ do
-        hPutStrLn (stdIn proce) (show $ length message)
+        hPrint (stdIn proce) (length message)
         hPutStr (stdIn proce) message
         hFlush (stdIn proce)
 

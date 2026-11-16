@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, StandaloneDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-
  Copyright (C) 2012-2017 Jimmy Liang <http://gsd.uwaterloo.ca>
@@ -162,9 +162,7 @@ sendLoadCommand alloyModel' =
         mapM_ resetScope sigs
     where
     resetScope Sig{s_name = name, s_startingScope = startingScope} =
-        case startingScope of
-            Just scope -> sendSetScopeCommand name scope >> return ()
-            Nothing    -> sendSetScopeCommand name 1 >> return ()
+        void $ sendSetScopeCommand name $ fromMaybe 1 startingScope
 
 
 -- | Get the next solution from alloyIG
@@ -194,9 +192,7 @@ getScope :: MonadIO m => String -> AlloyIGT m Integer
 getScope sig =
     do
         rscopes <- fetches scopes
-        case Map.lookup sig rscopes of
-            Just scope -> return scope
-            Nothing    -> getGlobalScope
+        maybe getGlobalScope return $ Map.lookup sig rscopes
 
 
 getScopes :: MonadIO m => AlloyIGT m [(String, Integer)]

@@ -127,7 +127,7 @@ buildFamilyTree (Solution sigs fields) =
     buildFields fields
     where
     asNodes :: Sig -> [Node]
-    asNodes Sig{s_id = id, s_atoms = atoms} = map (flip ClaferNode id) $ map (labelAsId . a_label) atoms
+    asNodes Sig{s_id = id, s_atoms = atoms} = map (flip ClaferNode id . labelAsId . a_label) atoms
     rootNodes :: [(Id, Node)]
     rootNodes = [(n_id rootNode, rootNode) | rootNode <- concatMap asNodes sigs]
 
