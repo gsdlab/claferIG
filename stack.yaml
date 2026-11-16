@@ -1,5 +1,5 @@
 # for GHC-9.12.4
-resolver: nightly-2026-11-11
+resolver: nightly-2026-11-15
 
 flags:
   # The test suites that need the models in the repositories (and Alloy for claferIG).

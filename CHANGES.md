@@ -2,6 +2,8 @@
 
 Minor release with Clafer 0.5.9.
 
+* Builds with GHC 9.12.4 (Stackage nightly-2026-11-15) and still with GHC 9.6.7.
+
 ##### ClaferIG Version 0.5.8, Nov 15, 2026
 
 Minor release with Clafer 0.5.8.
