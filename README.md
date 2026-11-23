@@ -1,6 +1,6 @@
 # Clafer Instance Generator
 
-##### v0.5.9
+##### v0.6.0
 
 [Clafer](http://clafer.org) is a powerful (equivalent to first-order predicate logic) yet lightweight structural modeling language. Despite simplicity and conciseness of Clafer, writing correct models remains challenging due to hard-to-predict interactions among all constraints expressed in the model.
 
@@ -129,7 +129,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG 0.5.9
+ClaferIG 0.6.0
 
 claferig [OPTIONS] FILE
 
@@ -336,7 +336,7 @@ In a static model, the diff view shows the first instance with `+` on each line,
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
 ```
-ClaferIG v0.5.9
+ClaferIG v0.6.0
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands

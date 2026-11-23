@@ -1,6 +1,6 @@
-##### ClaferIG Version 0.5.9, unreleased
+##### ClaferIG Version 0.6.0, unreleased
 
-Minor release with Clafer 0.5.9.
+Minor release with Clafer 0.6.0.
 
 * Builds with GHC 9.12.4 (Stackage nightly-2026-11-15) and still with GHC 9.6.7.
 
