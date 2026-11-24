@@ -103,12 +103,8 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Data.Maybe
 import Data.Data
-import Paths_claferIG (version)
-import Data.Version (showVersion)
+import Language.Clafer.IG.Version (claferIGVersion)
 import Prelude
-
-claferIGVersion :: String
-claferIGVersion = "ClaferIG " ++ showVersion Paths_claferIG.version
 
 data IGArgs = IGArgs {
     all :: Maybe Integer,

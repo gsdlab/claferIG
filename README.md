@@ -129,7 +129,7 @@ Clafer Instance Generator can be used in interactive and batch modes, as well as
 (As printed by `claferIG --help`)
 
 ```
-ClaferIG 0.6.0
+ClaferIG v0.6.0.2026-11-29
 
 claferig [OPTIONS] FILE
 
@@ -336,7 +336,9 @@ In a static model, the diff view shows the first instance with `+` on each line,
 In the interactive mode, the users can invoke the following commands by pressing a letter marked in  the command name between '' or the whole command as marked by '':
 
 ```
-ClaferIG v0.6.0
+------------------------------
+| ClaferIG v0.6.0.2026-11-29 |
+------------------------------
 
 You can invoke the following commands as indicated by single quotes:
 [tab]              - print the available commands

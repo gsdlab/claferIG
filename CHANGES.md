@@ -2,6 +2,8 @@
 
 Minor release with Clafer 0.6.0.
 
+* `claferIG --version` and the help of the interactive mode print the build date, as clafer and chocosolver do: `ClaferIG v0.6.0.2026-11-29`. It is the day of the build, or of `SOURCE_DATE_EPOCH` when it is set (`Language.Clafer.IG.Version`). The unused generator `src/dateVer.hs` is removed.
+
 * Builds with GHC 9.12.4 (Stackage nightly-2026-11-15) and still with GHC 9.6.7.
 
 ##### ClaferIG Version 0.5.8, Nov 15, 2026

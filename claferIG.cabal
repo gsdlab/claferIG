@@ -78,6 +78,7 @@ library
                       , Language.Clafer.IG.Solution
                       , Language.Clafer.IG.SolutionView
                       , Language.Clafer.IG.Sugarer
+                      , Language.Clafer.IG.Version
     other-modules:      Paths_claferIG
     autogen-modules:    Paths_claferIG
 Test-Suite test-suite
