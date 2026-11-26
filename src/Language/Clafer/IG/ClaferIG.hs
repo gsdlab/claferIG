@@ -225,14 +225,14 @@ load                 igArgs    =
             -- the integer range of the options (--maxint, --minint) raises the bitwidth
             bitwidth' = maximum $ bitwidth igArgs : map requiredBitwidth (catMaybes [maxint claferArgs', (\n -> -n - 1) <$> minint claferArgs'])
 
-        (claferEnv', alloyModel, mapping, sMap, dynamic) <- ExceptT $ return $ mapLeft (inFiles modelFiles') $ callClaferTranslator claferArgs' claferModel
+        (claferEnv', alloyModel, mapping, sMap, dynamic, core) <- ExceptT $ return $ mapLeft (inFiles modelFiles') $ callClaferTranslator claferArgs' claferModel
 
         let
             (ir0, genv', _) = fromJust $ cIr claferEnv'
             -- the clafers by their Alloy names, as in the Alloy model
             names = alloyNames ir0
             ir = toAlloyNames names ir0
-        let constraints = parseConstraints modelFiles' ir mapping
+        let constraints = parseConstraints modelFiles' ir core mapping
 
         lift $ AlloyIG.sendLoadCommand alloyModel
         lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
@@ -272,7 +272,7 @@ load                 igArgs    =
                     throwErr (ClaferErr reason' :: ClaferSErr)
                 -- a dynamic model compiles to a temporal Alloy model (tmp.als)
                 (Just alloyResult) ->
-                    return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult, extension alloyResult == "tmp.als")
+                    return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult, extension alloyResult == "tmp.als", alloyModule alloyResult)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
     -- the options given to claferIG take precedence over the files' options

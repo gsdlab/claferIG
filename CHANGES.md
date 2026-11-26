@@ -4,6 +4,8 @@ Minor release with Clafer 0.6.0.
 
 * `claferIG --version` and the help of the interactive mode print the build date, as clafer and chocosolver do: `ClaferIG v0.6.0.2026-11-29`. It is the day of the build, or of `SOURCE_DATE_EPOCH` when it is set (`Language.Clafer.IG.Version`). The unused generator `src/dateVer.hs` is removed.
 
+* Unsat cores show the constraints of `initial` with their clafers, e.g., `initial xor on -->> off ... (tmp_TrafficLight1.cfr:4:9)`, and `c` marks their lines. They showed another expression of the model, e.g., `off (tmp_TrafficLight1.cfr:4:29)`, because their pids were empty; claferIG now also looks the pids up in the core that the Alloy model comes from. They are what clafersg shows for the same models.
+
 * Builds with GHC 9.12.4 (Stackage nightly-2026-11-15) and still with GHC 9.6.7.
 
 ##### ClaferIG Version 0.5.8, Nov 15, 2026
