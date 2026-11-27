@@ -1,4 +1,4 @@
-##### ClaferIG Version 0.6.0, unreleased
+##### ClaferIG Version 0.6.0, Nov 29, 2026
 
 Minor release with Clafer 0.6.0.
 
