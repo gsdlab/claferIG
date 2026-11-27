@@ -177,10 +177,11 @@ runCommandLine =
 
     loop Help context =
         do
+            let rule = replicate (length claferIGVersion + 4) '-'
             outputStrLn (
-                "------------------\n" ++
+                rule ++ "\n" ++
                 "| " ++ claferIGVersion ++ " |\n" ++
-                "------------------\n\n" ++
+                rule ++ "\n\n" ++
                 "You can invoke the following commands as indicated by single quotes:\n" ++
                 "[tab]              - print the available commands\n" ++
                 "                   - auto-complete command name, a clafer name, or clafer instance name in a given context\n" ++
@@ -728,13 +729,13 @@ autoComplete _ _ No_Auto = return []
 autoCompleteDetect :: E.ParseError -> AutoComplete
 autoCompleteDetect error'
     -- An unexpected message means that parsing failed before eof
-    | any (not . null) unexpectedMessages = No_Auto
-    | any (== "command") expectedMessages = Auto_Command
-    | any (== "clafer") expectedMessages = Auto_Clafer
-    | any (== "claferInstance") expectedMessages = Auto_ClaferInstance
-    | any (== "Unsat core minimization level") expectedMessages = Auto_UnsatCoreMinimization
-    | any (== "digit") expectedMessages = Auto_Digit
-    | any (== "space") expectedMessages = Auto_Space
+    | not (Prelude.all null unexpectedMessages) = No_Auto
+    | "command" `elem` expectedMessages = Auto_Command
+    | "clafer" `elem` expectedMessages = Auto_Clafer
+    | "claferInstance" `elem` expectedMessages = Auto_ClaferInstance
+    | "Unsat core minimization level" `elem` expectedMessages = Auto_UnsatCoreMinimization
+    | "digit" `elem` expectedMessages = Auto_Digit
+    | "space" `elem` expectedMessages = Auto_Space
     | otherwise = No_Auto
     where
     messages = errorMessages error'
@@ -772,7 +773,7 @@ removeCommentsAndUnify ('/':'*':model) = removeBlock model
 removeCommentsAndUnify (c:model) = c : removeCommentsAndUnify model
 
 isEmptyLine :: String -> Bool
-isEmptyLine l = filter (`notElem` [' ', '\n', '\t', '\r']) l == []
+isEmptyLine = Prelude.all (`elem` [' ', '\n', '\t', '\r'])
 
 numberOfDigits :: Int -> Int
 numberOfDigits x = length $ show x

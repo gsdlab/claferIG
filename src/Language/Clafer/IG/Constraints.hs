@@ -95,12 +95,15 @@ lookupConstraint constraint' constraints =
         cs -> minimumBy (comparing $ to . range) cs
 
 
-parseConstraints :: [ModelFile] -> IModule -> [(Span, IrTrace)] -> [Constraint]
-parseConstraints modelFiles imodule mapping =
+-- | The constraints of the Alloy code by their regions, from the rich IR, or else from the core that
+--   the code was generated from, e.g., the constraints of the modifiers @initial@ and @final@.
+parseConstraints :: [ModelFile] -> IModule -> Maybe IModule -> [(Span, IrTrace)] -> [Constraint]
+parseConstraints modelFiles imodule core mapping =
     mapMaybe (uncurry convert) mapping
     where
     clafers = _mDecls imodule >>= subclafers
-    pexps = (mapMaybe constraint $ _mDecls imodule ++ concatMap _elements clafers) >>= subexpressions
+    pexps = expressions imodule ++ maybe [] expressions core
+    expressions m = (mapMaybe constraint $ _mDecls m ++ concatMap _elements (_mDecls m >>= subclafers)) >>= subexpressions
     convert s IrPExp{pUid} =
         Just $ UserConstraint s $ constraintInfoOf modelFiles $ findPExp pUid
     convert s LowerCard{pUid, isGroup = False} =

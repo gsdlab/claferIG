@@ -103,12 +103,8 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Data.Maybe
 import Data.Data
-import Paths_claferIG (version)
-import Data.Version (showVersion)
+import Language.Clafer.IG.Version (claferIGVersion)
 import Prelude
-
-claferIGVersion :: String
-claferIGVersion = "ClaferIG " ++ showVersion Paths_claferIG.version
 
 data IGArgs = IGArgs {
     all :: Maybe Integer,
@@ -134,7 +130,7 @@ data IGArgs = IGArgs {
     skip_resolver_comp :: Bool,
     scope_strategy_comp :: ScopeStrategy
 
-} deriving (Show, Data, Typeable)
+} deriving (Show, Data)
 
 newtype ClaferIGT m a = ClaferIGT (StateT ClaferIGEnv (AlloyIGT m) a)
     deriving (Applicative, Functor, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
@@ -229,14 +225,14 @@ load                 igArgs    =
             -- the integer range of the options (--maxint, --minint) raises the bitwidth
             bitwidth' = maximum $ bitwidth igArgs : map requiredBitwidth (catMaybes [maxint claferArgs', (\n -> -n - 1) <$> minint claferArgs'])
 
-        (claferEnv', alloyModel, mapping, sMap, dynamic) <- ExceptT $ return $ mapLeft (inFiles modelFiles') $ callClaferTranslator claferArgs' claferModel
+        (claferEnv', alloyModel, mapping, sMap, dynamic, core) <- ExceptT $ return $ mapLeft (inFiles modelFiles') $ callClaferTranslator claferArgs' claferModel
 
         let
             (ir0, genv', _) = fromJust $ cIr claferEnv'
             -- the clafers by their Alloy names, as in the Alloy model
             names = alloyNames ir0
             ir = toAlloyNames names ir0
-        let constraints = parseConstraints modelFiles' ir mapping
+        let constraints = parseConstraints modelFiles' ir core mapping
 
         lift $ AlloyIG.sendLoadCommand alloyModel
         lift $ AlloyIG.sendSetBitwidthCommand bitwidth'
@@ -252,7 +248,7 @@ load                 igArgs    =
     editMap :: Map.Map Span [Ir] -> Map.Map Integer String -- Map Line Number to Clafer Name
     editMap =
         fromList . removeConstraints . Data.List.foldr (\(num, ir) acc -> case getIClafer ir of
-            Just (IClafer _ _ _ _ uid' _ _ _ _ _ _) -> (num, uid') : acc
+            Just IClafer{_uid = uid'} -> (num, uid') : acc
             _ -> acc) [] . (Data.List.foldr (\((Span (Pos l1 _) (Pos l2 _)), irs) acc -> (zip [l1..l2] (replicate (fromIntegral $ l2 - l1 + 1) irs)) ++ acc) []) . toList
     getIClafer :: [Ir] -> Maybe IClafer
     getIClafer [] = Nothing
@@ -276,7 +272,7 @@ load                 igArgs    =
                     throwErr (ClaferErr reason' :: ClaferSErr)
                 -- a dynamic model compiles to a temporal Alloy model (tmp.als)
                 (Just alloyResult) ->
-                    return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult, extension alloyResult == "tmp.als")
+                    return (claferEnv alloyResult, outputCode alloyResult, mappingToAlloy alloyResult, stringMap alloyResult, extension alloyResult == "tmp.als", alloyModule alloyResult)
     mapLeft f (Left l) = Left $ f l
     mapLeft _ (Right r) = Right r
     -- the options given to claferIG take precedence over the files' options
@@ -532,10 +528,10 @@ findRemovable env core constraints' =
     in  Data.List.filter (removeAbsZero absIDs ) $ map (\c -> find ((== c) . range) constraints') core
     where
         removeAbsZero :: Seq.Seq String -> Maybe Constraint -> Bool
-        removeAbsZero absIDs (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) = ((Seq.elemIndexL uID absIDs)==Nothing)
+        removeAbsZero absIDs (Just (UpperCardinalityConstraint _ (ClaferInfo uID (Cardinality 0 (Just 0))))) = isNothing (Seq.elemIndexL uID absIDs)
         removeAbsZero _ _ = True
         getId :: Ir -> Seq.Seq String
-        getId (IRClafer (IClafer _ IClaferModifiers{_abstract=True} _ uID _ _ _ _ _ _ _)) = Seq.singleton uID
+        getId (IRClafer IClafer{_modifiers = IClaferModifiers{_abstract=True}, _ident = uID}) = Seq.singleton uID
         getId _ = mempty
 
 getIMod :: (IModule, GEnv, Bool) -> IModule
